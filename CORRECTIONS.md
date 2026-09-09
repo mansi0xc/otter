@@ -88,19 +88,49 @@ The fix is to fill each bidder up to `K(ask)` rather than testing the marginal p
 `K(t) = sup{y : F'(y) >= t}` includes equality by construction. `Q_Y >= M` then falls out of
 dominance for free: every eligible ask is `<= sigma0`, and `K(sigma0) = M`.
 
-## C5. Scope
+## C5. Scope and prize tracks (supersedes `idea.md` §6)
 
-Cut from the submission plan:
+`idea.md` §6 has two factual errors about the prize board, both checked against
+https://ethglobal.com/events/ethonline2026/prizes on 10 September 2026:
 
-- **1inch track.** Reimplementing settlement as SwapVM opcodes is a second full
-  implementation, not an integration.
-- **Chainlink CRE track.** Private beta; enrollment latency is not a risk worth carrying
-  with the time remaining.
-- **Live order-entry dApp.** Replace with a static results page rendered from a real
-  testnet batch's JSON output. Judges need to see a trade happen, not a wallet connector.
+- **Uniswap Foundation is $3,000, not $5,000.** The $5,000 is the total pool; the
+  Start Fresh track ("Best Uniswap Stack Contribution") is $3,000 across up to 3
+  teams at $1,000 each. The remaining $2,000 is Continuity-only, and this project
+  began during the event, so it is not eligible for it.
+- **1inch is $5,000 for Start Fresh, not $7,000.** Same split: $7,000 total,
+  $2,000 of it Continuity-only.
 
-Keep: Uniswap Foundation track, `FEEDBACK.md` + the Developer Feedback Form, the sandwich
-comparison harness, both benchmark curves, the demo video.
+`idea.md` §6 also states that the Chainlink CRE Confidential Workflows track
+"requires private-beta enrollment". **That is wrong.** The track has public
+starter templates, CLI simulation, published docs and a recorded bootcamp, and
+its qualification requirements are satisfiable without a live deployment.
+
+Submissions may select up to three partner prizes, and multiple tracks from one
+partner count as a single selection.
+
+**Selected:**
+
+- **Uniswap Foundation.** The primary track. This is the project.
+- **Chainlink — Best Confidential Workflow ($2,000, up to 2 teams).** Running the
+  solver inside a TEE handler means batch order flow is not visible to the solver
+  operator before it computes on it. It does not make welfare-optimality provable
+  — see C6 — but it addresses the confidentiality half of the trust limitation,
+  which is a coherent contribution on a paper about MEV.
+
+**Cut:**
+
+- **1inch.** Reimplementing settlement as SwapVM opcodes is a second full
+  implementation of the core contract, not an integration. Largest reachable pool,
+  wrong trade against the remaining time.
+- **The Graph.** The composable track explicitly rejects a single subgraph with no
+  composition, and the AI track needs an agent doing meaningful work. Both are a
+  forced fit.
+- **Live order-entry dApp.** Replaced with a static results page rendered from a
+  real testnet batch's JSON output. Judges need to see a trade happen, not a
+  wallet connector.
+
+**Also required, and easy to forget:** `FEEDBACK.md` plus a submitted Uniswap
+Developer Feedback Form linking to it. Winners are audited for this.
 
 ## C6. Positioning that survives Q&A
 
@@ -111,3 +141,90 @@ comparison harness, both benchmark curves, the demo video.
 - Welfare-optimality of the proposed allocation is asserted by the solver, verified only
   for feasibility, IR, budget bounds and curve conservation on-chain.
 - The pivot algorithm is extracted from the paper's Lemma 16, not original to this work.
+
+## C7. Theorem 12(c) is implied by the 12(b) bounds
+
+Not a correction to `idea.md` — a finding from implementing the on-chain checks.
+
+The burn constraint `sum x*_i <= F~(Q_Y)` cannot fail if all the per-user marginal
+bounds `x*_i <= F~(Y*) - F~(Y* - y*_i)` hold.
+
+`F~` is concave with `F~(0) = 0`, so `F~(t)/t` is nonincreasing and therefore
+`F~(Y* - y*_i) >= ((Y* - y*_i)/Y*) F~(Y*)`. Summing over all `i`, and using
+`sum y*_i = Y*`:
+
+```
+sum_i F~(Y* - y*_i)  >=  (n-1) F~(Y*)
+```
+
+so
+
+```
+sum_i [ F~(Y*) - F~(Y* - y*_i) ]  =  n F~(Y*) - sum_i F~(Y* - y*_i)  <=  F~(Y*)
+```
+
+Verified against the exact fixed-point implementation over 300,000 random batches:
+`sum(bounds) - F~(Y*)` never exceeded 0.
+
+The `NegativeBurn` revert in `OtterMath.verify` is therefore unreachable as
+written. It is retained deliberately — it costs one comparison, and it is the
+check that would catch a rounding direction being flipped in `fTildeDown` or
+`fTildeUp` later. `testFuzz_marginalBoundsImplyNonNegativeBurn` asserts the
+implication; if that fuzz ever fails, the revert has become load-bearing and the
+rounding has regressed.
+
+## C8. On-chain math needs no square root
+
+`plan.md`'s stack table offers `PRBMath` or solmate's `FixedPointMathLib` and says
+to pick one on day 1. Picked: **solmate**, which is already in the tree via
+v4-core.
+
+The reasoning matters more than the choice. `K(t) = sup{y : F~'(y) >= t}` requires
+a square root, but `K` is a solver-side function only — the contract never
+computes it. Every on-chain operation reduces to `mulDiv(a, b, c)` with a chosen
+rounding direction:
+
+| Quantity | Form |
+|---|---|
+| `sigma0 * y` | `mulDiv(x0, y, y0)` |
+| `k / (y0 + z)` | `mulDiv(x0, y0, y0 + z)` — never materialises `k`, so no overflow |
+| `v~_i * y*_i` | `mulDiv(ask, y, 1e18)` |
+
+solmate exposes both `mulDivDown` and `mulDivUp`. PRBMath's public API is
+round-down only (`Common.mulDiv`, `mulDiv18`, and the `UD60x18` operators), with
+no `mulDivUp`. For the one operation that decides whether rounding can flip an
+invariant, solmate is the better tool and costs no new dependency.
+
+Rounding rule, applied throughout `OtterMath`: bounds on what a user **may**
+receive round down; amounts a user **must** have earned round up. Every quantity
+exists in a `Down` and an `Up` form and the two are never mixed.
+
+## C9. v4-periphery is not a dependency
+
+`BaseHook` has been removed from both `v4-core` (tag `v4.0.0`,
+`e50237c43811bd9b526eff40f26772152a42daba`) and `v4-periphery`
+(`dce236d4e2057422d0791d9a973a58765eb46f65`), despite the docs and every tutorial
+starting from it. `OtterHook` implements `IHooks` directly.
+
+With `BaseHook` gone, the only thing this project wanted from v4-periphery was
+`HookMiner`, which lives at `test/shared/HookMiner.sol` and imports nothing but
+`Hooks` from v4-core. It is vendored to `contracts/test/utils/HookMiner.sol` with
+a provenance header. Dropping v4-periphery also removes permit2 and four nested
+submodules — roughly 70MB — plus a second copy of v4-core at a different commit
+than the top-level one.
+
+Working remappings for consuming v4-core from a parent Foundry project:
+
+```
+forge-std/=lib/forge-std/src/
+@uniswap/v4-core/=lib/v4-core/
+v4-core/=lib/v4-core/src/
+solmate/=lib/v4-core/lib/solmate/
+```
+
+Note `solmate/` has no trailing `src/`: v4-core's imports already carry it, and
+its own `remappings.txt` declares `solmate/=lib/solmate/`, correct relative to
+itself but wrong from a parent. Getting this wrong produces
+`lib/solmate/src/src/auth/Owned.sol not found`, an error that points into
+v4-core's source and reads like a bug there rather than a remapping problem in
+the consumer. Written up in `FEEDBACK.md`.
