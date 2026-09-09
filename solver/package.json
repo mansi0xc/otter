@@ -1,0 +1,11 @@
+{
+  "name": "otter-solver",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --experimental-strip-types test/properties.ts",
+    "mutation": "node --experimental-strip-types test/mutation.ts",
+    "bench": "node --experimental-strip-types test/bench.ts",
+    "vectors": "node --experimental-strip-types src/cli.ts --emit-vectors ../fixtures/vectors.json"
+  }
+}

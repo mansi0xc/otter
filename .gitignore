@@ -1,0 +1,9 @@
+node_modules/
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+harness/results/*.tmp
+.env
+.env.*
+!.env.example
+.DS_Store
