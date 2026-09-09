@@ -7,3 +7,4 @@ harness/results/*.tmp
 .env.*
 !.env.example
 .DS_Store
+contracts/lib/
