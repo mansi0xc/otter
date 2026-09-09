@@ -1,0 +1,5 @@
+{
+  "generatedBy": "solver/src/cli.ts",
+  "note": "Boundary-focused vectors. Verdicts computed by solver/src/fixed.ts, the BigInt mirror of OtterMath.sol.",
+  "count": 150
+}
