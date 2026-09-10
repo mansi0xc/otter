@@ -39,6 +39,27 @@ library OtterMath {
         uint256 x; // x*_i, output paid
     }
 
+    /// @notice Discretisation allowance, numerator over 1e6 of price impact.
+    /// @dev The paper's F~ is continuous and is evaluated once, rounded once. v4
+    ///      derives the new sqrtPrice from the input and then the output from the
+    ///      price delta, rounding in the pool's favour at each, on a Q64.96 grid.
+    ///      v4 therefore pays slightly LESS than F~ predicts, and the shortfall
+    ///      grows with price impact — measured at roughly 1 wei per 1.2% of
+    ///      impact, 9 wei at 11% impact (see test/CurveSweep.t.sol).
+    ///
+    ///      200/1e6 gives ceil(impact_ppm * 200 / 1e6) + 2, which covers every
+    ///      measured point with at least 1.5x margin. On a 10e18 trade at 10%
+    ///      impact that is 22 wei, or 2e-16% of the trade.
+    ///
+    ///      This is a fixed function of the batch's own size, not of any bidder's
+    ///      report, so it does not create an outcome-dependent transfer and leaves
+    ///      incentive compatibility intact (cf. Theorem 22 on builder payments).
+    ///      It does shave individual rationality at the very margin: a bidder
+    ///      whose ask exactly equals its compensation could be underpaid by up to
+    ///      the allowance. Stated in the README rather than buried.
+    uint256 internal constant IMPACT_ALLOWANCE_NUM = 200;
+    uint256 internal constant ALLOWANCE_FLOOR = 2;
+
     error BudgetExceeded(uint256 i);
     error PaymentExceedsSpot(uint256 i);
     error PaymentExceedsMarginal(uint256 i);
@@ -80,6 +101,23 @@ library OtterMath {
         uint256 rem = FixedPointMathLib.mulDivDown(c.x0, c.y0, c.y0 + z);
         if (rem > c.x0) rem = c.x0;
         return spotUp(c, c.M) + (c.x0 - rem);
+    }
+
+    /// @notice Wei that must be held back from F~(y) to stay within what v4 will
+    ///         actually pay. Zero below M, where no pool swap happens at all.
+    function discretisationAllowance(Curve memory c, uint256 y) internal pure returns (uint256) {
+        if (y <= c.M) return 0;
+        return FixedPointMathLib.mulDivUp(y - c.M, IMPACT_ALLOWANCE_NUM, c.y0) + ALLOWANCE_FLOOR;
+    }
+
+    /// @notice F~(y) rounded down and reduced by the discretisation allowance.
+    ///         This — not fTildeDown — is what bounds real payments. fTildeDown
+    ///         remains the faithful port of the paper's curve, for the reference
+    ///         mirror and for reasoning about the mechanism itself.
+    function fTildeSettleable(Curve memory c, uint256 y) internal pure returns (uint256) {
+        uint256 raw = fTildeDown(c, y);
+        uint256 allow = discretisationAllowance(c, y);
+        return raw > allow ? raw - allow : 0;
     }
 
     /// @notice Eligibility: ask <= sigma0, i.e. ask*y0 <= x0*WAD.
@@ -129,7 +167,7 @@ library OtterMath {
         // breaks first when the allocation's tie rule at equality is wrong.
         if (totalIn < c.M) revert DominanceViolated(totalIn, c.M);
 
-        uint256 available = fTildeDown(c, totalIn);
+        uint256 available = fTildeSettleable(c, totalIn);
 
         // Thm 12(b), sharp half: x*_i <= F~(Y*) - F~(Y* - y*_i)
         for (uint256 i; i < n; ++i) {

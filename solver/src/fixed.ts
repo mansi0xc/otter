@@ -52,6 +52,27 @@ export function fTildeUp(c: Curve, y: bigint): bigint {
   return spotUp(c, c.M) + (c.x0 - rem);
 }
 
+/**
+ * Discretisation allowance. Mirrors OtterMath.discretisationAllowance.
+ * v4 pays slightly less than the paper's continuous F~ because it rounds in the
+ * pool's favour twice per swap on a Q64.96 grid; the shortfall grows with price
+ * impact. See contracts/test/CurveSweep.t.sol for the measurements.
+ */
+export const IMPACT_ALLOWANCE_NUM = 200n;
+export const ALLOWANCE_FLOOR = 2n;
+
+export function discretisationAllowance(c: Curve, y: bigint): bigint {
+  if (y <= c.M) return 0n;
+  return mulDivUp(y - c.M, IMPACT_ALLOWANCE_NUM, c.y0) + ALLOWANCE_FLOOR;
+}
+
+/** F~(y) rounded down and reduced by the allowance. Bounds real payments. */
+export function fTildeSettleable(c: Curve, y: bigint): bigint {
+  const raw = fTildeDown(c, y);
+  const allow = discretisationAllowance(c, y);
+  return raw > allow ? raw - allow : 0n;
+}
+
 export const eligible = (c: Curve, ask: bigint) => mulDivUp(ask, c.y0, WAD) <= c.x0;
 
 /**
@@ -109,7 +130,7 @@ export function verify(c: Curve, fills: Fill[]): Verdict {
 
   if (totalIn < c.M) return fail(ERR_DOMINANCE, 0, totalIn, c.M);
 
-  const available = fTildeDown(c, totalIn);
+  const available = fTildeSettleable(c, totalIn);
 
   for (let i = 0; i < fills.length; i++) {
     const sub = fTildeUp(c, totalIn - fills[i].y);
@@ -124,7 +145,7 @@ export function verify(c: Curve, fills: Fill[]): Verdict {
 
 /** The largest x*_i that can be paid for a given fill, given the batch total. */
 export function payCeiling(c: Curve, fills: Fill[], i: number, totalIn: bigint): bigint {
-  const available = fTildeDown(c, totalIn);
+  const available = fTildeSettleable(c, totalIn);
   const sub = fTildeUp(c, totalIn - fills[i].y);
   const marginal = sub >= available ? 0n : available - sub;
   const spot = spotDown(c, fills[i].y);

@@ -119,6 +119,22 @@ contract OtterMathTest is Test {
         this.callVerify(c, f);
     }
 
+    /// The allowance is zero when the batch does not touch the pool at all.
+    function test_allowanceIsZeroAtOrBelowM() public pure {
+        OtterMath.Curve memory c = _curve(1_000_000e18, 500_000e18, 1000e18);
+        assertEq(OtterMath.discretisationAllowance(c, 999e18), 0);
+        assertEq(OtterMath.discretisationAllowance(c, 1000e18), 0);
+        assertGt(OtterMath.discretisationAllowance(c, 1001e18), 0);
+    }
+
+    /// It must cover the worst gap measured in CurveSweep.t.sol: 9 wei at ~11%
+    /// price impact. If this ever fails, re-run the sweep before touching it.
+    function test_allowanceCoversMeasuredWorstCase() public pure {
+        OtterMath.Curve memory c = _curve(1e20, 1e20, 0);
+        uint256 y = 11e18; // 11% of y0
+        assertGe(OtterMath.discretisationAllowance(c, y), 9);
+    }
+
     /// One wei under the bound, same shape, passes with an exact burn.
     function test_verify_acceptsJustUnderMarginalBound() public pure {
         OtterMath.Curve memory c = _curve(1_000_000e18, 500_000e18, 1000e18);
@@ -128,7 +144,7 @@ contract OtterMathTest is Test {
         (uint256 totalIn, uint256 paid, uint256 burn) = OtterMath.verify(c, f);
         assertEq(totalIn, 1200e18);
         assertEq(paid, 2398e18);
-        assertEq(burn, 1_840_063_974_410_235_905); // F~(1200e18) - 2398e18
+        assertEq(burn, 1_840_063_974_410_235_902); // F~(1200e18) - 2398e18 - 3 wei allowance
     }
 
     /// Thm 12(c) is implied by the 12(b) bounds: F~ is concave with F~(0)=0, so
@@ -147,7 +163,7 @@ contract OtterMathTest is Test {
         for (uint256 i; i < 3; ++i) Y += ys[i];
         vm.assume(Y > 0);
 
-        uint256 available = OtterMath.fTildeDown(c, Y);
+        uint256 available = OtterMath.fTildeSettleable(c, Y);
         uint256 sumBounds;
         for (uint256 i; i < 3; ++i) {
             uint256 sub = OtterMath.fTildeUp(c, Y - ys[i]);

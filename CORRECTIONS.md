@@ -228,3 +228,92 @@ itself but wrong from a parent. Getting this wrong produces
 `lib/solmate/src/src/auth/Owned.sol not found`, an error that points into
 v4-core's source and reads like a bug there rather than a remapping problem in
 the consumer. Written up in `FEEDBACK.md`.
+
+## C10. The paper's curve and v4's swap math differ, and the gap tracks price impact
+
+The most substantive finding here, and the only one not derived from the paper.
+
+Otter is proved on a continuous pricing curve `F(y) = x0 - k/(y0 + y)`, evaluated
+once and rounded once. Uniswap v4 executes a swap in two stages — derive the new
+`sqrtPrice` from the input, then derive the output from the price delta — rounding
+in the pool's favour at each, on a Q64.96 price grid. **v4 therefore pays strictly
+less than `F` predicts.** A settlement that pays the dominant side its exact `F~`
+ceiling has zero headroom and reverts.
+
+This is not hypothetical. `OtterMargin.t.sol`, paying the full ceiling, failed with
+`PoolOutputShortfall` by 14 wei before the fix.
+
+### Measurement
+
+`contracts/test/CurveSweep.t.sol`, three pools spanning liquidity `1e20` to `1e22`,
+six trade sizes through each, both directions, plain hookless pools so nothing but
+the curve is under test:
+
+| price impact | gap (wei) |
+|---|---|
+| <= 100 ppm | 0 |
+| ~1,000 ppm (0.1%) | 0 - 2 |
+| ~10,000 ppm (1%) | 0 - 1 |
+| ~50,000 ppm (5%) | 4 |
+| ~110,000 ppm (11%) | 8 - 9 |
+
+The gap scales with **price impact, not trade size** — roughly 1 wei per 1.2% of
+impact. An earlier version of this sweep varied trade size at fixed liquidity,
+which held impact near 0.1% throughout and reported a misleading 2 wei maximum.
+Sweeping the wrong variable is worse than not measuring, because it produces a
+number that looks like an answer.
+
+Across 512 fuzz runs the model never predicted *less* than v4 paid, so the error
+is one-directional and an allowance is sufficient.
+
+### The allowance
+
+```
+allowance(y) = ceil((y - M) * 200 / y0) + 2     for y > M
+             = 0                                otherwise
+```
+
+Zero at or below `M`: the batch never touches the pool there, since the minority
+side supplies everything at spot and no swap occurs.
+
+Covers every measured point with at least 1.5x margin. On a `10e18` trade at 10%
+impact it is 22 wei, or 2e-16% of the trade.
+
+`OtterMath.fTildeDown` is left untouched and remains a faithful port of the
+paper's curve — it is what `solver/src/fixed.ts` mirrors and what the mechanism is
+reasoned about in. The allowance is a separate function, and `verify` uses
+`fTildeSettleable = fTildeDown - allowance`. The two are different in kind: one is
+the paper, the other is a fact about executing it on v4, and folding them together
+would leave `OtterMath` a port of nothing.
+
+### What it costs the mechanism
+
+**Incentive compatibility survives.** The allowance is a function of the batch's
+own size and the pool's reserves, never of any bidder's report, so it creates no
+outcome-dependent transfer. This is the same distinction Theorem 22 draws for
+builder payments: a fixed exogenous deduction is permitted, an outcome-dependent
+one destroys the guarantees.
+
+**Individual rationality is shaved at the margin.** A bidder whose ask exactly
+equals its compensation can be underpaid by up to the allowance. Bidders with any
+strictly positive surplus are unaffected. This is a real, if tiny, deviation from
+the paper and belongs in the README next to the trust model.
+
+Guarded by `test_allowanceCoversMeasuredWorstCase`. If that ever fails, re-run the
+sweep before touching the constant.
+
+## C11. `plan.md`'s fallback triggers, resolved
+
+For the record, since none of the three fired:
+
+- **Two-sided mechanism not passing property tests.** It passed. The two-sided
+  case is implemented, not the one-sided fallback. The symmetry `H(x) =
+  -F^{-1}(-x)` is, for constant product, just `F` with the reserves swapped, so
+  the sell-X-dominant branch calls the same code with `(y0, x0)` and swaps the
+  answer back. One implementation, used twice, no chance of the branches drifting.
+- **On-chain invariant verification too expensive.** It is not. Every §3.7 check
+  is `O(n)` and arithmetically trivial; settlement cost is dominated by ERC-20
+  transfers and `ecrecover`, not by verification.
+- **v4 integration fighting you.** It did, but only at the dependency layer — see
+  C9 and `FEEDBACK.md`. The integration itself was straightforward once `BaseHook`
+  was ruled out and the remappings were right.

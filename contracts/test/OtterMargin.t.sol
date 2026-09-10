@@ -163,7 +163,7 @@ contract OtterMarginTest is Deployers {
         uint256[] memory y = new uint256[](2);
         uint256[] memory x = new uint256[](2);
         y[0] = domBudget;
-        x[0] = OtterMath.fTildeDown(c, domBudget); // FULL ceiling: zero headroom
+        x[0] = OtterMath.fTildeSettleable(c, domBudget); // FULL ceiling: zero headroom
         y[1] = minBudget;
         x[1] = (c.y0 * minBudget) / c.x0;
 

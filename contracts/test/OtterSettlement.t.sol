@@ -144,7 +144,7 @@ contract OtterSettlementTest is Deployers {
         uint256[] memory y = new uint256[](2);
         uint256[] memory x = new uint256[](2);
         y[0] = DOM_BUDGET;
-        x[0] = OtterMath.fTildeDown(c, DOM_BUDGET) - slack;
+        x[0] = OtterMath.fTildeSettleable(c, DOM_BUDGET) - slack;
         y[1] = MIN_BUDGET;
         x[1] = _mulDownPure(c.y0, MIN_BUDGET, c.x0);
         o = OtterSettlement.Outcome({dominantSellsCurrency0: true, y: y, x: x});
