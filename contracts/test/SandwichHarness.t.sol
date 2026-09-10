@@ -69,13 +69,21 @@ contract SandwichHarness is Deployers {
 
     /// the trade being attacked: ~5% price impact
     uint256 constant VICTIM_SIZE = 5e19;
-    /// what the searcher brings to the batch when it cannot swap directly
-    uint256 constant BOT_BATCH_SIZE = 5e19;
+    /// What the searcher brings to the batch when it cannot swap directly.
+    /// Deliberately SMALLER than the victim's order: if the two matched exactly,
+    /// M would cover the whole victim order, the pool would never be touched, and
+    /// the demo would be showing coincidence of wants rather than the mechanism.
+    uint256 constant BOT_BATCH_SIZE = 1e19;
+
+    /// A second seller on the dominant side, used only by the surplus test.
+    uint256 constant RIVAL_SIZE = 3e19;
 
     uint256 victimPk = 0xF1CE;
     uint256 botPk = 0xB07;
+    uint256 rivalPk = 0xB1;
     address victim;
     address bot;
+    address rival;
 
     function setUp() public {
         deployFreshManagerAndRouters();
@@ -101,6 +109,7 @@ contract SandwichHarness is Deployers {
 
         victim = vm.addr(victimPk);
         bot = vm.addr(botPk);
+        rival = vm.addr(rivalPk);
     }
 
     function _addLiquidity(PoolKey memory k) internal {
@@ -310,4 +319,90 @@ contract SandwichHarness is Deployers {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, book.digestOf(o));
         return abi.encodePacked(r, s, v);
     }
+
+    // ------------------------------------------------------------------
+    // surplus redistribution
+    // ------------------------------------------------------------------
+
+    /// The burn is the Clarke pivot surplus, and it only exists when there is
+    /// COMPETITION on the dominant side. With a single seller, that seller's
+    /// marginal contribution is the entire welfare and it is paid all of it —
+    /// which is why the comparison above shows a zero burn and should.
+    ///
+    /// With two sellers each is paid F~(Y) - F~(Y - y_i), so together they receive
+    /// 2F~(Y) - F~(y1) - F~(y2) and the pool retains
+    ///     F~(y1) + F~(y2) - F~(Y)
+    /// which is strictly positive because F~ is concave with F~(0) = 0 — the same
+    /// subadditivity that makes Theorem 12(c) redundant (CORRECTIONS.md C7).
+    /// That residue is the redistributed surplus. It is the thing that separates
+    /// Otter from a uniform-clearing-price batch AMM, and it is what the burn
+    /// counter in the demo should be showing.
+    function test_surplusRedistribution() public {
+        _fund(currency0, victim, VICTIM_SIZE);
+        _fund(currency0, rival, RIVAL_SIZE);
+
+        OtterOrderBook.Order[] memory orders = new OtterOrderBook.Order[](2);
+        bytes[] memory sigs = new bytes[](2);
+        orders[0] = _mkOrder(victim, true, VICTIM_SIZE);
+        orders[1] = _mkOrder(rival, true, RIVAL_SIZE);
+        sigs[0] = _sign(victimPk, orders[0]);
+        sigs[1] = _sign(rivalPk, orders[1]);
+
+        uint256 batchId = book.submit(orders, sigs);
+        vm.warp(block.timestamp + WINDOW);
+
+        (uint160 p,,,) = manager.getSlot0(otterId);
+        uint128 liq = manager.getLiquidity(otterId);
+        (uint256 r0, uint256 r1) = OtterPoolMath.virtualReserves(p, liq);
+        OtterMath.Curve memory c = OtterMath.Curve({x0: r1, y0: r0, M: 0}); // no minority side
+
+        uint256 total = VICTIM_SIZE + RIVAL_SIZE;
+        uint256 available = OtterMath.fTildeSettleable(c, total);
+
+        uint256[] memory y = new uint256[](2);
+        uint256[] memory x = new uint256[](2);
+        y[0] = VICTIM_SIZE;
+        y[1] = RIVAL_SIZE;
+        // Clarke pivot with ask 0: x_i = F~(Y) - F~(Y - y_i)
+        x[0] = available - OtterMath.fTildeUp(c, total - VICTIM_SIZE);
+        x[1] = available - OtterMath.fTildeUp(c, total - RIVAL_SIZE);
+
+        settlement.settle(
+            otterKey, batchId, orders, OtterSettlement.Outcome({dominantSellsCurrency0: true, y: y, x: x})
+        );
+
+        uint256 burn = IERC20H(Currency.unwrap(currency1)).balanceOf(burnSink);
+
+        // The burn has two components and they should be reported separately.
+        //
+        //   mechanism surplus = F~(Y) - sum x*_i, the welfare no bidder's marginal
+        //                       contribution claimed. This is the redistribution
+        //                       the paper is about.
+        //   allowance residue = the part of the discretisation allowance v4 did
+        //                       not actually consume. The allowance is sized ~3x
+        //                       the measured gap (CORRECTIONS.md C10), so most of
+        //                       it falls through to the burn on every batch.
+        //
+        // Conflating them would make the redistribution look larger than it is.
+        uint256 mechanismSurplus = available - x[0] - x[1];
+        uint256 allowance = OtterMath.discretisationAllowance(c, total);
+        uint256 residue = burn - mechanismSurplus;
+
+        console2.log("--- surplus redistribution (two competing sellers) ---");
+        console2.log("  total sold          ", total);
+        console2.log("  F~(Y) available     ", available);
+        console2.log("  paid to victim      ", x[0]);
+        console2.log("  paid to rival       ", x[1]);
+        console2.log("  burn to LPs         ", burn);
+        console2.log("    mechanism surplus ", mechanismSurplus);
+        console2.log("    allowance residue ", residue);
+        console2.log("  allowance budgeted  ", allowance);
+        console2.log("  v4 gap consumed     ", allowance - residue);
+        console2.log("  surplus as ppm      ", mechanismSurplus * 1e6 / total);
+
+        assertGt(mechanismSurplus, 0, "competition on the dominant side must leave surplus");
+        assertGe(burn, mechanismSurplus, "burn cannot fall below the unallocated welfare");
+        assertLe(residue, allowance, "residue cannot exceed the allowance that produced it");
+    }
 }
+

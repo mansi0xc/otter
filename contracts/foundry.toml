@@ -9,7 +9,17 @@ via_ir = true
 optimizer = true
 optimizer_runs = 200
 ffi = true
-fs_permissions = [{ access = "read", path = "../fixtures" }]
+fs_permissions = [
+    { access = "read", path = "../fixtures" },
+    { access = "read-write", path = "../harness/results" },
+]
+
+# Foundry's default per-test budget is 2^30, which the block-ceiling probe blows
+# through during SETUP alone: each probe funds and signs for ~600 traders before
+# it measures anything. This raises the harness's own ceiling; it does not change
+# what any measurement reports, since those come from gasleft() deltas around the
+# calls under test.
+gas_limit = "100000000000"
 
 [profile.default.fuzz]
 runs = 512
