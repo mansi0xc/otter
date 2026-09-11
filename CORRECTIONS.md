@@ -100,34 +100,48 @@ https://ethglobal.com/events/ethonline2026/prizes on 10 September 2026:
 - **1inch is $5,000 for Start Fresh, not $7,000.** Same split: $7,000 total,
   $2,000 of it Continuity-only.
 
-`idea.md` §6 also states that the Chainlink CRE Confidential Workflows track
-"requires private-beta enrollment". **That is wrong.** The track has public
-starter templates, CLI simulation, published docs and a recorded bootcamp, and
-its qualification requirements are satisfiable without a live deployment.
-
 Submissions may select up to three partner prizes, and multiple tracks from one
 partner count as a single selection.
 
-**Selected:**
+### On Chainlink CRE: `idea.md` was right and an earlier revision of this file was wrong
+
+An earlier version of C5 stated that `idea.md`'s claim of private-beta enrollment
+was wrong. **That correction was itself wrong**, and this paragraph replaces it.
+Chainlink's own documentation says:
+
+> Confidential Workflows is in private beta and requires enrollment through your
+> Chainlink account team.
+
+`idea.md` §6 was accurate. The error was introduced here by asserting a correction
+without checking the source — the same failure this file exists to record, and the
+reason it is recorded rather than quietly edited.
+
+The one nuance that matters: the docs also say *"Do not wait for early access.
+Simulate confidential workflows in minutes."* Local CLI simulation works without
+enrollment, and the track's qualification requirement is a simulation rather than
+a live deployment. So the track is reachable — but the deliverable would be a
+simulated workflow, not a deployed one, and that should be stated plainly in any
+submission rather than implied otherwise.
+
+### Selected
 
 - **Uniswap Foundation.** The primary track. This is the project.
-- **Chainlink — Best Confidential Workflow ($2,000, up to 2 teams).** Running the
-  solver inside a TEE handler means batch order flow is not visible to the solver
-  operator before it computes on it. It does not make welfare-optimality provable
-  — see C6 — but it addresses the confidentiality half of the trust limitation,
-  which is a coherent contribution on a paper about MEV.
 
-**Cut:**
+### Cut
 
+- **Chainlink CRE.** Reachable via simulation, but eight hours against an SDK that
+  compiles TypeScript to WASM through Javy/QuickJS, for a $2,000 pool split two
+  ways, is the wrong trade against the remaining time. Cut in favour of finishing
+  the demo, the deployment, and the submission artifacts.
 - **1inch.** Reimplementing settlement as SwapVM opcodes is a second full
   implementation of the core contract, not an integration. Largest reachable pool,
-  wrong trade against the remaining time.
+  still the wrong trade.
 - **The Graph.** The composable track explicitly rejects a single subgraph with no
   composition, and the AI track needs an agent doing meaningful work. Both are a
   forced fit.
-- **Live order-entry dApp.** Replaced with a static results page rendered from a
-  real testnet batch's JSON output. Judges need to see a trade happen, not a
-  wallet connector.
+- **Live order-entry dApp.** Replaced with a static results page rendered from the
+  test suite's own output. Judges need to see a trade happen, not a wallet
+  connector.
 
 **Also required, and easy to forget:** `FEEDBACK.md` plus a submitted Uniswap
 Developer Feedback Form linking to it. Winners are audited for this.

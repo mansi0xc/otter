@@ -65,11 +65,17 @@ contract OtterSettlement is IUnlockCallback {
     error LengthMismatch();
     error NotPoolManager();
     error EmptyBatch();
-    error DominanceMisreported(uint256 dDominant, uint256 mNeeded);
     error MinorityFillWrong(uint256 i);
     error IneligibleMustBeUnfilled(uint256 i);
     error PoolOutputShortfall(uint256 have, uint256 owed);
     error NoLiquidity();
+
+    /// @notice The modelled burn (F~s(Y) - sum x*_i) alongside what was actually
+    ///         realised. They differ by the part of the discretisation allowance
+    ///         v4 did not consume — see CORRECTIONS.md C10. Emitting both turns
+    ///         every settlement into a live re-measurement of that gap; a realised
+    ///         burn far above the model would mean the allowance is mis-sized.
+    event BurnBreakdown(PoolId indexed poolId, uint256 indexed batchId, uint256 modelled, uint256 realised);
 
     event Settled(
         PoolId indexed poolId,
@@ -117,19 +123,21 @@ contract OtterSettlement is IUnlockCallback {
 
         // (4) Theorem 12 invariants on the dominant side.
         (uint256 totalIn, uint256 totalPaid, uint256 modelBurn) = OtterMath.verify(curve, fills);
-        modelBurn; // the authoritative burn is measured in (6), not modelled
 
         // (5) Move tokens. Pulls first so the contract is never paying out funds
         // it has not yet received.
-        _collectAndPayMinority(key, orders, outcome, totalIn, dMinority);
+        _collectAndPayMinority(key, orders, outcome);
 
-        // (6) Residual through the pool, then distribute.
+        // (6) Residual through the pool, then distribute. The authoritative burn is
+        // measured here, not modelled: it is what v4 actually paid minus what the
+        // outcome owes, so it absorbs any unused discretisation allowance.
         uint256 realisedBurn =
             _executeAndDistribute(key, orders, outcome, totalIn, minorityPaid, dMinority, totalPaid);
 
         emit Settled(
             key.toId(), batchId, outcome.dominantSellsCurrency0, totalIn, totalPaid, realisedBurn
         );
+        emit BurnBreakdown(key.toId(), batchId, modelBurn, realisedBurn);
     }
 
     /// @dev OtterMath's `x0` is the reserve of the token the dominant side
@@ -200,9 +208,7 @@ contract OtterSettlement is IUnlockCallback {
     function _collectAndPayMinority(
         PoolKey calldata key,
         OtterOrderBook.Order[] calldata orders,
-        Outcome calldata outcome,
-        uint256 totalIn,
-        uint256 dMinority
+        Outcome calldata outcome
     ) private {
         Currency dominantIn = outcome.dominantSellsCurrency0 ? key.currency0 : key.currency1;
         Currency dominantOut = outcome.dominantSellsCurrency0 ? key.currency1 : key.currency0;
@@ -213,10 +219,6 @@ contract OtterSettlement is IUnlockCallback {
             Currency sold = isDominant ? dominantIn : dominantOut;
             _pull(sold, orders[i].trader, outcome.y[i]);
         }
-
-        // Sanity: what we pulled must match what the outcome claims.
-        totalIn;
-        dMinority;
 
         for (uint256 i; i < orders.length; ++i) {
             bool isDominant = orders[i].sellingCurrency0 == outcome.dominantSellsCurrency0;

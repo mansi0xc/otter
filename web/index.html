@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Otter — batch results</title>
+<style>
+  :root {
+    --ground:  #e7ecef;
+    --paper:   #f6f9fa;
+    --ink:     #14303a;
+    --ink-mid: #4c6772;
+    --ink-dim: #7d949d;
+    --rule:    #c5d2d8;
+    --signal:  #0d7a84;
+    --alarm:   #a94b19;
+    --grid:    #d6dfe4;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--ground); }
+  body {
+    margin: 0;
+    font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    line-height: 1.55;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .sheet {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 6rem;
+  }
+  h1 {
+    font-size: clamp(2rem, 5vw, 3.1rem);
+    font-weight: 650;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    margin: 0 0 0.4rem;
+  }
+  .standfirst {
+    max-width: 42rem;
+    font-size: 1.05rem;
+    color: var(--ink-mid);
+    margin: 0 0 2.5rem;
+  }
+  section { margin: 3.25rem 0 0; }
+  h2 {
+    font-size: 1.15rem;
+    font-weight: 620;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.2rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1.5px solid var(--ink);
+  }
+  .lede { color: var(--ink-mid); max-width: 44rem; margin: 0.7rem 0 1.4rem; }
+  .panel {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    padding: 1.25rem;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th {
+    text-align: right; font-weight: 560; color: var(--ink-mid);
+    border-bottom: 1px solid var(--rule); padding: 0.4rem 0.55rem;
+  }
+  th:first-child, td:first-child { text-align: left; }
+  td { padding: 0.42rem 0.55rem; text-align: right; border-bottom: 1px solid var(--grid); }
+  tr:last-child td { border-bottom: none; }
+  .tag { font-size: 0.78rem; padding: 0.08rem 0.42rem; border: 1px solid currentColor; }
+  .t-full    { color: var(--signal); }
+  .t-partial { color: var(--alarm); }
+  .t-out     { color: var(--ink-dim); }
+  .figures { display: flex; flex-wrap: wrap; gap: 2.5rem; margin: 1.5rem 0 0; }
+  .figure .n { font-size: 2.1rem; font-weight: 620; letter-spacing: -0.03em; line-height: 1; }
+  .figure .l { color: var(--ink-mid); font-size: 0.88rem; margin-top: 0.3rem; }
+  .wei { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.82rem; color: var(--ink-dim); }
+  .bars { display: grid; gap: 0.55rem; margin-top: 0.4rem; }
+  .bar-row { display: grid; grid-template-columns: 11rem 1fr auto; gap: 0.9rem; align-items: center; font-size: 0.9rem; }
+  .track { height: 1.35rem; background: var(--ground); border: 1px solid var(--rule); }
+  .fill { height: 100%; }
+  .note { color: var(--ink-mid); font-size: 0.88rem; max-width: 44rem; margin-top: 1rem; }
+  ul.plain { padding-left: 1.1rem; color: var(--ink-mid); max-width: 46rem; }
+  ul.plain li { margin-bottom: 0.55rem; }
+  .err { border-left: 3px solid var(--alarm); padding: 0.9rem 1.1rem; background: var(--paper); }
+  .err code { display: block; margin-top: 0.5rem; font-family: ui-monospace, monospace; font-size: 0.85rem; color: var(--ink); }
+  svg { display: block; width: 100%; height: auto; }
+  footer { margin-top: 4rem; padding-top: 1.2rem; border-top: 1px solid var(--rule); color: var(--ink-dim); font-size: 0.85rem; }
+  a { color: var(--signal); }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <h1>Otter, measured</h1>
+  <p class="standfirst">
+    A batch AMM that settles every order as an unordered set, so there is no
+    sequence for a builder to sell. Everything below is read from the test suite's
+    own output, not typed in by hand.
+  </p>
+
+  <div id="error" hidden class="err">
+    No results found. The page reads JSON and CSV from the repository, which
+    browsers block over <code>file://</code>. Serve the repo root and reload:
+    <code>cd otter &amp;&amp; python3 -m http.server 8000<br>open http://localhost:8000/web/</code>
+    If a file is still missing, regenerate it with
+    <code>cd solver &amp;&amp; npm run demo<br>cd contracts &amp;&amp; forge test</code>
+  </div>
+
+  <section id="s-batch" hidden>
+    <h2>One batch</h2>
+    <p class="lede">
+      Six orders against a pool trading at 1.00. Bars show each order's budget;
+      the solid part is what filled. Orders asking above spot are ineligible by
+      rule, not by price — the paper rules out Pareto-optimality across them.
+    </p>
+    <div class="panel">
+      <div id="ladder"></div>
+      <table id="batch-table">
+        <thead><tr>
+          <th>Order</th><th>Ask</th><th>Budget</th><th>Filled</th><th>Paid</th><th>Outcome</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="note" id="batch-note"></p>
+  </section>
+
+  <section id="s-burn" hidden>
+    <h2>Where the surplus went</h2>
+    <p class="lede">
+      Each seller is paid its marginal contribution to welfare. What no seller's
+      contribution claims stays behind and goes to liquidity providers.
+    </p>
+    <div class="figures">
+      <div class="figure">
+        <div class="n" id="burn-big" style="color:var(--signal)">—</div>
+        <div class="l">redistributed to LPs</div>
+        <div class="wei" id="burn-wei"></div>
+      </div>
+      <div class="figure">
+        <div class="n" id="burn-ppm">—</div>
+        <div class="l">of the batch, in parts per million</div>
+      </div>
+    </div>
+    <p class="note">
+      With a single seller on the dominant side there is nothing to redistribute —
+      that seller's marginal contribution is the entire welfare and it is paid all
+      of it. Surplus appears only when sellers compete.
+    </p>
+  </section>
+
+  <section id="s-sandwich" hidden>
+    <h2>The same trade, attacked and not</h2>
+    <p class="lede">
+      A searcher front-runs and back-runs one victim order on a plain v4 pool, then
+      tries the same thing on the Otter pool.
+    </p>
+    <div class="panel">
+      <div class="bars" id="sandwich-bars"></div>
+    </div>
+    <div class="figures">
+      <div class="figure">
+        <div class="n" id="loss-pct" style="color:var(--alarm)">—</div>
+        <div class="l">of the victim's trade taken on the plain pool</div>
+      </div>
+      <div class="figure">
+        <div class="n" id="otter-delta" style="color:var(--signal)">—</div>
+        <div class="l">versus the unattacked price, on Otter</div>
+      </div>
+    </div>
+    <p class="note">
+      On Otter the searcher's swap reverts at every capital level tested. Joining
+      the batch does not help: its order clears at the price that existed before
+      the batch, which its own front-run did not create. Both pools are zero-fee,
+      which flatters the attacker — on a 0.30% pool it would pay fees on both legs
+      and net less.
+    </p>
+  </section>
+
+  <section id="s-gas" hidden>
+    <h2>How large a batch fits in a block</h2>
+    <p class="lede">
+      Total cost per settlement, including calldata and the 21,000 intrinsic fee —
+      not execution gas alone.
+    </p>
+    <div class="panel"><div id="gas-chart"></div></div>
+    <div class="figures">
+      <div class="figure"><div class="n" id="ceiling">—</div><div class="l">orders per block, measured</div></div>
+      <div class="figure"><div class="n" id="per-order">—</div><div class="l">gas per order at n=200</div></div>
+    </div>
+    <p class="note">
+      Cost is superlinear: memory expansion grows with the square of the words
+      allocated, so a straight line fitted over small batches predicts 726 orders
+      and overstates capacity by about 13%. Most of the per-order cost is two
+      ERC-20 transfers, not the mechanism.
+    </p>
+  </section>
+
+  <section>
+    <h2>What this does not do</h2>
+    <ul class="plain">
+      <li>Every guarantee assumes the consensus layer resists censorship. A testnet does not provide that.</li>
+      <li>The contract checks that an outcome is feasible and that no seller is underpaid relative to its own bid. It does not check that the allocation maximises welfare — the solver asserts that.</li>
+      <li>The pool must hold one full-range position at zero fee, or the realised swap stops matching the curve the batch was solved against.</li>
+      <li>ERC-20 pairs only. No native ETH, no contract wallets.</li>
+      <li>Both headline numbers are upper bounds: the attack figure assumes zero fees, and the redistribution figure assumes sellers who accept any price.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Implementation of Shi, Zhang, Chung and Li, <em>Otter: A Provably MEV-Resilient
+    Automated Market Maker via Surplus Redistribution</em> (ePrint 2026/1877).
+    <a href="https://github.com/mansi0xc/otter">Source and full findings</a>.
+  </footer>
+</div>
+
+<script>
+const WAD = 10n ** 18n;
+const B = (h) => BigInt(h);
+const toNum = (v) => Number(v) / 1e18;
+const fmt = (v, d = 3) => toNum(v).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+const px = (n) => n.toFixed(2);
+
+async function getJSON(p) { const r = await fetch(p); if (!r.ok) throw new Error(p); return r.json(); }
+async function getCSV(p) {
+  const r = await fetch(p); if (!r.ok) throw new Error(p);
+  const rows = (await r.text()).trim().split("\n").map((l) => l.split(","));
+  const head = rows.shift();
+  return rows.map((row) => Object.fromEntries(row.map((c, i) => [head[i], c])));
+}
+const show = (id) => document.getElementById(id).removeAttribute("hidden");
+
+/* ---- the batch ---------------------------------------------------- */
+function renderBatch(d) {
+  const n = d.orderCount;
+  const budgets = d.budget.map(B), filled = d.y.map(B), paid = d.x.map(B), asks = d.ask.map(B);
+  const dom = d.sellingCurrency0.map((s) => B(s) === 1n);
+  const maxB = budgets.reduce((a, b) => (b > a ? b : a), 0n);
+
+  const W = 700, rowH = 34, pad = 120, H = n * rowH + 44;
+  const scale = (v) => Number(v * 1000n / maxB) / 1000 * (W - pad - 30);
+  const spotX = pad + (W - pad - 30) * 0.0; // spot marker drawn on the ask axis below
+
+  let bars = "";
+  for (let i = 0; i < n; i++) {
+    const y = 30 + i * rowH;
+    const wB = scale(budgets[i]), wF = scale(filled[i]);
+    const priced = filled[i] === 0n;
+    const colour = priced ? "var(--ink-dim)" : (filled[i] < budgets[i] ? "var(--alarm)" : "var(--signal)");
+    bars += `
+      <text x="0" y="${y + 15}" font-size="12" fill="var(--ink-mid)">#${i} · ${dom[i] ? "sells c0" : "sells c1"}</text>
+      <text x="${pad - 12}" y="${y + 15}" font-size="12" text-anchor="end" fill="var(--ink-mid)">${fmt(asks[i], 3)}</text>
+      <rect x="${pad}" y="${y + 3}" width="${px(wB)}" height="18" fill="var(--ground)" stroke="var(--rule)"/>
+      ${wF > 0 ? `<rect x="${pad}" y="${y + 3}" width="${px(wF)}" height="18" fill="${colour}"/>` : ""}`;
+  }
+  document.getElementById("ladder").innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Order budgets and fills">
+       <text x="0" y="14" font-size="11" fill="var(--ink-dim)">order</text>
+       <text x="${pad - 12}" y="14" font-size="11" text-anchor="end" fill="var(--ink-dim)">ask</text>
+       <text x="${pad}" y="14" font-size="11" fill="var(--ink-dim)">budget, shaded where filled</text>
+       ${bars}
+     </svg>`;
+
+  const tb = document.querySelector("#batch-table tbody");
+  tb.innerHTML = "";
+  for (let i = 0; i < n; i++) {
+    const full = filled[i] === budgets[i] && filled[i] > 0n;
+    const part = filled[i] > 0n && filled[i] < budgets[i];
+    const cls = full ? "t-full" : part ? "t-partial" : "t-out";
+    const label = full ? "filled" : part ? "partly filled" : (asks[i] > WAD ? "ineligible" : "priced out");
+    tb.insertAdjacentHTML("beforeend", `<tr>
+      <td>#${i} ${dom[i] ? "sells c0" : "sells c1"}</td>
+      <td>${fmt(asks[i], 3)}</td>
+      <td>${fmt(budgets[i], 2)}</td>
+      <td>${fmt(filled[i], 3)}</td>
+      <td>${fmt(paid[i], 3)}</td>
+      <td><span class="tag ${cls}">${label}</span></td></tr>`);
+  }
+
+  const totalIn = B(d.totalIn);
+  document.getElementById("batch-note").textContent =
+    `${fmt(totalIn, 3)} sold in total. Order #1 stops mid-budget at the point where the ` +
+    `marginal price falls to its ask; #2 is eligible but priced out by the sellers ahead of it.`;
+
+  const burn = B(d.burn);
+  document.getElementById("burn-big").textContent = fmt(burn, 4);
+  document.getElementById("burn-wei").textContent = burn.toString() + " wei";
+  document.getElementById("burn-ppm").textContent =
+    totalIn > 0n ? (Number(burn * 1000000n / totalIn)).toLocaleString() : "—";
+  show("s-batch"); show("s-burn");
+}
+
+/* ---- sandwich ----------------------------------------------------- */
+function renderSandwich(s) {
+  const fair = BigInt(s.fairOut), att = BigInt(s.sandwichedOut), ott = BigInt(s.otterOut);
+  const max = [fair, att, ott].reduce((a, b) => (b > a ? b : a));
+  const rows = [
+    ["No attacker", fair, "var(--ink-mid)"],
+    ["Sandwiched", att, "var(--alarm)"],
+    ["Otter pool", ott, "var(--signal)"],
+  ];
+  document.getElementById("sandwich-bars").innerHTML = rows.map(([l, v, c]) => `
+    <div class="bar-row">
+      <div>${l}</div>
+      <div class="track"><div class="fill" style="width:${px(Number(v * 1000n / max) / 10)}%;background:${c}"></div></div>
+      <div>${fmt(v, 3)}</div>
+    </div>`).join("");
+
+  const loss = Number(BigInt(s.victimLoss) * 1000n / BigInt(s.victimSize)) / 10;
+  document.getElementById("loss-pct").textContent = loss.toFixed(0) + "%";
+  const delta = (toNum(ott) / toNum(fair) - 1) * 100;
+  document.getElementById("otter-delta").textContent = (delta >= 0 ? "+" : "") + delta.toFixed(1) + "%";
+  show("s-sandwich");
+}
+
+/* ---- gas ---------------------------------------------------------- */
+function renderGas(curve, ceiling) {
+  const pts = curve.map((r) => ({ n: +r.orders, g: +r.total_gas }));
+  if (ceiling) for (const r of ceiling) pts.push({ n: +r.orders, g: +r.total_gas });
+  pts.sort((a, b) => a.n - b.n);
+
+  const W = 700, H = 300, L = 58, Bm = 34, T = 14, R = 14;
+  const maxN = Math.max(...pts.map((p) => p.n)) * 1.05;
+  const maxG = Math.max(30e6, ...pts.map((p) => p.g)) * 1.08;
+  const X = (n) => L + (n / maxN) * (W - L - R);
+  const Y = (g) => H - Bm - (g / maxG) * (H - Bm - T);
+
+  const path = pts.map((p, i) => `${i ? "L" : "M"}${px(X(p.n))},${px(Y(p.g))}`).join(" ");
+  const blockY = Y(30e6);
+  const fits = ceiling ? ceiling.filter((r) => r.fits === "yes").map((r) => +r.orders) : [];
+  const cap = fits.length ? Math.max(...fits) : null;
+
+  const ticks = [0, 10e6, 20e6, 30e6].map((g) =>
+    `<line x1="${L}" y1="${px(Y(g))}" x2="${W - R}" y2="${px(Y(g))}" stroke="var(--grid)"/>
+     <text x="${L - 8}" y="${px(Y(g) + 4)}" font-size="11" text-anchor="end" fill="var(--ink-dim)">${g / 1e6}M</text>`).join("");
+
+  document.getElementById("gas-chart").innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Settlement gas against batch size">
+      ${ticks}
+      <line x1="${L}" y1="${px(blockY)}" x2="${W - R}" y2="${px(blockY)}" stroke="var(--alarm)" stroke-dasharray="5 4"/>
+      <text x="${W - R}" y="${px(blockY - 7)}" font-size="11" text-anchor="end" fill="var(--alarm)">block limit</text>
+      <path d="${path}" fill="none" stroke="var(--signal)" stroke-width="2"/>
+      ${pts.map((p) => `<circle cx="${px(X(p.n))}" cy="${px(Y(p.g))}" r="2.6" fill="var(--signal)"/>`).join("")}
+      ${cap ? `<line x1="${px(X(cap))}" y1="${T}" x2="${px(X(cap))}" y2="${H - Bm}" stroke="var(--ink)" stroke-width="1"/>
+               <text x="${px(X(cap) + 6)}" y="${T + 12}" font-size="11" fill="var(--ink)">${cap} orders</text>` : ""}
+      <line x1="${L}" y1="${H - Bm}" x2="${W - R}" y2="${H - Bm}" stroke="var(--ink)"/>
+      <text x="${(L + W) / 2}" y="${H - 6}" font-size="11" text-anchor="middle" fill="var(--ink-dim)">orders in the batch</text>
+     </svg>`;
+
+  if (cap) document.getElementById("ceiling").textContent = cap;
+  const at200 = curve.find((r) => +r.orders === 200);
+  if (at200) document.getElementById("per-order").textContent = (+at200.total_per_order).toLocaleString();
+  show("s-gas");
+}
+
+/* ---- boot --------------------------------------------------------- */
+(async () => {
+  let any = false;
+  try { renderBatch(await getJSON("../fixtures/demo-batch.json")); any = true; } catch (e) { console.warn(e); }
+  try { renderSandwich(await getJSON("../harness/results/sandwich.json")); any = true; } catch (e) { console.warn(e); }
+  try {
+    const curve = await getCSV("../harness/results/gas-curve.csv");
+    let ceiling = null;
+    try { ceiling = await getCSV("../harness/results/block-ceiling.csv"); } catch (e) { console.warn(e); }
+    renderGas(curve, ceiling); any = true;
+  } catch (e) { console.warn(e); }
+  if (!any) document.getElementById("error").removeAttribute("hidden");
+})();
+</script>
+</body>
+</html>

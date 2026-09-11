@@ -9,6 +9,15 @@ Environment: Foundry, solc 0.8.26, `v4-core` at tag `v4.0.0`
 
 ---
 
+---
+
+Three of the four notes below are the same problem wearing different clothes:
+**v4 assumes you already know something it never tells you.** A removed base
+contract the docs still reference, a deployment-critical helper filed under
+`test/`, remappings that are correct relative to a dependency and wrong from a
+consumer, and base-class state variables that silently shadow yours. None is a
+bug. Each cost an hour, and each is a documentation fix rather than a code one.
+
 ## `BaseHook` has been removed from both repos with no migration note
 
 This cost the most time of anything in setup. Nearly all v4 hook material — the
@@ -72,6 +81,37 @@ type errors between contracts that look identical.
 **Suggestion:** a short "consuming v4-core from your own Foundry project" section
 with the four remappings that actually work. This is the first five minutes of
 every v4 project and currently everyone rediscovers it.
+
+## `Deployers` shadows unprefixed names into every test that inherits it
+
+`test/utils/Deployers.sol` declares `key`, `manager`, `swapRouter`, `SWAP_PARAMS`,
+`LIQUIDITY_PARAMS` and others as plain state variables. Any test contract
+inheriting it absorbs all of them. `PoolKey key` is a name anybody writing a pool
+test will reach for, and the collision surfaces as:
+
+```
+Error (9097): Identifier already declared.
+  --> lib/v4-core/test/utils/Deployers.sol:68:5
+```
+
+which points into `lib/` and reads like a dependency bug rather than a naming
+conflict in your own file.
+
+**Suggestion:** prefix them (`d_key`), or list the reserved names in the contract's
+NatSpec. Either would turn a confusing error into a non-event.
+
+## Smaller notes
+
+- `PoolModifyLiquidityTest` lives in `src/test/`, which is the only practical way
+  to add liquidity from a script once `v4-periphery` is not a dependency. It works
+  well for that, but deploying something named `...Test` to a network feels like
+  using an undocumented door. A minimal supported liquidity router in `src/` would
+  be welcome.
+- The `Hooks.sol` permission constants are genuinely good: clear, greppable, and
+  easy to assert against directly. Reading `BEFORE_SWAP_FLAG` out of the library
+  and masking the mined address against `ALL_HOOK_MASK` is a two-line test that
+  catches an entire class of deployment mistake. More libraries should be this
+  easy to verify against.
 
 ## What worked well
 
