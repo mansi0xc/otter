@@ -1,0 +1,53 @@
+{
+  "generatedBy": "solver/src/demo-cli.ts",
+  "note": "Batch with real reservation values, solved exactly. Pool is 1:1 so virtual reserves equal liquidity.",
+  "liquidity": "0x3635c9adc5dea00000",
+  "r0": "0x3635c9adc5dea00000",
+  "r1": "0x3635c9adc5dea00000",
+  "orderCount": 6,
+  "sellingCurrency0": [
+    "0x1",
+    "0x1",
+    "0x1",
+    "0x1",
+    "0x0",
+    "0x0"
+  ],
+  "ask": [
+    "0xc3663566a580000",
+    "0xce80612991d0000",
+    "0xd87e55590018000",
+    "0xe6ed27d66680000",
+    "0xca0f82db99b0000",
+    "0xff59ee833b30000"
+  ],
+  "budget": [
+    "0x1a055690d9db80000",
+    "0x15af1d78b58c40000",
+    "0x22b1c8c1227a00000",
+    "0x1158e460913d00000",
+    "0xa688906bd8b00000",
+    "0xd02ab486cedc0000"
+  ],
+  "dominantSellsCurrency0": "0x1",
+  "y": [
+    "0x1a055690d9db80000",
+    "0x10701f1f26aa3f889",
+    "0x0",
+    "0x0",
+    "0xa688906bd8b00000",
+    "0x0"
+  ],
+  "x": [
+    "0x18a7fd9ef8d897322",
+    "0xf9268fc047090dd1",
+    "0x0",
+    "0x0",
+    "0xa688906bd8b00000",
+    "0x0"
+  ],
+  "burn": "0x116ad5385faf29ca",
+  "M": "0xa688906bd8b00000",
+  "totalIn": "0x2a7575b00085bf889",
+  "totalPaid": "0x283a669afd49280f3"
+}

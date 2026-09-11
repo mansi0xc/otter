@@ -6,6 +6,8 @@
     "test": "node --experimental-strip-types test/properties.ts",
     "mutation": "node --experimental-strip-types test/mutation.ts",
     "bench": "node --experimental-strip-types test/bench.ts",
-    "vectors": "node --experimental-strip-types src/cli.ts ../fixtures/vectors"
+    "vectors": "node --experimental-strip-types src/cli.ts ../fixtures/vectors",
+    "demo": "node --experimental-strip-types src/demo-cli.ts ../fixtures/demo-batch.json",
+    "exact": "node --experimental-strip-types test/exact.ts"
   }
 }
