@@ -252,6 +252,22 @@ contract SandwichHarness is Deployers {
         console2.log("========================================");
 
         assertGt(otterOut, victimUnderAttack, "Otter must beat the sandwiched price");
+
+        // The demo page reads this. Writing it here rather than transcribing the
+        // console output keeps the page and the test from drifting apart.
+        vm.writeFile(
+            "../harness/results/sandwich.json",
+            string.concat(
+                '{\n  "victimSize": ', vm.toString(VICTIM_SIZE),
+                ',\n  "fairOut": ', vm.toString(fairOut),
+                ',\n  "sandwichedOut": ', vm.toString(victimUnderAttack),
+                ',\n  "otterOut": ', vm.toString(otterOut),
+                ',\n  "searcherCapital": ', vm.toString(bestFront),
+                ',\n  "searcherProfit": ', vm.toString(uint256(bestProfit)),
+                ',\n  "victimLoss": ', vm.toString(victimLoss),
+                '\n}\n'
+            )
+        );
     }
 
     /// Victim sells currency0 (dominant). Searcher joins selling currency1, which

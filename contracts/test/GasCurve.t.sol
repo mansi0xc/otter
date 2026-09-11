@@ -154,7 +154,11 @@ contract GasCurveTest is Deployers {
     }
 
     function test_gasCurve() public {
-        uint256[8] memory sizes = [uint256(1), 2, 5, 10, 25, 50, 100, 200];
+        // 300/400/500 exist so the plotted curve has data across the region where
+        // memory expansion starts to bite. Without them a chart interpolates a
+        // straight line from 200 to 610 and visually contradicts the superlinearity
+        // the numbers actually show.
+        uint256[11] memory sizes = [uint256(1), 2, 5, 10, 25, 50, 100, 200, 300, 400, 500];
 
         string memory csv = "orders,submit_gas,settle_gas,calldata_gas,total_gas,total_per_order,pct_of_block\n";
         console2.log("orders | settle gas | calldata gas");
@@ -169,6 +173,7 @@ contract GasCurveTest is Deployers {
 
             console2.log(n, settleGas, cdGas);
             console2.log("   total", totalGas, totalGas / n);
+            console2.log("   pct of block", pctOfBlock);
 
             csv = string.concat(
                 csv,
