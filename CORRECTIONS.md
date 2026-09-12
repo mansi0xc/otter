@@ -153,7 +153,10 @@ Developer Feedback Form linking to it. Winners are audited for this.
 - The mechanism's guarantees assume consensus-layer censorship resilience (Theorem 23).
   A testnet does not provide this.
 - Welfare-optimality of the proposed allocation is asserted by the solver, verified only
-  for feasibility, IR, budget bounds and curve conservation on-chain.
+  for feasibility, IR, budget bounds and curve conservation on-chain. Off-chain,
+  `solver/test/properties.ts` §8 now cross-checks `allocate`'s welfare against an
+  independent grid search for n <= 4 — evidence for small instances, not a proof
+  for arbitrary n.
 - The pivot algorithm is extracted from the paper's Lemma 16, not original to this work.
 
 ## C7. Theorem 12(c) is implied by the 12(b) bounds

@@ -30,7 +30,12 @@ Stated up front rather than buried:
   (Theorem 23). A testnet does not provide this.
 - The contract verifies feasibility, individual rationality, budget bounds and curve
   conservation. **Welfare-optimality of the proposed allocation is asserted by the
-  solver, not proven on-chain.**
+  solver, not proven on-chain.** Off-chain, `solver/test/properties.ts` §8
+  grid-searches the allocation space directly (independent of `allocate`'s own
+  logic) for small instances (n ≤ 4) and checks nothing on the grid beats what
+  the solver actually returns. That is evidence for small n, not a proof for
+  arbitrary n — see the section's comment for exactly what it does and does not
+  establish.
 - The `O(n log n)` pivot algorithm is extracted from the proof of the paper's Lemma 16.
   It is not original to this work.
 
