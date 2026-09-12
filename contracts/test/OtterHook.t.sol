@@ -8,6 +8,7 @@ import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {CustomRevert} from "@uniswap/v4-core/src/libraries/CustomRevert.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
@@ -33,8 +34,9 @@ contract OtterHookTest is Deployers {
         deployFreshManagerAndRouters();
         deployMintAndApprove2Currencies();
 
-        // Mine a CREATE2 salt whose low 14 bits carry only BEFORE_SWAP_FLAG.
-        uint160 flags = uint160(Hooks.BEFORE_SWAP_FLAG);
+        // Mine a CREATE2 salt whose low 14 bits carry BEFORE_SWAP and
+        // BEFORE_ADD_LIQUIDITY.
+        uint160 flags = uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG);
         (address predicted, bytes32 salt) = HookMiner.find(
             address(this), flags, type(OtterHook).creationCode, abi.encode(manager, settlement)
         );
@@ -61,9 +63,13 @@ contract OtterHookTest is Deployers {
     // ------------------------------------------------------------------
 
     /// plan.md standing rule: verify the flag against v4-core, never a table.
-    function test_hookAddressCarriesOnlyBeforeSwap() public view {
+    function test_hookAddressCarriesBeforeSwapAndBeforeAddLiquidity() public view {
         uint160 bits = uint160(address(hook)) & Hooks.ALL_HOOK_MASK;
-        assertEq(bits, uint160(Hooks.BEFORE_SWAP_FLAG), "hook address must encode exactly BEFORE_SWAP");
+        assertEq(
+            bits,
+            uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG),
+            "hook address must encode exactly BEFORE_SWAP | BEFORE_ADD_LIQUIDITY"
+        );
         console2.log("hook address", address(hook));
         console2.log("permission bits", uint256(bits));
     }
@@ -119,14 +125,122 @@ contract OtterHookTest is Deployers {
         );
     }
 
-    /// Liquidity is deliberately not gated: LPs move freely between batches.
-    function test_liquidityIsNotGated() public {
+    // ------------------------------------------------------------------
+    // liquidity gate — task 6: enforce, not just document, single full range
+    // ------------------------------------------------------------------
+
+    /// @dev PoolManager's `Hooks.callHook` does not let a hook's revert reason
+    ///      bubble up raw — it re-wraps it as an ERC-7751 `CustomRevert.WrappedError`
+    ///      carrying the hook address, the called selector, the original reason,
+    ///      and `Hooks.HookCallFailed.selector` as additional context (see
+    ///      `CustomRevert.bubbleUpAndRevertWith`). Matching that wrapper exactly,
+    ///      rather than a bare `vm.expectRevert()`, is what proves the rejection
+    ///      came from OUR `NotFullRange` check and not some unrelated revert.
+    function _wrappedNotFullRange(int24 tickLower, int24 tickUpper, int24 requiredLower, int24 requiredUpper)
+        internal
+        view
+        returns (bytes memory)
+    {
+        bytes memory reason =
+            abi.encodeWithSelector(OtterHook.NotFullRange.selector, tickLower, tickUpper, requiredLower, requiredUpper);
+        return abi.encodeWithSelector(
+            CustomRevert.WrappedError.selector,
+            address(hook),
+            IHooks.beforeAddLiquidity.selector,
+            reason,
+            abi.encodePacked(Hooks.HookCallFailed.selector)
+        );
+    }
+
+
+    /// LPs still move freely between batches — the gate restricts the SHAPE of
+    /// a position, not whether one can be added at all.
+    function test_fullRangeAddSucceeds() public {
         modifyLiquidityRouter.modifyLiquidity(
             otterKey,
             IPoolManager.ModifyLiquidityParams({
                 tickLower: TICK_LOWER,
                 tickUpper: TICK_UPPER,
                 liquidityDelta: 1e20,
+                salt: 0
+            }),
+            ZERO_BYTES
+        );
+    }
+
+    /// The exploit this closes: a second, narrower position makes `L` change
+    /// mid-swap if a batch crosses its boundary, which is exactly the assumption
+    /// OtterPoolMath's virtual-reserve math depends on holding everywhere.
+    function test_narrowerRangeAddIsRejected() public {
+        int24 lo = TICK_LOWER + 1000;
+        int24 hi = TICK_UPPER - 1000;
+        vm.expectRevert(_wrappedNotFullRange(lo, hi, TICK_LOWER, TICK_UPPER));
+        modifyLiquidityRouter.modifyLiquidity(
+            otterKey,
+            IPoolManager.ModifyLiquidityParams({tickLower: lo, tickUpper: hi, liquidityDelta: 1e20, salt: 0}),
+            ZERO_BYTES
+        );
+    }
+
+    /// A one-sided range (e.g. a limit-order-style position skewed to one side)
+    /// is exactly as disallowed as a symmetric narrow one — either tick alone
+    /// being off the full range must revert.
+    function test_oneSidedRangeAddIsRejected() public {
+        vm.expectRevert(_wrappedNotFullRange(TICK_LOWER, TICK_UPPER - 1, TICK_LOWER, TICK_UPPER));
+        modifyLiquidityRouter.modifyLiquidity(
+            otterKey,
+            IPoolManager.ModifyLiquidityParams({
+                tickLower: TICK_LOWER,
+                tickUpper: TICK_UPPER - 1,
+                liquidityDelta: 1e20,
+                salt: 0
+            }),
+            ZERO_BYTES
+        );
+    }
+
+    /// The required range is derived from `key.tickSpacing`, not hardcoded — a
+    /// pool at a different spacing has a different full range, and the gate
+    /// must track it rather than silently requiring the tickSpacing-1 range at
+    /// every pool.
+    function test_gateTracksTickSpacing() public {
+        int24 spacing = 60;
+        (PoolKey memory key60,) = initPool(currency0, currency1, IHooks(address(hook)), 0, spacing, SQRT_PRICE_1_1);
+        int24 lo60 = TickMath.minUsableTick(spacing);
+        int24 hi60 = TickMath.maxUsableTick(spacing);
+
+        // The tickSpacing=1 full range is not a valid range at tickSpacing=60.
+        vm.expectRevert(_wrappedNotFullRange(TICK_LOWER, TICK_UPPER, lo60, hi60));
+        modifyLiquidityRouter.modifyLiquidity(
+            key60,
+            IPoolManager.ModifyLiquidityParams({
+                tickLower: TICK_LOWER,
+                tickUpper: TICK_UPPER,
+                liquidityDelta: 1e20,
+                salt: 0
+            }),
+            ZERO_BYTES
+        );
+
+        // The actual full range at spacing 60 is accepted.
+        modifyLiquidityRouter.modifyLiquidity(
+            key60,
+            IPoolManager.ModifyLiquidityParams({tickLower: lo60, tickUpper: hi60, liquidityDelta: 1e20, salt: 0}),
+            ZERO_BYTES
+        );
+    }
+
+    /// Removing from the (only ever full-range) position must still work — the
+    /// gate must not have accidentally blocked `beforeRemoveLiquidity`, which v4
+    /// never even routes through it (see the LIQUIDITY GATE note), but this
+    /// pins the end-to-end behaviour rather than trusting that reasoning alone.
+    function test_removingFullRangeLiquidityStillWorks() public {
+        modifyLiquidityRouter.modifyLiquidity(
+            otterKey,
+            IPoolManager.ModifyLiquidityParams({
+                tickLower: TICK_LOWER,
+                tickUpper: TICK_UPPER,
+                liquidityDelta: -1e20,
                 salt: 0
             }),
             ZERO_BYTES

@@ -67,7 +67,7 @@ contract OtterSettlementSellXTest is Deployers {
 
         (address predicted, bytes32 salt) = HookMiner.find(
             address(this),
-            uint160(Hooks.BEFORE_SWAP_FLAG),
+            uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG),
             type(OtterHook).creationCode,
             abi.encode(manager, address(settlement))
         );

@@ -8,6 +8,7 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
 import {FixedPoint96} from "@uniswap/v4-core/src/libraries/FixedPoint96.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 
 /// @title OtterPoolMath
 /// @notice Recovers the constant-product reserves the paper's `F` is defined on
@@ -49,25 +50,44 @@ library OtterPoolMath {
 
 /// @title OtterHook
 /// @notice Makes a v4 pool batch-only by rejecting every swap that does not come
-///         from the Otter settlement contract.
+///         from the Otter settlement contract, and restricts liquidity to a
+///         single full-range position so `OtterPoolMath`'s constant-liquidity
+///         assumption is enforced rather than merely documented.
 ///
 /// This is not decoration. Otter's guarantees come from settling a whole batch as
 /// an order-independent set; if anyone can slip an ordinary sequential swap into
 /// the same block, the pool state the batch was solved against moves underneath
-/// it and order-independence is meaningless. `beforeSwap` is the only enabled
-/// permission, so the hook address must carry BEFORE_SWAP_FLAG (1 << 7) in its
-/// low 14 bits — mine the CREATE2 salt with HookMiner.
+/// it and order-independence is meaningless. Both `beforeSwap` and
+/// `beforeAddLiquidity` are enabled, so the hook address must carry
+/// BEFORE_SWAP_FLAG (1 << 7) and BEFORE_ADD_LIQUIDITY_FLAG (1 << 11) in its low
+/// 14 bits — mine the CREATE2 salt with HookMiner against both.
 ///
-/// Liquidity provision is deliberately NOT gated: LPs come and go freely between
-/// batches. Settlement reads the pool's price and liquidity at execution time, so
-/// a change between solving and settling shows up as a curve-conservation failure
-/// rather than a silent mispricing.
+/// LIQUIDITY GATE. `beforeAddLiquidity` requires `tickLower`/`tickUpper` to equal
+/// the pool's full range at its own tick spacing (`TickMath.minUsableTick` /
+/// `maxUsableTick`). This is the enforcement side of the assumption
+/// `OtterPoolMath` already documents: liquidity concentrated in a narrower range
+/// makes `L` change mid-swap if a batch crosses that range's boundary, and the
+/// settled outcome would then diverge from the curve the mechanism was solved
+/// against. Gating only ADDS is sufficient — v4 only invokes this hook for
+/// `liquidityDelta > 0` (Hooks.sol), never for removes or the zero-delta calls
+/// LPs use to collect fees — because a position can only exist if it was
+/// admitted through this same check when it was created; there is no way to
+/// remove liquidity from a range that was never allowed to be added.
+///
+/// LPs otherwise come and go freely between batches — the gate gives them one
+/// shape to add in, not permission to add at all. Settlement still reads the
+/// pool's price and liquidity at execution time, so a change in the AMOUNT of
+/// full-range liquidity between solving and settling shows up as a
+/// curve-conservation failure rather than a silent mispricing; the gate's job is
+/// only to keep the SHAPE of that liquidity from ever being anything but
+/// full-range.
 contract OtterHook is IHooks {
     IPoolManager public immutable poolManager;
     address public immutable settlement;
 
     error NotPoolManager();
     error BatchOnly(address sender);
+    error NotFullRange(int24 tickLower, int24 tickUpper, int24 requiredLower, int24 requiredUpper);
     error HookNotImplemented();
 
     constructor(IPoolManager poolManager_, address settlement_) {
@@ -92,6 +112,24 @@ contract OtterHook is IHooks {
         return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
     }
 
+    /// @dev Only called for `liquidityDelta > 0` — see the LIQUIDITY GATE note
+    ///      above. Reads `key.tickSpacing` rather than trusting a caller-supplied
+    ///      value, so the required range always matches the pool this add is
+    ///      actually against.
+    function beforeAddLiquidity(
+        address,
+        PoolKey calldata key,
+        IPoolManager.ModifyLiquidityParams calldata params,
+        bytes calldata
+    ) external view onlyPoolManager returns (bytes4) {
+        int24 lo = TickMath.minUsableTick(key.tickSpacing);
+        int24 hi = TickMath.maxUsableTick(key.tickSpacing);
+        if (params.tickLower != lo || params.tickUpper != hi) {
+            revert NotFullRange(params.tickLower, params.tickUpper, lo, hi);
+        }
+        return IHooks.beforeAddLiquidity.selector;
+    }
+
     // ------------------------------------------------------------------
     // Unused permissions. The hook address does not carry these flags, so the
     // PoolManager never calls them; they revert rather than silently succeed.
@@ -105,13 +143,6 @@ contract OtterHook is IHooks {
         revert HookNotImplemented();
     }
 
-    function beforeAddLiquidity(address, PoolKey calldata, IPoolManager.ModifyLiquidityParams calldata, bytes calldata)
-        external
-        pure
-        returns (bytes4)
-    {
-        revert HookNotImplemented();
-    }
 
     function afterAddLiquidity(
         address,

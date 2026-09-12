@@ -87,16 +87,16 @@ contract Deploy is Script {
         OtterSettlement settlement = new OtterSettlement(manager, book, solver, exclusivityWindow);
         book.setSettlement(address(settlement));
 
-        // --- hook: mine a salt carrying exactly BEFORE_SWAP -----------
+        // --- hook: mine a salt carrying BEFORE_SWAP + BEFORE_ADD_LIQUIDITY ---
         bytes memory args = abi.encode(manager, address(settlement));
+        uint160 hookFlags = uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG);
         (address predicted, bytes32 salt) =
-            HookMiner.find(CREATE2_DEPLOYER, uint160(Hooks.BEFORE_SWAP_FLAG), type(OtterHook).creationCode, args);
+            HookMiner.find(CREATE2_DEPLOYER, hookFlags, type(OtterHook).creationCode, args);
 
         OtterHook hook = new OtterHook{salt: salt}(manager, address(settlement));
         require(address(hook) == predicted, "hook address mismatch: wrong CREATE2 deployer?");
         require(
-            uint160(address(hook)) & Hooks.ALL_HOOK_MASK == uint160(Hooks.BEFORE_SWAP_FLAG),
-            "hook address encodes unexpected permissions"
+            uint160(address(hook)) & Hooks.ALL_HOOK_MASK == hookFlags, "hook address encodes unexpected permissions"
         );
 
         // --- pool -----------------------------------------------------
