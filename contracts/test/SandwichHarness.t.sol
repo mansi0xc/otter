@@ -32,22 +32,44 @@ interface IERC20H {
 /// join the batch — where its order executes at the pre-batch spot price, so
 /// there is no "before" and "after" to extract value between.
 ///
-/// A zero-fee sandwich has NO OPTIMAL SIZE. Profit rises monotonically with the
-/// searcher's capital and asymptotes to the victim's ENTIRE input: 9.5% of it at
-/// 1x the victim's size, 75% at 20x, 97% at 100x. Extraction is bounded by the
-/// attacker's balance sheet, not by the curve. (With a non-zero LP fee there is an
-/// interior optimum, because fees on both legs eventually dominate — one more way
-/// the zero-fee comparison flatters the attacker.)
+/// This harness reports TWO different numbers for the vanilla pool, and they
+/// answer different questions:
 ///
-/// So this harness does not search for "the" sandwich. It sweeps capital and
-/// reports extraction as a function of it, which is the honest shape of the
-/// threat — and the shape Otter flattens to zero at every level.
+/// CEILING (unrealistic). A zero-fee sandwich against a victim with no slippage
+/// protection has NO OPTIMAL SIZE — profit rises monotonically with the
+/// searcher's capital and asymptotes to the victim's ENTIRE input: 9% of it at
+/// 1x the victim's size, 75% at 20x, 97% at 100x. This number requires assuming
+/// the victim would accept literally any execution price, which no real wallet
+/// defaults to. It is included because it is the honest upper bound on the
+/// threat, not because it is what a sandwich nets in practice.
+///
+/// REALISTIC (slippage-protected). A searcher who pushes price past the
+/// victim's actual tolerance gets a REVERTED victim transaction, not a bigger
+/// sandwich — there is nothing to back-run. At the tolerances real wallets and
+/// routers actually use (0.5% / 1% / 5%, all measured against the victim's
+/// ALREADY-price-impacted quote, not some hypothetical impact-free execution),
+/// the searcher's extraction is bounded by roughly that same tolerance — a
+/// fraction of a percent of the trade, not 97% of it. This is the number that
+/// describes an actual sandwich against an actual careful trader.
+///
+/// Both numbers are computed and reported. Leading with the ceiling number alone
+/// — as an earlier version of this harness did — invites exactly the objection
+/// it deserves: nobody trades with unlimited slippage, so a 97% headline number
+/// measures a strawman, not the threat.
+///
+/// Otter beats BOTH numbers, at every tolerance tested, and (see the assertions
+/// at the end of the test) beats the completely unattacked fairOut too — the
+/// mechanism doesn't just avoid losing to a sandwich, it gives this particular
+/// victim a curve strictly better than the one a lone AMM trade would apply
+/// throughout. The reason why is explained where it happens, in
+/// `test_sandwichComparison`'s final section, not asserted here.
 ///
 /// Caveat stated up front: both pools are zero-fee, because Otter requires it (a
 /// non-zero LP fee makes the realised swap diverge from F~ and breaks curve
-/// conservation). Zero fee FLATTERS the attacker — on a 0.30% pool the searcher
-/// would pay fees on both legs and net less. The comparison is therefore an upper
-/// bound on extraction, not a typical one, and the README should say so.
+/// conservation). Zero fee FLATTERS the attacker in both scenarios above — on a
+/// 0.30% pool the searcher would pay fees on both legs and net less. The
+/// comparison is therefore an upper bound on extraction in both cases, not a
+/// typical one, and the README should say so.
 contract SandwichHarness is Deployers {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
@@ -158,7 +180,60 @@ contract SandwichHarness is Deployers {
         botProfit = int256(returned) - int256(frontSize);
     }
 
-    // ------------------------------------------------------------------
+    /// Victim's output for a given front-run size, in isolation (state reverted
+    /// after). Used as the monotone function the tolerance search below climbs.
+    function _victimOutForFront(uint256 frontSize) internal returns (uint256 victimOut) {
+        uint256 snap = vm.snapshotState();
+        _swap(vanillaKey, true, frontSize);
+        victimOut = _swap(vanillaKey, true, VICTIM_SIZE);
+        vm.revertToState(snap);
+    }
+
+    /// @notice The realistic version of "the searcher's optimal front-run": the
+    ///         largest front-run that still lets the victim's trade clear at or
+    ///         above `minOut`.
+    ///
+    /// A searcher who pushes the price past the victim's slippage limit does not
+    /// get a bigger sandwich — they get a REVERTED victim transaction and no
+    /// back-run to fund from, which is why every real wallet defaults to some
+    /// non-zero tolerance and every serious searcher respects it. Modelling
+    /// extraction as unconstrained by that limit (the ceiling search above) is
+    /// the strawman version of this attack; this is the realistic one.
+    ///
+    /// Binary search relies on `victimOut` being non-increasing in `frontSize`,
+    /// which holds for any front-run in the same direction as the victim on a
+    /// monotone AMM curve — asserted at `hi` rather than assumed.
+    function _maxFrontRunWithinTolerance(uint256 minOut)
+        internal
+        returns (uint256 frontSize, int256 profit, uint256 victimOut)
+    {
+        uint256 lo = 0;
+        uint256 hi = VICTIM_SIZE; // see the note at VICTIM_SIZE: already ~5% impact alone
+        assertLt(_victimOutForFront(hi), minOut, "search bound too small: raise hi");
+
+        for (uint256 i; i < 40; ++i) {
+            uint256 mid = (lo + hi) / 2;
+            if (_victimOutForFront(mid) >= minOut) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+
+        frontSize = lo;
+        uint256 snap = vm.snapshotState();
+        (profit, victimOut) = _runSandwich(frontSize);
+        vm.revertToState(snap);
+    }
+
+    /// Realistic slippage tolerances a wallet or router would actually set,
+    /// in basis points, relative to `fairOut` — i.e. on top of the victim's OWN
+    /// price impact, which `fairOut` already reflects and the trader already
+    /// accepted when they saw the quote. 50 = the common wallet default (0.5%);
+    /// 100 = a looser default (1%); 500 = a deliberately generous one (5%),
+    /// included specifically so the ceiling comparison below isn't cherry-picked
+    /// to make Otter look better than a merely-careless victim would find it.
+    uint16[3] internal TOLERANCE_BPS = [uint16(50), uint16(100), uint16(500)];
 
     function test_sandwichComparison() public {
         // ---- 1. what the victim gets with nobody attacking -------------
@@ -166,9 +241,13 @@ contract SandwichHarness is Deployers {
         uint256 fairOut = _swap(vanillaKey, true, VICTIM_SIZE);
         vm.revertToState(snap);
 
-        // ---- 2. search the searcher's optimal front-run ----------------
+        // ---- 2a. UNREALISTIC CEILING: victim has no slippage protection ----
         // Searcher capital, as a multiple of the victim's trade. Bounded by the
-        // balance sheet, not by any optimum — see the note at the top.
+        // balance sheet, not by any optimum — see the note at the top. This
+        // requires a victim who will accept literally any execution price,
+        // which no real wallet defaults to and no careful trader would set.
+        // It is included as the theoretical ceiling, not as what a sandwich
+        // actually nets against a protected trade — see 2b for that.
         uint256[6] memory candidates = [
             VICTIM_SIZE,
             VICTIM_SIZE * 4,
@@ -178,12 +257,12 @@ contract SandwichHarness is Deployers {
             VICTIM_SIZE * 100
         ];
 
-        int256 bestProfit = type(int256).min;
-        uint256 bestFront;
-        uint256 victimUnderAttack;
+        int256 ceilingProfit = type(int256).min;
+        uint256 ceilingFront;
+        uint256 ceilingVictimOut;
         int256 prevProfit = type(int256).min;
 
-        console2.log("--- vanilla pool: extraction vs searcher capital ---");
+        console2.log("--- ceiling (NO slippage protection): extraction vs searcher capital ---");
         console2.log("capital / searcher profit / victim output / pct of victim trade");
         for (uint256 i; i < candidates.length; ++i) {
             snap = vm.snapshotState();
@@ -198,14 +277,44 @@ contract SandwichHarness is Deployers {
             assertGt(profit, prevProfit, "extraction must rise monotonically with capital");
             prevProfit = profit;
 
-            if (profit > bestProfit) {
-                bestProfit = profit;
-                bestFront = candidates[i];
-                victimUnderAttack = vOut;
+            if (profit > ceilingProfit) {
+                ceilingProfit = profit;
+                ceilingFront = candidates[i];
+                ceilingVictimOut = vOut;
             }
         }
 
-        assertGt(bestProfit, 0, "no profitable sandwich found: the demo has no attack to show");
+        assertGt(ceilingProfit, 0, "no profitable sandwich found: the demo has no attack to show");
+
+        // ---- 2b. REALISTIC: victim protected by an actual slippage tolerance --
+        // The searcher's real constraint: push the price further than this and
+        // the victim's transaction reverts instead of executing worse. No
+        // completed victim trade means no acquired tokens to back-run, so a
+        // searcher aware of the tolerance has no reason to exceed it.
+        uint256[3] memory tolFront;
+        int256[3] memory tolProfit;
+        uint256[3] memory tolVictimOut;
+
+        console2.log("");
+        console2.log("--- realistic (slippage-protected): extraction at each tolerance ---");
+        console2.log("tolerance bps / searcher capital / searcher profit / victim output");
+        for (uint256 i; i < TOLERANCE_BPS.length; ++i) {
+            uint256 minOut = fairOut - (fairOut * TOLERANCE_BPS[i]) / 10_000;
+            (uint256 front, int256 profit, uint256 vOut) = _maxFrontRunWithinTolerance(minOut);
+            tolFront[i] = front;
+            tolProfit[i] = profit;
+            tolVictimOut[i] = vOut;
+
+            console2.log(TOLERANCE_BPS[i], front, uint256(profit > 0 ? profit : int256(0)));
+            console2.log("  victim output", vOut);
+
+            // The searcher is not made WORSE off by a tighter tolerance forcing a
+            // smaller front-run — it simply cannot extract as much. Profit should
+            // be non-decreasing as tolerance widens (same monotonicity as 2a).
+            if (i > 0) {
+                assertGe(tolProfit[i], tolProfit[i - 1], "wider tolerance must allow at least as much extraction");
+            }
+        }
 
         // ---- 3. the same victim order through Otter --------------------
         // The searcher cannot swap at ANY capital level: the hook rejects anything
@@ -228,43 +337,93 @@ contract SandwichHarness is Deployers {
 
         // Its only remaining move is to join the batch, where its order clears at
         // the pre-batch spot price.
-        uint256 otterOut = _settleVictimBatchWithBot();
+        (uint256 otterOut, uint256 m) = _settleVictimBatchWithBot();
 
         // ---- 4. report --------------------------------------------------
-        uint256 victimLoss = fairOut - victimUnderAttack;
+        uint256 ceilingLoss = fairOut - ceilingVictimOut;
 
+        console2.log("");
         console2.log("========================================");
         console2.log("victim sells (currency0)     ", VICTIM_SIZE);
+        console2.log("fair output (no attack)      ", fairOut);
         console2.log("");
-        console2.log("VANILLA v4 POOL  (searcher at max capital tested)");
-        console2.log("  fair output (no attack)    ", fairOut);
-        console2.log("  searcher capital           ", bestFront);
-        console2.log("  searcher profit (currency0)");
-        console2.logInt(bestProfit);
-        console2.log("  victim output under attack ", victimUnderAttack);
-        console2.log("  victim loss                ", victimLoss);
-        console2.log("  loss as pct of trade       ", victimLoss * 100 / VICTIM_SIZE);
+        console2.log("VANILLA v4 POOL");
+        console2.log("  [ceiling, unrealistic: no slippage protection]");
+        console2.log("    searcher capital          ", ceilingFront);
+        console2.log("    searcher profit (currency0)");
+        console2.logInt(ceilingProfit);
+        console2.log("    victim output             ", ceilingVictimOut);
+        console2.log("    loss as pct of trade      ", ceilingLoss * 100 / VICTIM_SIZE);
+        console2.log("  [realistic, slippage-protected]");
+        for (uint256 i; i < TOLERANCE_BPS.length; ++i) {
+            console2.log("    tolerance (bps)           ", TOLERANCE_BPS[i]);
+            console2.log("      searcher capital        ", tolFront[i]);
+            console2.log("      victim output           ", tolVictimOut[i]);
+        }
         console2.log("");
         console2.log("OTTER POOL");
         console2.log("  searcher swap: REVERTED at every capital level tested");
-        console2.log("  victim output              ", otterOut);
-        console2.log("  burn to LPs                ", settlement.pendingSurplus(otterId, currency1));
+        console2.log("  victim output               ", otterOut);
+        console2.log("  burn to LPs                 ", settlement.pendingSurplus(otterId, currency1));
         console2.log("========================================");
 
-        assertGt(otterOut, victimUnderAttack, "Otter must beat the sandwiched price");
+        // ---- 5. why Otter's victim gets MORE than fairOut, not just "not less"
+        //
+        // fairOut is a plain constant-product swap of the WHOLE VICTIM_SIZE:
+        // marginal price degrades from the first unit sold. otterOut instead
+        // comes from F~_M, the augmented curve, which clears the first M units
+        // at the pre-batch SPOT price and only applies curve pricing beyond that
+        // — M being the size the bot's counter-order can absorb at spot. Since
+        // the victim here is the ONLY dominant-side seller, its Clarke pivot
+        // payment is its entire marginal contribution: F~(VICTIM_SIZE), i.e. it
+        // is paid AS IF it were the only trade against this exact curve, and
+        // that curve is weakly better than the plain AMM curve at every point
+        // (concavity) — strictly better here because M > 0. This is not
+        // rounding noise or a mispriced edge case; it is the mechanism working
+        // exactly as designed for whatever fraction of a trade a batch's
+        // opposite side can actually absorb at spot.
+        console2.log("");
+        console2.log("why otterOut > fairOut:");
+        console2.log("  spot-cleared portion (M)    ", m);
+        console2.log("  M as pct of victim trade    ", m * 100 / VICTIM_SIZE);
+        console2.log("  remainder priced by curve   ", VICTIM_SIZE - m);
+        assertGt(otterOut, fairOut, "the spot-cleared portion should make Otter strictly beat a plain AMM swap here");
 
-        // The demo page reads this. Writing it here rather than transcribing the
-        // console output keeps the page and the test from drifting apart.
+        assertGt(otterOut, ceilingVictimOut, "Otter must beat even the ceiling-attacked price");
+        for (uint256 i; i < TOLERANCE_BPS.length; ++i) {
+            assertGt(otterOut, tolVictimOut[i], "Otter must beat every slippage-protected realistic price too");
+        }
+
+        // The demo page reads victimSize/fairOut/sandwichedOut/otterOut/
+        // searcherCapital/searcherProfit/victimLoss — kept as the ceiling numbers
+        // for backward compatibility with the existing page. `realistic` is new
+        // and not yet consumed there.
+        string memory realisticJson = "[";
+        for (uint256 i; i < TOLERANCE_BPS.length; ++i) {
+            realisticJson = string.concat(
+                realisticJson,
+                i == 0 ? "" : ",",
+                '\n    { "bps": ', vm.toString(uint256(TOLERANCE_BPS[i])),
+                ', "searcherCapital": ', vm.toString(tolFront[i]),
+                ', "searcherProfit": ', vm.toString(uint256(tolProfit[i] > 0 ? tolProfit[i] : int256(0))),
+                ', "victimOut": ', vm.toString(tolVictimOut[i]),
+                " }"
+            );
+        }
+        realisticJson = string.concat(realisticJson, "\n  ]");
+
         vm.writeFile(
             "../harness/results/sandwich.json",
             string.concat(
                 '{\n  "victimSize": ', vm.toString(VICTIM_SIZE),
                 ',\n  "fairOut": ', vm.toString(fairOut),
-                ',\n  "sandwichedOut": ', vm.toString(victimUnderAttack),
+                ',\n  "sandwichedOut": ', vm.toString(ceilingVictimOut),
                 ',\n  "otterOut": ', vm.toString(otterOut),
-                ',\n  "searcherCapital": ', vm.toString(bestFront),
-                ',\n  "searcherProfit": ', vm.toString(uint256(bestProfit)),
-                ',\n  "victimLoss": ', vm.toString(victimLoss),
+                ',\n  "searcherCapital": ', vm.toString(ceilingFront),
+                ',\n  "searcherProfit": ', vm.toString(uint256(ceilingProfit)),
+                ',\n  "victimLoss": ', vm.toString(ceilingLoss),
+                ',\n  "spotClearedM": ', vm.toString(m),
+                ',\n  "realistic": ', realisticJson,
                 '\n}\n'
             )
         );
@@ -273,7 +432,12 @@ contract SandwichHarness is Deployers {
     /// Victim sells currency0 (dominant). Searcher joins selling currency1, which
     /// fills in full at the INITIAL spot price — the pre-batch price, not a price
     /// its own front-run created. That is where the sandwich dies.
-    function _settleVictimBatchWithBot() internal returns (uint256 victimOut) {
+    /// @return victimOut what the victim actually receives.
+    /// @return m the dominant-side spot-clearing capacity created by the bot's
+    ///         order (in the victim's sold token) — see the explanation in
+    ///         `test_sandwichComparison` for why this is what makes `victimOut`
+    ///         come out ABOVE `fairOut`.
+    function _settleVictimBatchWithBot() internal returns (uint256 victimOut, uint256 m) {
         _fund(currency0, victim, VICTIM_SIZE);
         _fund(currency1, bot, BOT_BATCH_SIZE);
 
@@ -292,6 +456,7 @@ contract SandwichHarness is Deployers {
         (uint256 r0, uint256 r1) = OtterPoolMath.virtualReserves(p, liq);
         OtterMath.Curve memory c = OtterMath.Curve({x0: r1, y0: r0, M: 0});
         c.M = (c.y0 * BOT_BATCH_SIZE) / c.x0;
+        m = c.M;
 
         uint256[] memory y = new uint256[](2);
         uint256[] memory x = new uint256[](2);
