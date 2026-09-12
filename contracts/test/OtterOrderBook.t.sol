@@ -2,10 +2,13 @@
 pragma solidity 0.8.26;
 
 import {Test, console2} from "forge-std/Test.sol";
+import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 import {OtterOrderBook} from "../src/OtterOrderBook.sol";
 
 contract OtterOrderBookTest is Test {
     OtterOrderBook book;
+    MockERC20 currency0;
+    MockERC20 currency1;
 
     bytes32 constant POOL = bytes32(uint256(0xB0));
     bytes32 constant OTHER_POOL = bytes32(uint256(0xB1));
@@ -22,6 +25,25 @@ contract OtterOrderBookTest is Test {
         book.setSettlement(settlement);
         alice = vm.addr(alicePk);
         bob = vm.addr(bobPk);
+
+        currency0 = new MockERC20("TEST0", "T0", 18);
+        currency1 = new MockERC20("TEST1", "T1", 18);
+        vm.prank(settlement);
+        book.registerPoolCurrencies(POOL, address(currency0), address(currency1));
+        vm.prank(settlement);
+        book.registerPoolCurrencies(OTHER_POOL, address(currency0), address(currency1));
+
+        _fund(alice);
+        _fund(bob);
+    }
+
+    function _fund(address who) internal {
+        currency0.mint(who, 1_000_000e18);
+        currency1.mint(who, 1_000_000e18);
+        vm.prank(who);
+        currency0.approve(address(book), type(uint256).max);
+        vm.prank(who);
+        currency1.approve(address(book), type(uint256).max);
     }
 
     // ------------------------------------------------------------------
@@ -289,6 +311,7 @@ contract OtterOrderBookTest is Test {
                 uint256 pk = uint256(keccak256(abi.encode(s, i)));
                 address t = vm.addr(pk);
                 OtterOrderBook.Order memory o = _order(t, i, i % 2 == 0);
+                _fund(t);
                 os[i] = o;
                 sigs[i] = _sign(pk, o);
             }

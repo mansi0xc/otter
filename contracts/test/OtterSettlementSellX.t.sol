@@ -41,7 +41,6 @@ contract OtterSettlementSellXTest is Deployers {
     OtterSettlement settlement;
     OtterHook hook;
 
-    address burnSink = address(0xB0F1);
     uint64 constant WINDOW = 60;
 
     uint256 domPk = 0xD0;
@@ -63,7 +62,7 @@ contract OtterSettlementSellXTest is Deployers {
         deployMintAndApprove2Currencies();
 
         book = new OtterOrderBook(WINDOW);
-        settlement = new OtterSettlement(manager, book, burnSink);
+        settlement = new OtterSettlement(manager, book);
         book.setSettlement(address(settlement));
 
         (address predicted, bytes32 salt) = HookMiner.find(
@@ -76,6 +75,7 @@ contract OtterSettlementSellXTest is Deployers {
         assertEq(address(hook), predicted);
 
         (otterKey, otterId) = initPool(currency0, currency1, IHooks(address(hook)), 0, 1, SQRT_PRICE_1_1);
+        settlement.registerPool(otterKey);
         modifyLiquidityRouter.modifyLiquidity(
             otterKey,
             IPoolManager.ModifyLiquidityParams({
@@ -95,7 +95,7 @@ contract OtterSettlementSellXTest is Deployers {
         address token = Currency.unwrap(c);
         deal(token, who, amount);
         vm.prank(who);
-        IERC20X(token).approve(address(settlement), type(uint256).max);
+        IERC20X(token).approve(address(book), type(uint256).max);
     }
 
     function _mkOrder(address trader, bool sellsC0, uint256 budget, uint256 nonce)
@@ -175,7 +175,7 @@ contract OtterSettlementSellXTest is Deployers {
 
         domReceived = IERC20X(Currency.unwrap(domOut)).balanceOf(dom);
         minReceived = IERC20X(Currency.unwrap(domIn)).balanceOf(min);
-        burn = IERC20X(Currency.unwrap(domOut)).balanceOf(burnSink);
+        burn = settlement.pendingSurplus(otterId, domOut);
     }
 
     // ------------------------------------------------------------------

@@ -29,9 +29,6 @@ import {HookMiner} from "../test/utils/HookMiner.sol";
 /// Optional env:
 ///   TOKEN0, TOKEN1   existing ERC20s. If unset, two MockERC20s are deployed and
 ///                    minted to the deployer.
-///   BURN_SINK        where redistributed surplus goes. Defaults to the deployer.
-///                    MUST NOT depend on any bidder's report (Theorem 22 / §3.6),
-///                    which is why it is immutable in OtterSettlement.
 ///   WINDOW           batch window in seconds. Default 60.
 ///   LIQUIDITY        full-range liquidity to seed. Default 1e21.
 ///
@@ -56,7 +53,9 @@ contract Deploy is Script {
     int24 constant TICK_UPPER = 887272;
 
     /// Fee MUST be zero: a non-zero LP fee makes the realised swap diverge from F~
-    /// and breaks curve conservation. LPs are paid from the burn instead.
+    /// and breaks curve conservation. LPs are paid from the redistributed surplus
+    /// instead, donated through the pool's own fee-growth accounting — see
+    /// OtterSettlement's `pendingSurplus` note.
     uint24 constant FEE = 0;
     int24 constant TICK_SPACING = 1;
 
@@ -68,7 +67,6 @@ contract Deploy is Script {
         uint64 window = uint64(vm.envOr("WINDOW", uint256(60)));
         uint256 liquidity = vm.envOr("LIQUIDITY", uint256(1e21));
         address deployer = msg.sender;
-        address burnSink = vm.envOr("BURN_SINK", deployer);
 
         vm.startBroadcast();
 
@@ -77,7 +75,7 @@ contract Deploy is Script {
 
         // --- core -----------------------------------------------------
         OtterOrderBook book = new OtterOrderBook(window);
-        OtterSettlement settlement = new OtterSettlement(manager, book, burnSink);
+        OtterSettlement settlement = new OtterSettlement(manager, book);
         book.setSettlement(address(settlement));
 
         // --- hook: mine a salt carrying exactly BEFORE_SWAP -----------
@@ -102,6 +100,10 @@ contract Deploy is Script {
         });
         manager.initialize(key, SQRT_PRICE_1_1);
 
+        // Escrow needs to know which two tokens this poolId trades before any
+        // order can be submitted against it — see OtterOrderBook's ESCROW note.
+        settlement.registerPool(key);
+
         // --- liquidity ------------------------------------------------
         // PoolModifyLiquidityTest ships in v4-core's src/test. It is a testnet
         // convenience: with v4-periphery dropped (CORRECTIONS.md C9) there is no
@@ -124,7 +126,7 @@ contract Deploy is Script {
 
         vm.stopBroadcast();
 
-        _report(key, book, settlement, hook, lpRouter, burnSink, window, liquidity);
+        _report(key, book, settlement, hook, lpRouter, window, liquidity);
     }
 
     function _resolveTokens(address deployer, uint256 liquidity)
@@ -155,7 +157,6 @@ contract Deploy is Script {
         OtterSettlement settlement,
         OtterHook hook,
         PoolModifyLiquidityTest lpRouter,
-        address burnSink,
         uint64 window,
         uint256 liquidity
     ) private {
@@ -171,7 +172,6 @@ contract Deploy is Script {
         console2.log("lpRouter       ", address(lpRouter));
         console2.log("currency0      ", Currency.unwrap(key.currency0));
         console2.log("currency1      ", Currency.unwrap(key.currency1));
-        console2.log("burnSink       ", burnSink);
         console2.log("window (s)     ", window);
         console2.log("liquidity      ", liquidity);
         console2.logBytes32(PoolId.unwrap(id));
@@ -185,7 +185,6 @@ contract Deploy is Script {
             '",\n  "lpRouter": "', vm.toString(address(lpRouter)),
             '",\n  "currency0": "', vm.toString(Currency.unwrap(key.currency0)),
             '",\n  "currency1": "', vm.toString(Currency.unwrap(key.currency1)),
-            '",\n  "burnSink": "', vm.toString(burnSink),
             '",\n  "poolId": "', vm.toString(PoolId.unwrap(id)),
             '",\n  "window": ', vm.toString(uint256(window)),
             ',\n  "liquidity": ', vm.toString(liquidity),

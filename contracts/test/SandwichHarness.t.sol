@@ -55,7 +55,6 @@ contract SandwichHarness is Deployers {
     OtterOrderBook book;
     OtterSettlement settlement;
     OtterHook hook;
-    address burnSink = address(0xB0F1);
     uint64 constant WINDOW = 60;
 
     PoolKey vanillaKey;
@@ -90,7 +89,7 @@ contract SandwichHarness is Deployers {
         deployMintAndApprove2Currencies();
 
         book = new OtterOrderBook(WINDOW);
-        settlement = new OtterSettlement(manager, book, burnSink);
+        settlement = new OtterSettlement(manager, book);
         book.setSettlement(address(settlement));
 
         (address predicted, bytes32 salt) = HookMiner.find(
@@ -104,6 +103,7 @@ contract SandwichHarness is Deployers {
 
         (vanillaKey, vanillaId) = initPool(currency0, currency1, IHooks(address(0)), 0, 1, SQRT_PRICE_1_1);
         (otterKey, otterId) = initPool(currency0, currency1, IHooks(address(hook)), 0, 1, SQRT_PRICE_1_1);
+        settlement.registerPool(otterKey);
         _addLiquidity(vanillaKey);
         _addLiquidity(otterKey);
 
@@ -129,7 +129,7 @@ contract SandwichHarness is Deployers {
         address token = Currency.unwrap(c);
         deal(token, who, amount);
         vm.prank(who);
-        IERC20H(token).approve(address(settlement), type(uint256).max);
+        IERC20H(token).approve(address(book), type(uint256).max);
     }
 
     /// exact-input swap by this contract, returns the output received
@@ -248,7 +248,7 @@ contract SandwichHarness is Deployers {
         console2.log("OTTER POOL");
         console2.log("  searcher swap: REVERTED at every capital level tested");
         console2.log("  victim output              ", otterOut);
-        console2.log("  burn to LPs                ", IERC20H(Currency.unwrap(currency1)).balanceOf(burnSink));
+        console2.log("  burn to LPs                ", settlement.pendingSurplus(otterId, currency1));
         console2.log("========================================");
 
         assertGt(otterOut, victimUnderAttack, "Otter must beat the sandwiched price");
@@ -387,7 +387,7 @@ contract SandwichHarness is Deployers {
             otterKey, batchId, orders, OtterSettlement.Outcome({dominantSellsCurrency0: true, y: y, x: x})
         );
 
-        uint256 burn = IERC20H(Currency.unwrap(currency1)).balanceOf(burnSink);
+        uint256 burn = settlement.pendingSurplus(otterId, currency1);
 
         // The burn has two components and they should be reported separately.
         //

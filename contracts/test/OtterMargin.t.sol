@@ -40,7 +40,6 @@ contract OtterMarginTest is Deployers {
     OtterOrderBook book;
     OtterSettlement settlement;
     OtterHook hook;
-    address burnSink = address(0xB0F1);
     uint64 constant WINDOW = 60;
 
     uint256 domPk = 0xD0;
@@ -53,7 +52,7 @@ contract OtterMarginTest is Deployers {
         deployMintAndApprove2Currencies();
 
         book = new OtterOrderBook(WINDOW);
-        settlement = new OtterSettlement(manager, book, burnSink);
+        settlement = new OtterSettlement(manager, book);
         book.setSettlement(address(settlement));
 
         (address predicted, bytes32 salt) = HookMiner.find(
@@ -73,7 +72,7 @@ contract OtterMarginTest is Deployers {
         address token = Currency.unwrap(c);
         deal(token, who, amount);
         vm.prank(who);
-        IERC20Min(token).approve(address(settlement), type(uint256).max);
+        IERC20Min(token).approve(address(book), type(uint256).max);
     }
 
     /// Distinct tickSpacing gives a distinct PoolKey, which is how each fuzz run
@@ -83,6 +82,7 @@ contract OtterMarginTest is Deployers {
         returns (PoolKey memory k, PoolId id)
     {
         (k, id) = initPool(currency0, currency1, IHooks(address(hook)), 0, spacing, sqrtPrice);
+        settlement.registerPool(k);
         int24 lo = -(887272 / spacing) * spacing;
         int24 hi = (887272 / spacing) * spacing;
         modifyLiquidityRouter.modifyLiquidity(
@@ -171,7 +171,7 @@ contract OtterMarginTest is Deployers {
         // model is not conservative enough. Any other revert is a setup problem.
         settlement.settle(k, batchId, orders, OtterSettlement.Outcome({dominantSellsCurrency0: true, y: y, x: x}));
 
-        uint256 burn = IERC20Min(Currency.unwrap(currency1)).balanceOf(burnSink);
+        uint256 burn = settlement.pendingSurplus(id, currency1);
         console2.log("rounding margin (wei)", burn);
     }
 }

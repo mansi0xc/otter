@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 import {OtterOrderBook} from "../src/OtterOrderBook.sol";
 
 /// @notice Covers `openBatchId`, which nothing else calls.
@@ -13,6 +14,8 @@ import {OtterOrderBook} from "../src/OtterOrderBook.sol";
 /// must be the batch `submit` actually writes to.
 contract OtterOrderBookViewTest is Test {
     OtterOrderBook book;
+    MockERC20 currency0;
+    MockERC20 currency1;
     bytes32 constant POOL = bytes32(uint256(0xB0));
     uint64 constant WINDOW = 60;
 
@@ -23,6 +26,15 @@ contract OtterOrderBookViewTest is Test {
         book = new OtterOrderBook(WINDOW);
         book.setSettlement(address(0x5E77));
         alice = vm.addr(alicePk);
+
+        currency0 = new MockERC20("TEST0", "T0", 18);
+        currency1 = new MockERC20("TEST1", "T1", 18);
+        vm.prank(address(0x5E77));
+        book.registerPoolCurrencies(POOL, address(currency0), address(currency1));
+
+        currency0.mint(alice, 100_000_000e18);
+        vm.prank(alice);
+        currency0.approve(address(book), type(uint256).max);
     }
 
     function _submit(uint256 nonce) internal returns (uint256) {

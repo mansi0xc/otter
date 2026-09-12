@@ -20,6 +20,7 @@ import {HookMiner} from "./utils/HookMiner.sol";
 interface IERC20Minimal {
     function approve(address, uint256) external returns (bool);
     function balanceOf(address) external view returns (uint256);
+    function transfer(address, uint256) external returns (bool);
 }
 
 contract OtterSettlementTest is Deployers {
@@ -30,7 +31,6 @@ contract OtterSettlementTest is Deployers {
     OtterSettlement settlement;
     OtterHook hook;
 
-    address burnSink = address(0xB0F1);
     uint64 constant WINDOW = 60;
 
     uint256 domPk = 0xD0;
@@ -52,7 +52,7 @@ contract OtterSettlementTest is Deployers {
         deployMintAndApprove2Currencies();
 
         book = new OtterOrderBook(WINDOW);
-        settlement = new OtterSettlement(manager, book, burnSink);
+        settlement = new OtterSettlement(manager, book);
         book.setSettlement(address(settlement));
 
         (address predicted, bytes32 salt) = HookMiner.find(
@@ -65,6 +65,7 @@ contract OtterSettlementTest is Deployers {
         assertEq(address(hook), predicted);
 
         (otterKey, otterId) = initPool(currency0, currency1, IHooks(address(hook)), 0, 1, SQRT_PRICE_1_1);
+        settlement.registerPool(otterKey);
         modifyLiquidityRouter.modifyLiquidity(
             otterKey,
             IPoolManager.ModifyLiquidityParams({
@@ -86,7 +87,7 @@ contract OtterSettlementTest is Deployers {
         address token = Currency.unwrap(c);
         deal(token, who, amount);
         vm.prank(who);
-        IERC20Minimal(token).approve(address(settlement), type(uint256).max);
+        IERC20Minimal(token).approve(address(book), type(uint256).max);
     }
 
     // ------------------------------------------------------------------
@@ -155,6 +156,52 @@ contract OtterSettlementTest is Deployers {
     }
 
     // ------------------------------------------------------------------
+    // the veto attack this escrow model closes
+    // ------------------------------------------------------------------
+
+    /// @notice Before escrow, funds were pulled from the trader at SETTLE time.
+    ///         A trader who revoked approval, or simply spent the tokens, any
+    ///         time between submitting and settlement made the whole batch
+    ///         revert — including every other trader's fill, because the digest
+    ///         forbids dropping the order that broke. One dishonest or careless
+    ///         trader could veto arbitrarily many honest ones.
+    ///
+    ///         Escrowing at `submit` moves the pull to the moment the trader's
+    ///         balance and allowance are known good. What they do with their
+    ///         wallet afterwards is irrelevant to settlement, because this
+    ///         contract is no longer asking their wallet for anything.
+    function test_revokingApprovalAfterSubmitDoesNotBlockSettlement() public {
+        (uint256 batchId, OtterOrderBook.Order[] memory orders) = _openBatch();
+
+        // The attack: revoke the approval that funded the order, and spend the
+        // balance elsewhere. Under the old pull-at-settle design either of these
+        // alone would have made settlement of this whole batch revert.
+        vm.prank(dom);
+        IERC20Minimal(Currency.unwrap(currency0)).approve(address(book), 0);
+        vm.prank(dom);
+        currency0.transfer(address(0xdead), currency0.balanceOf(dom));
+
+        assertEq(currency0.balanceOf(dom), 0, "dominant trader is now broke, as the attack requires");
+
+        OtterMath.Curve memory c = _curve();
+        OtterSettlement.Outcome memory o = _outcome(c, 1e15);
+
+        // Settlement succeeds anyway: the funds were already escrowed at submit.
+        settlement.settle(otterKey, batchId, orders, o);
+
+        assertEq(
+            IERC20Minimal(Currency.unwrap(currency1)).balanceOf(dom),
+            o.x[0],
+            "dominant trader is still paid in full despite revoking approval afterward"
+        );
+        assertEq(
+            IERC20Minimal(Currency.unwrap(currency0)).balanceOf(min),
+            o.x[1],
+            "minority trader's fill is unaffected by the other trader's later behaviour"
+        );
+    }
+
+    // ------------------------------------------------------------------
     // the happy path
     // ------------------------------------------------------------------
 
@@ -182,9 +229,9 @@ contract OtterSettlementTest is Deployers {
             "minority filled in full at spot"
         );
 
-        uint256 burn = IERC20Minimal(Currency.unwrap(currency1)).balanceOf(burnSink);
+        uint256 burn = settlement.pendingSurplus(otterId, currency1);
         assertGt(burn, 0, "surplus should reach the sink");
-        console2.log("burn to sink", burn);
+        console2.log("surplus held for LPs", burn);
         console2.log("slack given up by dominant", uint256(1e15));
     }
 
@@ -198,7 +245,7 @@ contract OtterSettlementTest is Deployers {
         OtterSettlement.Outcome memory o = _outcome(c, 0);
 
         settlement.settle(otterKey, batchId, orders, o);
-        console2.log("burn at exact ceiling", IERC20Minimal(Currency.unwrap(currency1)).balanceOf(burnSink));
+        console2.log("burn at exact ceiling", settlement.pendingSurplus(otterId, currency1));
     }
 
     // ------------------------------------------------------------------

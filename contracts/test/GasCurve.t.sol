@@ -46,7 +46,6 @@ contract GasCurveTest is Deployers {
     OtterOrderBook book;
     OtterSettlement settlement;
     OtterHook hook;
-    address burnSink = address(0xB0F1);
     uint64 constant WINDOW = 60;
 
     PoolKey otterKey;
@@ -60,7 +59,7 @@ contract GasCurveTest is Deployers {
         deployMintAndApprove2Currencies();
 
         book = new OtterOrderBook(WINDOW);
-        settlement = new OtterSettlement(manager, book, burnSink);
+        settlement = new OtterSettlement(manager, book);
         book.setSettlement(address(settlement));
 
         (address predicted, bytes32 salt) = HookMiner.find(
@@ -73,6 +72,7 @@ contract GasCurveTest is Deployers {
         assertEq(address(hook), predicted);
 
         (otterKey, otterId) = initPool(currency0, currency1, IHooks(address(hook)), 0, 1, SQRT_PRICE_1_1);
+        settlement.registerPool(otterKey);
         modifyLiquidityRouter.modifyLiquidity(
             otterKey,
             IPoolManager.ModifyLiquidityParams({
@@ -106,7 +106,7 @@ contract GasCurveTest is Deployers {
             address t = vm.addr(pk);
             deal(Currency.unwrap(currency0), t, PER_ORDER_BUDGET);
             vm.prank(t);
-            IERC20G(Currency.unwrap(currency0)).approve(address(settlement), type(uint256).max);
+            IERC20G(Currency.unwrap(currency0)).approve(address(book), type(uint256).max);
 
             orders[i] = OtterOrderBook.Order({
                 trader: t,

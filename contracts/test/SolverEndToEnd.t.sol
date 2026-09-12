@@ -47,7 +47,6 @@ contract SolverEndToEndTest is Deployers {
     OtterOrderBook book;
     OtterSettlement settlement;
     OtterHook hook;
-    address burnSink = address(0xB0F1);
     uint64 constant WINDOW = 60;
 
     PoolKey otterKey;
@@ -62,7 +61,7 @@ contract SolverEndToEndTest is Deployers {
         deployMintAndApprove2Currencies();
 
         book = new OtterOrderBook(WINDOW);
-        settlement = new OtterSettlement(manager, book, burnSink);
+        settlement = new OtterSettlement(manager, book);
         book.setSettlement(address(settlement));
 
         (address predicted, bytes32 salt) = HookMiner.find(
@@ -75,6 +74,7 @@ contract SolverEndToEndTest is Deployers {
         assertEq(address(hook), predicted);
 
         (otterKey, otterId) = initPool(currency0, currency1, IHooks(address(hook)), 0, 1, SQRT_PRICE_1_1);
+        settlement.registerPool(otterKey);
         modifyLiquidityRouter.modifyLiquidity(
             otterKey,
             IPoolManager.ModifyLiquidityParams({
@@ -122,7 +122,7 @@ contract SolverEndToEndTest is Deployers {
             Currency sold = sellsC0 ? currency0 : currency1;
             deal(Currency.unwrap(sold), traders[i], budget[i]);
             vm.prank(traders[i]);
-            IERC20E(Currency.unwrap(sold)).approve(address(settlement), type(uint256).max);
+            IERC20E(Currency.unwrap(sold)).approve(address(book), type(uint256).max);
 
             orders[i] = OtterOrderBook.Order({
                 trader: traders[i],
@@ -166,7 +166,7 @@ contract SolverEndToEndTest is Deployers {
         }
 
         Currency burnCurrency = domSellsC0 ? currency1 : currency0;
-        uint256 burn = IERC20E(Currency.unwrap(burnCurrency)).balanceOf(burnSink);
+        uint256 burn = settlement.pendingSurplus(otterId, burnCurrency);
         uint256 expected = json.readUint(".burn");
 
         console2.log("solver burn ", expected);
