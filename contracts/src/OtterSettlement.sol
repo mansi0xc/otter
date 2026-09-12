@@ -30,10 +30,26 @@ import {OtterOrderBook} from "./OtterOrderBook.sol";
 /// Recomputation on-chain, fraud proofs, or a TEE would close this; none are
 /// implemented. Stated in the README as a limitation, not buried.
 ///
+/// `settle` itself is exclusive to `solver` for `exclusivityWindow` seconds after
+/// a batch's window closes, then permissionless. This is not a second, separate
+/// trust assumption on top of the one above — it is a fix for one this contract
+/// would otherwise reintroduce. `verify` bounds a proposed outcome, it does not
+/// pick a unique one: an all-zero allocation, or one that fills only the minimum
+/// required to pass every check, is feasible and passes every check just as
+/// legitimately as an optimal one, and dumps the difference into the burn (see
+/// CORRECTIONS.md). Fully permissionless settlement lets whoever is fastest
+/// choose which feasible outcome executes, which is exactly the kind of race
+/// this mechanism exists to remove from trading. Exclusivity does not make the
+/// solver trusted with anything it doesn't already touch — `verify` still runs
+/// against whatever outcome it submits — it just means the party with an
+/// incentive to submit the fully-optimal one gets there first.
+///
 /// SCOPE
 /// - ERC20 pairs only. Native ETH is not supported; `Currency.isAddressZero()`
 ///   pools will revert on the pull, which is deliberate rather than silent.
-/// - Traders must approve this contract for the token they are selling.
+/// - Traders approve `orderBook`, not this contract, for the token they are
+///   selling — funds are escrowed at `submit`, not pulled here. See
+///   OtterOrderBook's ESCROW note.
 /// - The pool must be a zero-fee, single full-range position — see OtterPoolMath.
 contract OtterSettlement is IUnlockCallback {
     using PoolIdLibrary for PoolKey;
@@ -42,6 +58,28 @@ contract OtterSettlement is IUnlockCallback {
 
     IPoolManager public immutable poolManager;
     OtterOrderBook public immutable orderBook;
+
+    /// @notice The only address permitted to call `settle` during the exclusivity
+    ///         window after a batch's window closes. After the window elapses,
+    ///         `settle` is permissionless — anyone can and should call it if the
+    ///         solver goes offline, so a batch can never be stuck forever.
+    /// @dev EXCLUSIVITY, not gatekeeping: this address never decides an
+    ///      allocation and never touches funds it isn't itself owed — `settle`
+    ///      still runs every check in the TRUST MODEL note above no matter who
+    ///      calls it. It only decides who gets first crack at paying the gas.
+    ///      Without it, `settle` is fully permissionless from t=closesAt, and
+    ///      a searcher can win the race to submit a WORSE-for-everyone-but-itself
+    ///      feasible outcome — see CORRECTIONS.md. Immutable rather than
+    ///      owner-rotatable: this is the hackathon-scope version of that fix, not
+    ///      the production one. A single fixed key that goes offline needs a
+    ///      redeploy to replace; a permissioned solver SET, or a bond-and-slash
+    ///      scheme, would remove that dependency without reintroducing the race.
+    ///      Neither is implemented.
+    address public immutable solver;
+
+    /// @notice Seconds after a batch's window closes during which only `solver`
+    ///         may settle it.
+    uint64 public immutable exclusivityWindow;
 
     /// @notice Surplus held back from settled batches, awaiting donation to the
     ///         pool's liquidity providers. Keyed by pool and by the token it is
@@ -101,6 +139,7 @@ contract OtterSettlement is IUnlockCallback {
     error PoolOutputShortfall(uint256 have, uint256 owed);
     error NoLiquidity();
     error NoSurplus();
+    error NotExclusiveSolver(uint256 exclusiveUntil);
 
     /// @notice The modelled burn (F~s(Y) - sum x*_i) alongside what was actually
     ///         realised. They differ by the part of the discretisation allowance
@@ -126,9 +165,11 @@ contract OtterSettlement is IUnlockCallback {
     ///      the curve the batch was priced on.
     event SurplusDonated(PoolId indexed poolId, uint256 amount0, uint256 amount1);
 
-    constructor(IPoolManager poolManager_, OtterOrderBook orderBook_) {
+    constructor(IPoolManager poolManager_, OtterOrderBook orderBook_, address solver_, uint64 exclusivityWindow_) {
         poolManager = poolManager_;
         orderBook = orderBook_;
+        solver = solver_;
+        exclusivityWindow = exclusivityWindow_;
     }
 
     /// @notice One-time setup per pool: tells `orderBook` which two tokens it
@@ -156,9 +197,21 @@ contract OtterSettlement is IUnlockCallback {
         if (n == 0) revert EmptyBatch();
         if (outcome.y.length != n || outcome.x.length != n) revert LengthMismatch();
 
+        bytes32 poolId = PoolId.unwrap(key.toId());
+
+        // (0) Exclusivity. Only `solver` may settle within `exclusivityWindow`
+        // seconds of the batch's window closing; anyone may after that. Checked
+        // BEFORE `consume` so a rejected non-solver attempt cannot mark the
+        // batch settled — see the TRUST MODEL note above for why this exists.
+        (uint64 closesAt,,) = orderBook.batches(poolId, batchId);
+        uint256 exclusiveUntil = uint256(closesAt) + exclusivityWindow;
+        if (msg.sender != solver && block.timestamp < exclusiveUntil) {
+            revert NotExclusiveSolver(exclusiveUntil);
+        }
+
         // (1) Inclusion. Reverts unless `orders` is exactly the committed batch,
         // the window has closed, and the batch has not already been settled.
-        orderBook.consume(PoolId.unwrap(key.toId()), batchId, orders);
+        orderBook.consume(poolId, batchId, orders);
 
         // (2) The curve, read from the pool at execution time rather than trusted
         // from the solver. If liquidity moved since the batch was solved, the

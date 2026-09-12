@@ -27,10 +27,17 @@ import {HookMiner} from "../test/utils/HookMiner.sol";
 ///   PRIVATE_KEY    deployer key
 ///
 /// Optional env:
-///   TOKEN0, TOKEN1   existing ERC20s. If unset, two MockERC20s are deployed and
-///                    minted to the deployer.
-///   WINDOW           batch window in seconds. Default 60.
-///   LIQUIDITY        full-range liquidity to seed. Default 1e21.
+///   TOKEN0, TOKEN1        existing ERC20s. If unset, two MockERC20s are deployed
+///                         and minted to the deployer.
+///   WINDOW                batch window in seconds. Default 60.
+///   LIQUIDITY             full-range liquidity to seed. Default 1e21.
+///   SOLVER                the address with exclusive settlement rights for
+///                         EXCLUSIVITY_WINDOW seconds after each batch's window
+///                         closes. Defaults to the deployer. See OtterSettlement's
+///                         TRUST MODEL note for why this exists and what it does
+///                         NOT do.
+///   EXCLUSIVITY_WINDOW    seconds of SOLVER exclusivity after a window closes,
+///                         after which settlement is permissionless. Default 300.
 ///
 /// POOL_MANAGER is deliberately NOT hardcoded per chain. The Uniswap docs warn
 /// that v4 addresses differ between chains and the published table has been
@@ -67,6 +74,8 @@ contract Deploy is Script {
         uint64 window = uint64(vm.envOr("WINDOW", uint256(60)));
         uint256 liquidity = vm.envOr("LIQUIDITY", uint256(1e21));
         address deployer = msg.sender;
+        address solver = vm.envOr("SOLVER", deployer);
+        uint64 exclusivityWindow = uint64(vm.envOr("EXCLUSIVITY_WINDOW", uint256(300)));
 
         vm.startBroadcast();
 
@@ -75,7 +84,7 @@ contract Deploy is Script {
 
         // --- core -----------------------------------------------------
         OtterOrderBook book = new OtterOrderBook(window);
-        OtterSettlement settlement = new OtterSettlement(manager, book);
+        OtterSettlement settlement = new OtterSettlement(manager, book, solver, exclusivityWindow);
         book.setSettlement(address(settlement));
 
         // --- hook: mine a salt carrying exactly BEFORE_SWAP -----------
@@ -126,7 +135,7 @@ contract Deploy is Script {
 
         vm.stopBroadcast();
 
-        _report(key, book, settlement, hook, lpRouter, window, liquidity);
+        _report(key, book, settlement, hook, lpRouter, window, liquidity, solver, exclusivityWindow);
     }
 
     function _resolveTokens(address deployer, uint256 liquidity)
@@ -158,7 +167,9 @@ contract Deploy is Script {
         OtterHook hook,
         PoolModifyLiquidityTest lpRouter,
         uint64 window,
-        uint256 liquidity
+        uint256 liquidity,
+        address solver,
+        uint64 exclusivityWindow
     ) private {
         PoolId id = key.toId();
 
@@ -174,6 +185,8 @@ contract Deploy is Script {
         console2.log("currency1      ", Currency.unwrap(key.currency1));
         console2.log("window (s)     ", window);
         console2.log("liquidity      ", liquidity);
+        console2.log("solver         ", solver);
+        console2.log("exclusivity (s)", exclusivityWindow);
         console2.logBytes32(PoolId.unwrap(id));
 
         string memory json = string.concat(
@@ -188,6 +201,8 @@ contract Deploy is Script {
             '",\n  "poolId": "', vm.toString(PoolId.unwrap(id)),
             '",\n  "window": ', vm.toString(uint256(window)),
             ',\n  "liquidity": ', vm.toString(liquidity),
+            ',\n  "solver": "', vm.toString(solver),
+            '",\n  "exclusivityWindow": ', vm.toString(uint256(exclusivityWindow)),
             ',\n  "fee": 0,\n  "tickSpacing": 1\n}\n'
         );
         string memory path =

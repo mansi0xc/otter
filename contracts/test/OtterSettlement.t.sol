@@ -52,7 +52,7 @@ contract OtterSettlementTest is Deployers {
         deployMintAndApprove2Currencies();
 
         book = new OtterOrderBook(WINDOW);
-        settlement = new OtterSettlement(manager, book);
+        settlement = new OtterSettlement(manager, book, address(this), 300);
         book.setSettlement(address(settlement));
 
         (address predicted, bytes32 salt) = HookMiner.find(
@@ -153,6 +153,58 @@ contract OtterSettlementTest is Deployers {
 
     function _mulDownPure(uint256 a, uint256 b, uint256 d) internal pure returns (uint256) {
         return (a * b) / d;
+    }
+
+    // ------------------------------------------------------------------
+    // exclusivity window
+    // ------------------------------------------------------------------
+
+    /// @notice Within `exclusivityWindow` seconds of the window closing, only
+    ///         `solver` may call `settle` — even with a perfectly valid outcome.
+    function test_nonSolverCannotSettleDuringExclusivityWindow() public {
+        (uint256 batchId, OtterOrderBook.Order[] memory orders) = _openBatch();
+        OtterMath.Curve memory c = _curve();
+        OtterSettlement.Outcome memory o = _outcome(c, 1e15);
+
+        // Still inside the 300s exclusivity window: _openBatch warps exactly to
+        // closesAt, so exclusiveUntil is closesAt + 300 from here.
+        address rando = address(0xBEEF);
+        vm.prank(rando);
+        vm.expectRevert(abi.encodeWithSelector(OtterSettlement.NotExclusiveSolver.selector, block.timestamp + 300));
+        settlement.settle(otterKey, batchId, orders, o);
+    }
+
+    /// @notice The designated solver may always settle, including at the very
+    ///         instant the window closes — exclusivity restricts everyone else,
+    ///         not the solver itself.
+    function test_solverCanSettleImmediatelyAfterWindowCloses() public {
+        (uint256 batchId, OtterOrderBook.Order[] memory orders) = _openBatch();
+        OtterMath.Curve memory c = _curve();
+        OtterSettlement.Outcome memory o = _outcome(c, 1e15);
+
+        // settlement's solver is address(this) — see setUp.
+        settlement.settle(otterKey, batchId, orders, o);
+        assertEq(orders.length, 2, "sanity: batch had orders");
+    }
+
+    /// @notice Once the exclusivity window elapses, settlement is permissionless
+    ///         — a batch can never be stuck forever because a solver went dark.
+    function test_anyoneCanSettleAfterExclusivityWindowElapses() public {
+        (uint256 batchId, OtterOrderBook.Order[] memory orders) = _openBatch();
+        OtterMath.Curve memory c = _curve();
+        OtterSettlement.Outcome memory o = _outcome(c, 1e15);
+
+        vm.warp(block.timestamp + 300); // clears the exclusivity window too
+
+        address rando = address(0xBEEF);
+        vm.prank(rando);
+        settlement.settle(otterKey, batchId, orders, o); // does not revert
+
+        assertEq(
+            IERC20Minimal(Currency.unwrap(currency1)).balanceOf(dom),
+            o.x[0],
+            "settlement by a non-solver after the window still pays correctly"
+        );
     }
 
     // ------------------------------------------------------------------

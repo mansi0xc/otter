@@ -59,7 +59,7 @@ contract GasCurveTest is Deployers {
         deployMintAndApprove2Currencies();
 
         book = new OtterOrderBook(WINDOW);
-        settlement = new OtterSettlement(manager, book);
+        settlement = new OtterSettlement(manager, book, address(this), 300);
         book.setSettlement(address(settlement));
 
         (address predicted, bytes32 salt) = HookMiner.find(
