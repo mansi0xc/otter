@@ -1,0 +1,15 @@
+.wrap { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-dim);
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}

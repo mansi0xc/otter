@@ -1,0 +1,105 @@
+.main {
+  flex: 1;
+  padding: 1.75rem 1.5rem 3rem;
+}
+
+.container {
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+/* ── Sepolia sandbox layout ── */
+.sandboxLayout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+.sandboxLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sandboxBanner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sandboxBanner p {
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+  line-height: 1.6;
+  max-width: 42ch;
+}
+
+.sandboxRight {}
+
+.sandboxInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  background: var(--surface-hi);
+  border: 1px solid var(--rule);
+  border-radius: var(--r2);
+}
+
+.sandboxInfoTitle {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+}
+
+.sandboxSteps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-left: 1.25rem;
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+  line-height: 1.6;
+}
+
+.sandboxSteps li { padding-left: 0.25rem; }
+
+.sandboxNote {
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+  padding: 0.75rem;
+  background: var(--plum-dim);
+  border-radius: var(--r2);
+  line-height: 1.6;
+}
+
+.sandboxNote strong { color: var(--ink); }
+
+.inlineLink {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--flow-dark);
+  font-size: inherit;
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* ── Footer ── */
+.footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+  text-align: center;
+}
+
+.footer em { font-style: italic; }
+
+@media (max-width: 800px) {
+  .sandboxLayout { grid-template-columns: 1fr; }
+  .main { padding: 1.25rem 1rem 2rem; }
+}

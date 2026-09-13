@@ -1,0 +1,173 @@
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+}
+
+/* ---- Disconnected ---- */
+.disconnected {
+  padding: 1rem;
+  text-align: center;
+  color: var(--ink-dim);
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.hint { font-size: 0.78rem; }
+
+/* ---- Faucet ---- */
+.faucet {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--flow-dim);
+  border: 1px solid rgba(46,138,130,0.2);
+  border-radius: var(--r2);
+}
+
+.faucetLabel {
+  font-size: 0.78rem;
+  color: var(--flow-dark);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+/* ---- Side toggle ---- */
+.sideToggle {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.sideActive {
+  background: var(--ink);
+  color: #fff;
+  border: 1px solid transparent;
+}
+
+.sideInactive {
+  background: transparent;
+  color: var(--ink-dim);
+  border: 1px solid var(--rule);
+}
+
+/* ---- Fields ---- */
+.fields { display: flex; flex-direction: column; gap: 0.625rem; }
+.field { display: flex; flex-direction: column; gap: 0.25rem; }
+
+.fieldHint {
+  font-size: 0.7rem;
+  color: var(--ink-dim);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ---- Stepper ---- */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.stepItem {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--ink-dim);
+}
+
+.stepActive .stepNum,
+.stepActive .stepLabel {
+  color: var(--ink);
+}
+
+.stepNum {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--rule);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.stepActive .stepNum {
+  background: var(--ink);
+  color: #fff;
+}
+
+.stepArrow { color: var(--rule); }
+.stepLabel { white-space: nowrap; }
+
+/* ---- Actions ---- */
+.actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+
+.working {
+  font-size: 0.82rem;
+  color: var(--ink-dim);
+  font-style: italic;
+}
+
+/* ---- Error ---- */
+.errorText {
+  font-size: 0.78rem;
+  color: var(--alarm);
+}
+
+/* ---- Success ---- */
+.success {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: rgba(46,138,130,0.08);
+  border: 1px solid rgba(46,138,130,0.25);
+  border-radius: var(--r2);
+}
+
+.successIcon {
+  font-size: 1.1rem;
+  color: var(--flow-dark);
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.successMsg {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--flow-dark);
+  margin-bottom: 0.25rem;
+}
+
+.settlementNote {
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+  margin-top: 0.35rem;
+  font-style: italic;
+}
+
+/* ---- Tx link ---- */
+.txLink {
+  font-size: 0.78rem;
+  color: var(--flow-dark);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.txLink:hover { text-decoration: underline; }

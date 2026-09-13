@@ -1,0 +1,149 @@
+.rail {
+  border-top: 1px solid var(--rule);
+  padding: 1.25rem 0 0;
+}
+
+.railInner {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ---- Disclaimer ---- */
+.disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--flow-dark);
+  background: rgba(46, 138, 130, 0.07);
+  border: 1px solid rgba(46, 138, 130, 0.2);
+  border-radius: var(--r2);
+  padding: 0.625rem 0.875rem;
+  line-height: 1.5;
+}
+
+/* ---- Contract cards ---- */
+.contracts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.625rem;
+}
+
+.contractCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.75rem;
+  background: var(--surface-hi);
+  border: 1px solid var(--rule);
+  border-radius: var(--r2);
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.contractCard:hover {
+  border-color: var(--flow-dark);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+}
+
+.contractName {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.contractDesc {
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+  flex: 1;
+}
+
+.contractBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.25rem;
+  color: var(--flow-dark);
+}
+
+/* ---- Gas row ---- */
+.gasRow {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  font-size: 0.82rem;
+  padding: 0.75rem 1rem;
+  background: var(--plum-dim);
+  border-radius: var(--r2);
+}
+
+.gasItem {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.gasN {
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.gasL {
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+}
+
+.gasDivider {
+  color: var(--rule);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+/* ---- Restart ---- */
+.restartRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.footerCredit {
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+}
+
+/* ---- Compact footer (other steps) ---- */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid var(--rule);
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.footerMeta { color: var(--ink-dim); }
+
+.footerLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--flow-dark);
+  text-decoration: none;
+  font-size: 0.78rem;
+}
+.footerLink:hover { text-decoration: underline; }
+
+@media (max-width: 640px) {
+  .contracts { grid-template-columns: 1fr; }
+  .gasRow { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+  .gasDivider { display: none; }
+}

@@ -1,0 +1,133 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background: var(--plum);
+  border-radius: var(--r2);
+  padding: 1.25rem;
+  color: #ead9ef;
+}
+
+.title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--flow);
+}
+
+.motto {
+  font-size: 0.88rem;
+  color: rgba(234, 217, 239, 0.75);
+  font-style: italic;
+  margin-top: -0.5rem;
+}
+
+/* ---- Fill rows ---- */
+.rows { display: flex; flex-direction: column; gap: 0.45rem; }
+
+.row {
+  display: grid;
+  grid-template-columns: 110px 1fr 100px;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.8rem;
+}
+
+.rowLabel {
+  color: rgba(234, 217, 239, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowSide {
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.rowBar {
+  height: 8px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.rowFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.6s ease-out;
+}
+
+.rowFillVal {
+  font-size: 0.75rem;
+  color: rgba(234, 217, 239, 0.65);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ---- Surplus ---- */
+.surplus {
+  display: flex;
+  gap: 1.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.surplusItem { display: flex; flex-direction: column; gap: 0.2rem; }
+
+.surplusN {
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--flow);
+}
+
+.surplusL {
+  font-size: 0.72rem;
+  color: rgba(234, 217, 239, 0.6);
+  max-width: 90px;
+}
+
+/* ---- Invariants ---- */
+.invariants {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.invariantsTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(234, 217, 239, 0.5);
+  margin-bottom: 0.25rem;
+}
+
+.invRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.invCheck {
+  color: var(--flow);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.invLabel {
+  font-weight: 600;
+  color: #ead9ef;
+}
+
+.invDesc {
+  color: rgba(234, 217, 239, 0.6);
+}

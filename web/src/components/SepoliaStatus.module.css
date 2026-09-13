@@ -1,0 +1,74 @@
+.wrap { display: flex; flex-direction: column; gap: 1rem; }
+
+.disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+  background: rgba(46,138,130,0.07);
+  border: 1px solid rgba(46,138,130,0.2);
+  border-radius: var(--r2);
+  padding: 0.75rem 1rem;
+  line-height: 1.55;
+}
+
+.disclaimer strong { color: var(--flow-dark); }
+
+/* ---- Live panel ---- */
+.livePanel {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+  padding: 1rem;
+  background: var(--surface-hi);
+  border: 1px solid var(--rule);
+  border-radius: var(--r2);
+  position: relative;
+  overflow: hidden;
+}
+
+.clockWrap { flex-shrink: 0; }
+
+.batchInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+}
+
+.batchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+}
+
+.batchLabel { color: var(--ink-dim); }
+.batchVal { font-weight: 600; color: var(--ink); }
+
+/* ---- Error ---- */
+.errorNote {
+  font-size: 0.78rem;
+  color: var(--alarm);
+  background: var(--alarm-dim);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--r2);
+}
+
+/* ---- Links ---- */
+.links {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.link {
+  font-size: 0.78rem;
+  color: var(--flow-dark);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.link:hover { text-decoration: underline; }
