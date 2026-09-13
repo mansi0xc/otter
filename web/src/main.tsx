@@ -1,3 +1,12 @@
+// Suppress internal Reown/WalletConnect cloud fallback warning when running without a cloud project ID
+if (typeof window !== 'undefined') {
+  const originalWarn = console.warn
+  console.warn = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && args[0].includes('[Reown Config]')) return
+    originalWarn(...args)
+  }
+}
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { WagmiProvider } from 'wagmi'
@@ -8,6 +17,7 @@ import { wagmiConfig } from '@/config/wagmi'
 import App from './App'
 import './styles/theme.css'
 import './styles/animations.css'
+
 
 const queryClient = new QueryClient()
 

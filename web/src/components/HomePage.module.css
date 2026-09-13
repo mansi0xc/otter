@@ -1,0 +1,568 @@
+/* ============================================================
+   HomePage — landing / about page
+   ============================================================ */
+
+/* ── Page shell ── */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Hero ── */
+.hero {
+  padding: 5rem 1.5rem 3rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--surface-hi) 0%, var(--surface) 100%);
+  border-bottom: 1px solid var(--rule);
+}
+
+.heroInner {
+  max-width: 56rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.heroLogo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.heroWordmark {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--ink);
+}
+
+.heroTitle {
+  font-size: clamp(1.8rem, 5vw, 2.8rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.heroSub {
+  font-size: 1rem;
+  color: var(--ink-dim);
+  line-height: 1.7;
+  max-width: 52ch;
+}
+
+.heroSub em {
+  font-style: italic;
+  color: var(--ink);
+}
+
+.heroCta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.heroNote {
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+  letter-spacing: 0.01em;
+}
+
+/* Animated wave */
+.heroWave {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  pointer-events: none;
+}
+
+.heroWaveSvg {
+  width: 100%;
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .heroWaveSvg path:first-child {
+    animation: wave-drift 8s ease-in-out infinite alternate;
+  }
+  .heroWaveSvg path:last-child {
+    animation: wave-drift 10s ease-in-out infinite alternate-reverse;
+  }
+
+  @keyframes wave-drift {
+    from { transform: translateX(-20px); }
+    to   { transform: translateX(20px); }
+  }
+}
+
+/* ── Generic section ── */
+.section {
+  padding: 4rem 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.sectionDark {
+  background: var(--plum);
+  border-bottom: none;
+}
+
+.sectionAccent {
+  background: var(--surface-hi);
+}
+
+.sectionInner {
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+.sectionLabel {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--flow-dark);
+  margin-bottom: 0.75rem;
+}
+
+.sectionLabelLight {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--flow);
+  margin-bottom: 0.75rem;
+}
+
+.sectionTitle {
+  margin-bottom: 1rem;
+}
+
+.sectionTitleLight {
+  margin-bottom: 1rem;
+  color: #ead9ef;
+}
+
+.sectionLead {
+  font-size: 0.95rem;
+  color: var(--ink-dim);
+  line-height: 1.7;
+  max-width: 62ch;
+  margin-bottom: 2rem;
+}
+
+.sectionLeadLight {
+  font-size: 0.95rem;
+  color: rgba(234, 217, 239, 0.75);
+  line-height: 1.7;
+  max-width: 62ch;
+  margin-bottom: 2rem;
+}
+
+/* ── Problem / Attack ── */
+.attackGrid {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  margin-bottom: 1.25rem;
+  max-width: 36rem;
+}
+
+.attackBlock {
+  width: 100%;
+  padding: 0.875rem 1.1rem;
+  border-radius: var(--r2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.attackBlockBad {
+  background: var(--alarm-dim);
+  border: 1px solid rgba(192, 57, 43, 0.22);
+}
+
+.attackBlockVictim {
+  background: var(--plum-dim);
+  border: 1px solid var(--rule);
+}
+
+.attackRole {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.attackAction {
+  font-size: 0.9rem;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.attackArrow {
+  padding: 0.15rem 1.25rem;
+  color: var(--ink-dim);
+  font-size: 1.1rem;
+}
+
+.attackNote {
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+  line-height: 1.6;
+  max-width: 52ch;
+  margin-top: 0.5rem;
+}
+
+/* ── Mechanism grid ── */
+.mechanismGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+}
+
+.mechanismCard {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(140, 209, 199, 0.18);
+  border-radius: var(--r3);
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.mechanismIcon {
+  width: 40px;
+  height: 40px;
+  background: rgba(140, 209, 199, 0.1);
+  border-radius: var(--r2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mechanismCardTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ead9ef;
+}
+
+.mechanismCardBody {
+  font-size: 0.85rem;
+  color: rgba(234, 217, 239, 0.7);
+  line-height: 1.65;
+}
+
+/* ── Invariants ── */
+.invariantList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.invariantRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface-hi);
+  border: 1px solid var(--rule);
+  border-radius: var(--r2);
+}
+
+.invariantCheck {
+  color: var(--flow-dark);
+  font-weight: 700;
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.invariantLabel {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.invariantDesc {
+  font-size: 0.88rem;
+  color: var(--ink-dim);
+}
+
+.invariantNote {
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+  line-height: 1.6;
+  padding: 0.875rem 1rem;
+  background: var(--plum-dim);
+  border-radius: var(--r2);
+  max-width: 62ch;
+}
+
+.invariantNote code {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--flow-dark);
+}
+
+/* ── Stats ── */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+
+.statCard {
+  padding: 1.5rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r3);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.statN {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.03em;
+  font-family: var(--font-mono);
+}
+
+.statLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.statSub {
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+/* ── Architecture table ── */
+.archTable {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--r3);
+  overflow: hidden;
+}
+
+.archRow {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: 1.5rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--rule);
+  align-items: start;
+}
+
+.archRow:last-child {
+  border-bottom: none;
+}
+
+.archRow:nth-child(even) {
+  background: var(--surface-hi);
+}
+
+.archPath {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--flow-dark);
+  font-weight: 600;
+  padding-top: 1px;
+}
+
+.archDesc {
+  font-size: 0.87rem;
+  color: var(--ink-dim);
+  line-height: 1.65;
+}
+
+/* ── Contracts ── */
+.contractsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.contractCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(140, 209, 199, 0.2);
+  border-radius: var(--r3);
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.contractCard:hover {
+  background: rgba(140, 209, 199, 0.08);
+  border-color: rgba(140, 209, 199, 0.4);
+  text-decoration: none;
+}
+
+.contractCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.contractName {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ead9ef;
+  font-family: var(--font-mono);
+}
+
+.contractDesc {
+  font-size: 0.85rem;
+  color: rgba(234, 217, 239, 0.85);
+  font-weight: 500;
+}
+
+.contractDetail {
+  font-size: 0.78rem;
+  color: rgba(234, 217, 239, 0.5);
+  line-height: 1.5;
+}
+
+.contractLink {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--flow);
+  margin-top: auto;
+  padding-top: 0.5rem;
+}
+
+/* ── Limitations ── */
+.limitList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 64rem;
+}
+
+.limitRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  background: var(--surface-hi);
+  border: 1px solid var(--rule);
+  border-left: 3px solid #a0631e;
+  border-radius: var(--r2);
+}
+
+.limitIcon {
+  color: #a0631e;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+  font-weight: 700;
+}
+
+.limitText {
+  font-size: 0.87rem;
+  color: var(--ink-dim);
+  line-height: 1.65;
+}
+
+.limitText strong {
+  color: var(--ink);
+}
+
+/* ── CTA section ── */
+.ctaSection {
+  padding: 5rem 1.5rem;
+  text-align: center;
+  background: var(--surface-hi);
+}
+
+.ctaInner {
+  max-width: 52rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.ctaTitle {
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+}
+
+.ctaSub {
+  font-size: 0.95rem;
+  color: var(--ink-dim);
+  line-height: 1.7;
+  max-width: 48ch;
+}
+
+.ctaBtns {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.ctaPaper {
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .mechanismGrid {
+    grid-template-columns: 1fr;
+  }
+  .contractsGrid {
+    grid-template-columns: 1fr;
+  }
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding: 3rem 1rem 2rem;
+  }
+  .section {
+    padding: 2.5rem 1rem;
+  }
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .archRow {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  .ctaSection {
+    padding: 3rem 1rem;
+  }
+}

@@ -1,14 +1,15 @@
 import React, { useState } from 'react'
 import { Header } from '@/components/Header'
+import { HomePage } from '@/components/HomePage'
 import { DemoStory } from '@/components/DemoStory'
 import { SepoliaStatus } from '@/components/SepoliaStatus'
 import { GasChart } from '@/components/GasChart'
 import styles from './App.module.css'
 
-type AppMode = 'demo' | 'sepolia'
+type AppMode = 'home' | 'demo' | 'sepolia'
 
 export default function App() {
-  const [mode, setMode] = useState<AppMode>('demo')
+  const [mode, setMode] = useState<AppMode>('home')
 
   return (
     <>
