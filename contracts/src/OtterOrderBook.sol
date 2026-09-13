@@ -117,6 +117,12 @@ contract OtterOrderBook {
     /// length of a batch window in seconds
     uint64 public immutable windowLength;
 
+    /// @notice Time after a window closes after which anyone may refund an
+    ///         unprocessed batch in full. This is a liveness escape hatch, not a
+    ///         normal cancellation path: preserving the committed batch until the
+    ///         timeout expires is what keeps inclusion meaningful.
+    uint64 public immutable refundDelay;
+
     /// the only address permitted to mark a batch settled
     address public settlement;
     address public owner;
@@ -134,6 +140,12 @@ contract OtterOrderBook {
     /// submitting repeatedly pays one cold SSTORE per 256 orders rather than each.
     mapping(address trader => mapping(uint256 word => uint256 bits)) public nonceBitmap;
 
+    /// @dev Guards the commitment accumulator around token transfers. A
+    /// callback-capable token could otherwise submit another order while an outer
+    /// `submit` has its digest only in memory, incrementing the count and then
+    /// having its digest overwritten by the outer call.
+    uint256 private _reentrancyLock = 1;
+
     // ------------------------------------------------------------------
     // Events / errors
     // ------------------------------------------------------------------
@@ -142,6 +154,7 @@ contract OtterOrderBook {
         bytes32 indexed poolId, uint256 indexed batchId, address indexed trader, bytes32 orderHash
     );
     event BatchSettled(bytes32 indexed poolId, uint256 indexed batchId, uint32 count);
+    event BatchRefunded(bytes32 indexed poolId, uint256 indexed batchId, uint32 count);
     event SettlementSet(address settlement);
 
     error NotOwner();
@@ -155,6 +168,8 @@ contract OtterOrderBook {
     error ZeroBudget(uint256 i);
     error WindowClosed();
     error WindowStillOpen();
+    error PreviousBatchUnsettled(uint256 batchId);
+    error RefundTooEarly(uint256 refundableAt);
     error AlreadySettled();
     error DigestMismatch();
     error CountMismatch(uint256 supplied, uint32 expected);
@@ -162,14 +177,24 @@ contract OtterOrderBook {
     error PoolAlreadyRegistered();
     error ZeroCurrency();
     error TransferFailed();
+    error ReentrantCall();
 
     event PoolRegistered(bytes32 indexed poolId, address currency0, address currency1);
 
     // ------------------------------------------------------------------
 
-    constructor(uint64 windowLength_) {
+    modifier nonReentrant() {
+        if (_reentrancyLock != 1) revert ReentrantCall();
+        _reentrancyLock = 2;
+        _;
+        _reentrancyLock = 1;
+    }
+
+    constructor(uint64 windowLength_, uint64 refundDelay_) {
         require(windowLength_ > 0, "window");
+        require(refundDelay_ > 0, "refund delay");
         windowLength = windowLength_;
+        refundDelay = refundDelay_;
         owner = msg.sender;
         _CACHED_CHAIN_ID = block.chainid;
         _CACHED_DOMAIN_SEPARATOR = _buildDomainSeparator();
@@ -227,6 +252,7 @@ contract OtterOrderBook {
         id = currentBatchId[poolId];
         Batch memory b = batches[poolId][id];
         if (b.closesAt == 0 || block.timestamp >= b.closesAt) {
+            if (b.closesAt != 0 && !b.settled) revert PreviousBatchUnsettled(id);
             return (b.closesAt == 0 ? id : id + 1, uint64(block.timestamp) + windowLength);
         }
         return (id, b.closesAt);
@@ -237,7 +263,11 @@ contract OtterOrderBook {
     ///         cannot fund someone else's order.
     /// @dev Every order must target the same pool, which is what lets one
     ///      rollover check and one currency lookup cover the whole array.
-    function submit(Order[] calldata orders, bytes[] calldata signatures) external returns (uint256 batchId) {
+    function submit(Order[] calldata orders, bytes[] calldata signatures)
+        external
+        nonReentrant
+        returns (uint256 batchId)
+    {
         uint256 n = orders.length;
         if (n == 0 || n != signatures.length) revert LengthMismatch();
 
@@ -286,6 +316,11 @@ contract OtterOrderBook {
             return id;
         }
         if (block.timestamp >= b.closesAt) {
+            // Keep at most one unprocessed batch per pool. The hook can then
+            // freeze liquidity based on the current batch without an unbounded
+            // scan over history, and a solver cannot leave batch N exposed while
+            // new orders start batch N+1.
+            if (!b.settled) revert PreviousBatchUnsettled(id);
             id += 1;
             currentBatchId[poolId] = id;
             batches[poolId][id].closesAt = uint64(block.timestamp) + windowLength;
@@ -336,6 +371,31 @@ contract OtterOrderBook {
         emit BatchSettled(poolId, batchId, b.count);
     }
 
+    /// @notice Refund every order in a committed batch that was not settled in
+    ///         time. The caller supplies the complete committed sequence, which
+    ///         is replayed before any funds move, so no individual order can be
+    ///         omitted or redirected.
+    function refundExpired(bytes32 poolId, uint256 batchId, Order[] calldata orders) external nonReentrant {
+        Batch storage b = batches[poolId][batchId];
+        if (b.settled) revert AlreadySettled();
+        if (b.closesAt == 0) revert WindowStillOpen();
+
+        uint256 refundableAt = uint256(b.closesAt) + refundDelay;
+        if (block.timestamp < refundableAt) revert RefundTooEarly(refundableAt);
+
+        replay(poolId, batchId, orders);
+        b.settled = true;
+
+        address c0 = currency0Of[poolId];
+        address c1 = currency1Of[poolId];
+        for (uint256 i; i < orders.length; ++i) {
+            address sold = orders[i].sellingCurrency0 ? c0 : c1;
+            if (!IERC20Escrow(sold).transfer(orders[i].trader, orders[i].budget)) revert TransferFailed();
+        }
+
+        emit BatchRefunded(poolId, batchId, b.count);
+    }
+
     /// @notice Move each order's filled amount from escrow to `settlement`, and
     ///         refund the unfilled remainder straight to the trader.
     /// @dev Only callable as part of the same `settle` that already ran
@@ -343,7 +403,10 @@ contract OtterOrderBook {
     ///      already been checked by OtterMath (`BudgetExceeded`) before any
     ///      token here moves. This contract does not re-check it — it trusts
     ///      settlement the same way `consume` already does.
-    function releaseFilled(bytes32 poolId, Order[] calldata orders, uint256[] calldata filled) external {
+    function releaseFilled(bytes32 poolId, Order[] calldata orders, uint256[] calldata filled)
+        external
+        nonReentrant
+    {
         if (msg.sender != settlement) revert NotSettlement();
         if (filled.length != orders.length) revert LengthMismatch();
 

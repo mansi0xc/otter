@@ -58,6 +58,12 @@ contract OtterSettlement is IUnlockCallback {
 
     IPoolManager public immutable poolManager;
     OtterOrderBook public immutable orderBook;
+    address public immutable owner;
+
+    /// @notice The sole hook implementation whose pools may be registered. It is
+    ///         set once after deployment because the hook constructor itself
+    ///         needs this settlement address.
+    address public approvedHook;
 
     /// @notice The only address permitted to call `settle` during the exclusivity
     ///         window after a batch's window closes. After the window elapses,
@@ -140,6 +146,11 @@ contract OtterSettlement is IUnlockCallback {
     error NoLiquidity();
     error NoSurplus();
     error NotExclusiveSolver(uint256 exclusiveUntil);
+    error NotOwner();
+    error HookAlreadySet();
+    error InvalidHook(address supplied);
+    error NonZeroFee(uint24 fee);
+    error NativeCurrencyUnsupported();
 
     /// @notice The modelled burn (F~s(Y) - sum x*_i) alongside what was actually
     ///         realised. They differ by the part of the discretisation allowance
@@ -164,20 +175,32 @@ contract OtterSettlement is IUnlockCallback {
     ///      can share a settlement with the batch's own swap without perturbing
     ///      the curve the batch was priced on.
     event SurplusDonated(PoolId indexed poolId, uint256 amount0, uint256 amount1);
+    event HookSet(address indexed hook);
 
     constructor(IPoolManager poolManager_, OtterOrderBook orderBook_, address solver_, uint64 exclusivityWindow_) {
         poolManager = poolManager_;
         orderBook = orderBook_;
+        owner = msg.sender;
         solver = solver_;
         exclusivityWindow = exclusivityWindow_;
     }
 
     /// @notice One-time setup per pool: tells `orderBook` which two tokens it
-    ///         may escrow against this `poolId`. Permissionless — it only ever
-    ///         relays a `PoolKey`'s own currencies, so there is nothing to gain
-    ///         by calling it for someone else's pool, and `orderBook` rejects a
-    ///         second registration of the same pool outright.
+    ///         may escrow against this `poolId`. Every registered pool must use
+    ///         the one approved Otter hook and the zero-fee curve that the solver
+    ///         and settlement verify against.
+    function setApprovedHook(address hook) external {
+        if (msg.sender != owner) revert NotOwner();
+        if (approvedHook != address(0)) revert HookAlreadySet();
+        if (hook == address(0)) revert InvalidHook(hook);
+        approvedHook = hook;
+        emit HookSet(hook);
+    }
+
     function registerPool(PoolKey calldata key) external {
+        if (address(key.hooks) != approvedHook) revert InvalidHook(address(key.hooks));
+        if (key.fee != 0) revert NonZeroFee(key.fee);
+        if (key.currency0.isAddressZero() || key.currency1.isAddressZero()) revert NativeCurrencyUnsupported();
         orderBook.registerPoolCurrencies(
             PoolId.unwrap(key.toId()), Currency.unwrap(key.currency0), Currency.unwrap(key.currency1)
         );

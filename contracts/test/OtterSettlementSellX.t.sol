@@ -61,18 +61,19 @@ contract OtterSettlementSellXTest is Deployers {
         deployFreshManagerAndRouters();
         deployMintAndApprove2Currencies();
 
-        book = new OtterOrderBook(WINDOW);
+        book = new OtterOrderBook(WINDOW, 900);
         settlement = new OtterSettlement(manager, book, address(this), 300);
         book.setSettlement(address(settlement));
 
         (address predicted, bytes32 salt) = HookMiner.find(
             address(this),
-            uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG),
+            uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG),
             type(OtterHook).creationCode,
             abi.encode(manager, address(settlement))
         );
         hook = new OtterHook{salt: salt}(manager, address(settlement));
         assertEq(address(hook), predicted);
+        settlement.setApprovedHook(address(hook));
 
         (otterKey, otterId) = initPool(currency0, currency1, IHooks(address(hook)), 0, 1, SQRT_PRICE_1_1);
         settlement.registerPool(otterKey);

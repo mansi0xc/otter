@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
@@ -48,6 +49,21 @@ library OtterPoolMath {
     }
 }
 
+/// @dev Narrow view of the order book used by the hook to freeze a pool's
+/// liquidity while a committed batch is outstanding. Kept as an interface to
+/// avoid coupling the hook to order-book implementation details.
+interface IOtterBatchStatus {
+    function currentBatchId(bytes32 poolId) external view returns (uint256);
+    function batches(bytes32 poolId, uint256 batchId)
+        external
+        view
+        returns (uint64 closesAt, uint32 count, bool settled);
+}
+
+interface IOtterSettlementView {
+    function orderBook() external view returns (address);
+}
+
 /// @title OtterHook
 /// @notice Makes a v4 pool batch-only by rejecting every swap that does not come
 ///         from the Otter settlement contract, and restricts liquidity to a
@@ -57,10 +73,10 @@ library OtterPoolMath {
 /// This is not decoration. Otter's guarantees come from settling a whole batch as
 /// an order-independent set; if anyone can slip an ordinary sequential swap into
 /// the same block, the pool state the batch was solved against moves underneath
-/// it and order-independence is meaningless. Both `beforeSwap` and
-/// `beforeAddLiquidity` are enabled, so the hook address must carry
-/// BEFORE_SWAP_FLAG (1 << 7) and BEFORE_ADD_LIQUIDITY_FLAG (1 << 11) in its low
-/// 14 bits — mine the CREATE2 salt with HookMiner against both.
+/// it and order-independence is meaningless. The `beforeSwap`,
+/// `beforeAddLiquidity`, and `beforeRemoveLiquidity` callbacks are enabled, so
+/// the hook address must carry their flags in its low 14 bits — mine the CREATE2
+/// salt with HookMiner against all three.
 ///
 /// LIQUIDITY GATE. `beforeAddLiquidity` requires `tickLower`/`tickUpper` to equal
 /// the pool's full range at its own tick spacing (`TickMath.minUsableTick` /
@@ -82,17 +98,22 @@ library OtterPoolMath {
 /// only to keep the SHAPE of that liquidity from ever being anything but
 /// full-range.
 contract OtterHook is IHooks {
+    using PoolIdLibrary for PoolKey;
+
     IPoolManager public immutable poolManager;
     address public immutable settlement;
+    IOtterBatchStatus public immutable orderBook;
 
     error NotPoolManager();
     error BatchOnly(address sender);
+    error ActiveBatch(bytes32 poolId, uint256 batchId);
     error NotFullRange(int24 tickLower, int24 tickUpper, int24 requiredLower, int24 requiredUpper);
     error HookNotImplemented();
 
     constructor(IPoolManager poolManager_, address settlement_) {
         poolManager = poolManager_;
         settlement = settlement_;
+        orderBook = IOtterBatchStatus(IOtterSettlementView(settlement_).orderBook());
     }
 
     modifier onlyPoolManager() {
@@ -122,12 +143,33 @@ contract OtterHook is IHooks {
         IPoolManager.ModifyLiquidityParams calldata params,
         bytes calldata
     ) external view onlyPoolManager returns (bytes4) {
+        _revertIfBatchActive(key);
         int24 lo = TickMath.minUsableTick(key.tickSpacing);
         int24 hi = TickMath.maxUsableTick(key.tickSpacing);
         if (params.tickLower != lo || params.tickUpper != hi) {
             revert NotFullRange(params.tickLower, params.tickUpper, lo, hi);
         }
         return IHooks.beforeAddLiquidity.selector;
+    }
+
+    /// @notice Liquidity must remain fixed from the first accepted order until
+    ///         the batch has either settled or been refunded. Otherwise a solver
+    ///         can price against one curve and find a different curve at execution.
+    function beforeRemoveLiquidity(
+        address,
+        PoolKey calldata key,
+        IPoolManager.ModifyLiquidityParams calldata,
+        bytes calldata
+    ) external view onlyPoolManager returns (bytes4) {
+        _revertIfBatchActive(key);
+        return IHooks.beforeRemoveLiquidity.selector;
+    }
+
+    function _revertIfBatchActive(PoolKey calldata key) private view {
+        bytes32 poolId = PoolId.unwrap(key.toId());
+        uint256 batchId = orderBook.currentBatchId(poolId);
+        (uint64 closesAt, uint32 count, bool settled) = orderBook.batches(poolId, batchId);
+        if (closesAt != 0 && count != 0 && !settled) revert ActiveBatch(poolId, batchId);
     }
 
     // ------------------------------------------------------------------
@@ -152,15 +194,6 @@ contract OtterHook is IHooks {
         BalanceDelta,
         bytes calldata
     ) external pure returns (bytes4, BalanceDelta) {
-        revert HookNotImplemented();
-    }
-
-    function beforeRemoveLiquidity(
-        address,
-        PoolKey calldata,
-        IPoolManager.ModifyLiquidityParams calldata,
-        bytes calldata
-    ) external pure returns (bytes4) {
         revert HookNotImplemented();
     }
 

@@ -23,7 +23,8 @@ import {HookMiner} from "../test/utils/HookMiner.sol";
 ///     --rpc-url $RPC_URL --broadcast --verify -vvvv
 ///
 /// Required env:
-///   POOL_MANAGER   the v4 PoolManager on your target chain
+///   POOL_MANAGER   Sepolia's v4 PoolManager:
+///                  0xE03A1074c86CFeDd5C142C4F04F1a1536e203543
 ///   PRIVATE_KEY    deployer key
 ///
 /// Optional env:
@@ -38,6 +39,8 @@ import {HookMiner} from "../test/utils/HookMiner.sol";
 ///                         NOT do.
 ///   EXCLUSIVITY_WINDOW    seconds of SOLVER exclusivity after a window closes,
 ///                         after which settlement is permissionless. Default 300.
+///   REFUND_DELAY           seconds after close before anyone can refund a
+///                          batch that was never settled. Default 900.
 ///
 /// POOL_MANAGER is deliberately NOT hardcoded per chain. The Uniswap docs warn
 /// that v4 addresses differ between chains and the published table has been
@@ -65,31 +68,37 @@ contract Deploy is Script {
     /// OtterSettlement's `pendingSurplus` note.
     uint24 constant FEE = 0;
     int24 constant TICK_SPACING = 1;
+    uint256 constant SEPOLIA_CHAIN_ID = 11155111;
 
     function run() external {
+        require(block.chainid == SEPOLIA_CHAIN_ID, "Sepolia deployment only");
         address pmAddress = vm.envAddress("POOL_MANAGER");
         require(pmAddress.code.length > 0, "no code at POOL_MANAGER: wrong address or wrong chain");
         IPoolManager manager = IPoolManager(pmAddress);
 
         uint64 window = uint64(vm.envOr("WINDOW", uint256(60)));
         uint256 liquidity = vm.envOr("LIQUIDITY", uint256(1e21));
-        address deployer = msg.sender;
+        uint256 privateKey = vm.envUint("PRIVATE_KEY");
+        address deployer = vm.addr(privateKey);
         address solver = vm.envOr("SOLVER", deployer);
         uint64 exclusivityWindow = uint64(vm.envOr("EXCLUSIVITY_WINDOW", uint256(300)));
+        uint64 refundDelay = uint64(vm.envOr("REFUND_DELAY", uint256(900)));
 
-        vm.startBroadcast();
+        vm.startBroadcast(privateKey);
 
         // --- tokens ---------------------------------------------------
         (Currency currency0, Currency currency1) = _resolveTokens(deployer, liquidity);
 
         // --- core -----------------------------------------------------
-        OtterOrderBook book = new OtterOrderBook(window);
+        OtterOrderBook book = new OtterOrderBook(window, refundDelay);
         OtterSettlement settlement = new OtterSettlement(manager, book, solver, exclusivityWindow);
         book.setSettlement(address(settlement));
 
-        // --- hook: mine a salt carrying BEFORE_SWAP + BEFORE_ADD_LIQUIDITY ---
+        // --- hook: mine a salt carrying swap + add/remove-liquidity permissions ---
         bytes memory args = abi.encode(manager, address(settlement));
-        uint160 hookFlags = uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG);
+        uint160 hookFlags = uint160(
+            Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
+        );
         (address predicted, bytes32 salt) =
             HookMiner.find(CREATE2_DEPLOYER, hookFlags, type(OtterHook).creationCode, args);
 
@@ -98,6 +107,7 @@ contract Deploy is Script {
         require(
             uint160(address(hook)) & Hooks.ALL_HOOK_MASK == hookFlags, "hook address encodes unexpected permissions"
         );
+        settlement.setApprovedHook(address(hook));
 
         // --- pool -----------------------------------------------------
         PoolKey memory key = PoolKey({
@@ -135,7 +145,7 @@ contract Deploy is Script {
 
         vm.stopBroadcast();
 
-        _report(key, book, settlement, hook, lpRouter, window, liquidity, solver, exclusivityWindow);
+        _report(key, book, settlement, hook, lpRouter, window, refundDelay, liquidity, solver, exclusivityWindow);
     }
 
     function _resolveTokens(address deployer, uint256 liquidity)
@@ -167,10 +177,11 @@ contract Deploy is Script {
         OtterHook hook,
         PoolModifyLiquidityTest lpRouter,
         uint64 window,
+        uint64 refundDelay,
         uint256 liquidity,
         address solver,
         uint64 exclusivityWindow
-    ) private {
+    ) private view {
         PoolId id = key.toId();
 
         console2.log("=== Otter deployed ===");
@@ -184,30 +195,14 @@ contract Deploy is Script {
         console2.log("currency0      ", Currency.unwrap(key.currency0));
         console2.log("currency1      ", Currency.unwrap(key.currency1));
         console2.log("window (s)     ", window);
+        console2.log("refund delay (s)", refundDelay);
         console2.log("liquidity      ", liquidity);
         console2.log("solver         ", solver);
         console2.log("exclusivity (s)", exclusivityWindow);
         console2.logBytes32(PoolId.unwrap(id));
 
-        string memory json = string.concat(
-            '{\n  "chainId": ', vm.toString(block.chainid),
-            ',\n  "poolManager": "', vm.toString(address(settlement.poolManager())),
-            '",\n  "orderBook": "', vm.toString(address(book)),
-            '",\n  "settlement": "', vm.toString(address(settlement)),
-            '",\n  "hook": "', vm.toString(address(hook)),
-            '",\n  "lpRouter": "', vm.toString(address(lpRouter)),
-            '",\n  "currency0": "', vm.toString(Currency.unwrap(key.currency0)),
-            '",\n  "currency1": "', vm.toString(Currency.unwrap(key.currency1)),
-            '",\n  "poolId": "', vm.toString(PoolId.unwrap(id)),
-            '",\n  "window": ', vm.toString(uint256(window)),
-            ',\n  "liquidity": ', vm.toString(liquidity),
-            ',\n  "solver": "', vm.toString(solver),
-            '",\n  "exclusivityWindow": ', vm.toString(uint256(exclusivityWindow)),
-            ',\n  "fee": 0,\n  "tickSpacing": 1\n}\n'
-        );
-        string memory path =
-            string.concat("../harness/results/deployment-", vm.toString(block.chainid), ".json");
-        vm.writeFile(path, json);
-        console2.log("wrote", path);
+        // The script intentionally logs addresses rather than writing a report:
+        // Foundry executes a local simulation before every broadcast, and a file
+        // written here could otherwise contain simulated (not deployed) addresses.
     }
 }

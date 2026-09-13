@@ -1,0 +1,18 @@
+{
+  "chainId": 11155111,
+  "poolManager": "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
+  "orderBook": "0x8152DA3f2affDa3d233b0BDF8BF77e0bCeBA32cf",
+  "settlement": "0x476943E2399d135B5e1F8497A4Dc50564886F1F5",
+  "hook": "0xa4eb62f1A79856b030ce08B4A4E95fDd22C64a80",
+  "lpRouter": "0x9F3F36097B6C9193439962096A6E1ef1A6ee1912",
+  "currency0": "0xA47293F2138724639942e34882D1741E33EC188D",
+  "currency1": "0xe934ab08488a89aEb491c5425D11AdCC44ac12e3",
+  "poolId": "0x62226a92f6feecc0053b46f84c202da078c41c5f69a250f5d352541eceb8fb90",
+  "window": 60,
+  "refundDelay": 900,
+  "liquidity": 1000000000000000000000,
+  "solver": "0x34Df0107d4aEE3830899d2AC1F52ACd4015F729B",
+  "exclusivityWindow": 300,
+  "fee": 0,
+  "tickSpacing": 1
+}

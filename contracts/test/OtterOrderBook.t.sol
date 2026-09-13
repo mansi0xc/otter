@@ -13,6 +13,7 @@ contract OtterOrderBookTest is Test {
     bytes32 constant POOL = bytes32(uint256(0xB0));
     bytes32 constant OTHER_POOL = bytes32(uint256(0xB1));
     uint64 constant WINDOW = 60;
+    uint64 constant REFUND_DELAY = 300;
 
     address settlement = address(0x5E77);
     uint256 alicePk = 0xA11CE;
@@ -21,7 +22,7 @@ contract OtterOrderBookTest is Test {
     address bob;
 
     function setUp() public {
-        book = new OtterOrderBook(WINDOW);
+        book = new OtterOrderBook(WINDOW, REFUND_DELAY);
         book.setSettlement(settlement);
         alice = vm.addr(alicePk);
         bob = vm.addr(bobPk);
@@ -258,6 +259,11 @@ contract OtterOrderBookTest is Test {
 
         OtterOrderBook.Order memory b = _order(bob, 0, true);
         (OtterOrderBook.Order[] memory os2, bytes[] memory sigs2) = _one(b, _sign(bobPk, b));
+        vm.expectRevert(abi.encodeWithSelector(OtterOrderBook.PreviousBatchUnsettled.selector, first));
+        book.submit(os2, sigs2);
+
+        vm.prank(settlement);
+        book.consume(POOL, first, os);
         uint256 second = book.submit(os2, sigs2);
 
         assertEq(second, first + 1, "window should roll");
@@ -295,6 +301,35 @@ contract OtterOrderBookTest is Test {
         book.consume(POOL, batchId, os);
     }
 
+    function test_refundExpiredReturnsTheEntireCommittedBatch() public {
+        (uint256 batchId, OtterOrderBook.Order[] memory os) = _submitTwo();
+        uint256 aliceBefore = currency0.balanceOf(alice);
+        uint256 bobBefore = currency1.balanceOf(bob);
+
+        vm.warp(block.timestamp + WINDOW + REFUND_DELAY - 1);
+        vm.expectRevert(abi.encodeWithSelector(OtterOrderBook.RefundTooEarly.selector, uint256(361)));
+        book.refundExpired(POOL, batchId, os);
+
+        vm.warp(block.timestamp + 1);
+        book.refundExpired(POOL, batchId, os);
+
+        assertEq(currency0.balanceOf(alice), aliceBefore + os[0].budget, "seller 0 fully refunded");
+        assertEq(currency1.balanceOf(bob), bobBefore + os[1].budget, "seller 1 fully refunded");
+
+        vm.expectRevert(OtterOrderBook.AlreadySettled.selector);
+        book.refundExpired(POOL, batchId, os);
+    }
+
+    function test_refundExpiredRequiresTheCommittedOrderSequence() public {
+        (uint256 batchId, OtterOrderBook.Order[] memory os) = _submitTwo();
+        vm.warp(block.timestamp + WINDOW + REFUND_DELAY);
+
+        OtterOrderBook.Order[] memory trimmed = new OtterOrderBook.Order[](1);
+        trimmed[0] = os[0];
+        vm.expectRevert(abi.encodeWithSelector(OtterOrderBook.CountMismatch.selector, 1, uint32(2)));
+        book.refundExpired(POOL, batchId, trimmed);
+    }
+
     // ------------------------------------------------------------------
     // cost
     // ------------------------------------------------------------------
@@ -322,6 +357,8 @@ contract OtterOrderBookTest is Test {
             console2.log("  gas total   ", used);
             console2.log("  gas / order ", used / n);
             vm.warp(block.timestamp + WINDOW); // fresh batch each round
+            vm.prank(settlement);
+            book.consume(POOL, s, os);
         }
     }
 }

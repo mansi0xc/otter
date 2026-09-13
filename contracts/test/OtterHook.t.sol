@@ -7,6 +7,7 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {CustomRevert} from "@uniswap/v4-core/src/libraries/CustomRevert.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
@@ -14,14 +15,21 @@ import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
 
 import {OtterHook, OtterPoolMath} from "../src/OtterHook.sol";
+import {OtterOrderBook} from "../src/OtterOrderBook.sol";
+import {OtterSettlement} from "../src/OtterSettlement.sol";
 import {HookMiner} from "./utils/HookMiner.sol";
+
+interface IERC20HookTest {
+    function approve(address spender, uint256 amount) external returns (bool);
+}
 
 contract OtterHookTest is Deployers {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
 
     OtterHook hook;
-    address settlement = address(0x5E77);
+    OtterOrderBook book;
+    OtterSettlement settlement;
 
     PoolKey otterKey;
     PoolId otterId;
@@ -34,17 +42,25 @@ contract OtterHookTest is Deployers {
         deployFreshManagerAndRouters();
         deployMintAndApprove2Currencies();
 
+        book = new OtterOrderBook(60, 900);
+        settlement = new OtterSettlement(manager, book, address(this), 300);
+        book.setSettlement(address(settlement));
+
         // Mine a CREATE2 salt whose low 14 bits carry BEFORE_SWAP and
-        // BEFORE_ADD_LIQUIDITY.
-        uint160 flags = uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG);
-        (address predicted, bytes32 salt) = HookMiner.find(
-            address(this), flags, type(OtterHook).creationCode, abi.encode(manager, settlement)
+        // BEFORE_ADD_LIQUIDITY and BEFORE_REMOVE_LIQUIDITY.
+        uint160 flags = uint160(
+            Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
         );
-        hook = new OtterHook{salt: salt}(manager, settlement);
+        (address predicted, bytes32 salt) = HookMiner.find(
+            address(this), flags, type(OtterHook).creationCode, abi.encode(manager, address(settlement))
+        );
+        hook = new OtterHook{salt: salt}(manager, address(settlement));
         assertEq(address(hook), predicted, "mined address mismatch");
+        settlement.setApprovedHook(address(hook));
 
         // fee 0 and tickSpacing 1: see the note in OtterPoolMath
         (otterKey, otterId) = initPool(currency0, currency1, IHooks(address(hook)), 0, 1, SQRT_PRICE_1_1);
+        settlement.registerPool(otterKey);
 
         modifyLiquidityRouter.modifyLiquidity(
             otterKey,
@@ -67,8 +83,8 @@ contract OtterHookTest is Deployers {
         uint160 bits = uint160(address(hook)) & Hooks.ALL_HOOK_MASK;
         assertEq(
             bits,
-            uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG),
-            "hook address must encode exactly BEFORE_SWAP | BEFORE_ADD_LIQUIDITY"
+            uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG),
+            "hook address must encode swap and both liquidity permissions"
         );
         console2.log("hook address", address(hook));
         console2.log("permission bits", uint256(bits));
@@ -76,7 +92,7 @@ contract OtterHookTest is Deployers {
 
     function test_hookRejectsDirectCalls() public {
         vm.expectRevert(OtterHook.NotPoolManager.selector);
-        hook.beforeSwap(settlement, otterKey, SWAP_PARAMS, ZERO_BYTES);
+        hook.beforeSwap(address(settlement), otterKey, SWAP_PARAMS, ZERO_BYTES);
     }
 
     // ------------------------------------------------------------------
@@ -152,6 +168,42 @@ contract OtterHookTest is Deployers {
         );
     }
 
+    function _wrappedActiveBatch(bytes4 selector, uint256 batchId) internal view returns (bytes memory) {
+        bytes memory reason = abi.encodeWithSelector(OtterHook.ActiveBatch.selector, PoolId.unwrap(otterId), batchId);
+        return abi.encodeWithSelector(
+            CustomRevert.WrappedError.selector,
+            address(hook),
+            selector,
+            reason,
+            abi.encodePacked(Hooks.HookCallFailed.selector)
+        );
+    }
+
+    function _submitActiveOrder() internal returns (uint256 batchId) {
+        uint256 traderPk = 0xA11CE;
+        address trader = vm.addr(traderPk);
+        address token = Currency.unwrap(currency0);
+        deal(token, trader, 10e18);
+        vm.prank(trader);
+        IERC20HookTest(token).approve(address(book), type(uint256).max);
+
+        OtterOrderBook.Order memory order = OtterOrderBook.Order({
+            trader: trader,
+            poolId: PoolId.unwrap(otterId),
+            sellingCurrency0: true,
+            ask: 0,
+            budget: 1e18,
+            deadline: block.timestamp + 1 days,
+            nonce: 0
+        });
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(traderPk, book.digestOf(order));
+        OtterOrderBook.Order[] memory orders = new OtterOrderBook.Order[](1);
+        bytes[] memory signatures = new bytes[](1);
+        orders[0] = order;
+        signatures[0] = abi.encodePacked(r, s, v);
+        batchId = book.submit(orders, signatures);
+    }
+
 
     /// LPs still move freely between batches — the gate restricts the SHAPE of
     /// a position, not whether one can be added at all.
@@ -162,6 +214,36 @@ contract OtterHookTest is Deployers {
                 tickLower: TICK_LOWER,
                 tickUpper: TICK_UPPER,
                 liquidityDelta: 1e20,
+                salt: 0
+            }),
+            ZERO_BYTES
+        );
+    }
+
+    function test_activeBatchBlocksLiquidityAdd() public {
+        uint256 batchId = _submitActiveOrder();
+        vm.expectRevert(_wrappedActiveBatch(IHooks.beforeAddLiquidity.selector, batchId));
+        modifyLiquidityRouter.modifyLiquidity(
+            otterKey,
+            IPoolManager.ModifyLiquidityParams({
+                tickLower: TICK_LOWER,
+                tickUpper: TICK_UPPER,
+                liquidityDelta: 1e20,
+                salt: 0
+            }),
+            ZERO_BYTES
+        );
+    }
+
+    function test_activeBatchBlocksLiquidityRemoval() public {
+        uint256 batchId = _submitActiveOrder();
+        vm.expectRevert(_wrappedActiveBatch(IHooks.beforeRemoveLiquidity.selector, batchId));
+        modifyLiquidityRouter.modifyLiquidity(
+            otterKey,
+            IPoolManager.ModifyLiquidityParams({
+                tickLower: TICK_LOWER,
+                tickUpper: TICK_UPPER,
+                liquidityDelta: -1e20,
                 salt: 0
             }),
             ZERO_BYTES

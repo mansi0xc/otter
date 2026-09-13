@@ -53,3 +53,28 @@ via surplus redistribution. This is its first implementation.
 cd solver && npm test
 cd contracts && forge test
 ```
+
+## Sepolia deployment
+
+The deployment script is deliberately restricted to Ethereum Sepolia. It deploys
+the order book, settlement contract, hook, a zero-fee full-range v4 pool, and a
+small LP position. With no token addresses supplied, it deploys two mintable demo
+tokens; this is the appropriate starting point for the hackathon demo.
+
+```bash
+cd contracts
+cp .env.example .env
+# Edit .env: add SEPOLIA_RPC_URL and PRIVATE_KEY. Keep .env private.
+set -a && source .env && set +a
+forge script script/Deploy.s.sol:Deploy \
+  --rpc-url "$SEPOLIA_RPC_URL" --broadcast -vvvv
+```
+
+`SOLVER` is optional. If unset, the deployer is the solver. For a public demo,
+use a separate, funded hot-wallet address once the off-chain relayer is running;
+the solver is only the address allowed to submit a settlement during the initial
+exclusivity window, and pays its own transaction gas.
+
+The script prints the deployed addresses. Record those only after the broadcast
+transactions have confirmed. Never put a private key in the repository or in a
+terminal transcript.
