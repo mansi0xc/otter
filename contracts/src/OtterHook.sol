@@ -97,6 +97,17 @@ interface IOtterSettlementView {
 /// curve-conservation failure rather than a silent mispricing; the gate's job is
 /// only to keep the SHAPE of that liquidity from ever being anything but
 /// full-range.
+///
+/// ACTIVE-BATCH FREEZE, a separate and later mechanism from the shape gate
+/// above: both `beforeAddLiquidity` and `beforeRemoveLiquidity` also reject any
+/// AMOUNT change — add or genuine remove — while a batch is open or closed-but-
+/// unsettled for that pool (`_revertIfBatchActive`), because the "curve-
+/// conservation failure rather than a silent mispricing" outcome mentioned above
+/// is a REVERTED SETTLEMENT, not a free pass — repeatable griefing if left
+/// possible. This still deliberately excludes `liquidityDelta == 0` fee
+/// collection (see `beforeRemoveLiquidity`'s own note): that changes nothing the
+/// mechanism depends on, so freezing it would only cost LPs their rewards for no
+/// safety reason.
 contract OtterHook is IHooks {
     using PoolIdLibrary for PoolKey;
 
@@ -155,13 +166,24 @@ contract OtterHook is IHooks {
     /// @notice Liquidity must remain fixed from the first accepted order until
     ///         the batch has either settled or been refunded. Otherwise a solver
     ///         can price against one curve and find a different curve at execution.
+    ///
+    /// @dev Gated on `liquidityDelta < 0` specifically, not on which callback v4
+    ///      routed to. v4 calls `beforeRemoveLiquidity` for every
+    ///      `liquidityDelta <= 0` (Hooks.sol), and `liquidityDelta == 0` is the
+    ///      standard way an LP collects accrued fees — including the `donate()`
+    ///      surplus from OtterSettlement — without touching their position size.
+    ///      That collection changes no on-chain state this hook or the mechanism
+    ///      cares about: it does not move price, liquidity, or the curve a batch
+    ///      was solved against. Gating it too would block LPs from claiming
+    ///      rewards for as long as any batch is outstanding on the pool, for no
+    ///      safety benefit — so it is deliberately let through.
     function beforeRemoveLiquidity(
         address,
         PoolKey calldata key,
-        IPoolManager.ModifyLiquidityParams calldata,
+        IPoolManager.ModifyLiquidityParams calldata params,
         bytes calldata
     ) external view onlyPoolManager returns (bytes4) {
-        _revertIfBatchActive(key);
+        if (params.liquidityDelta < 0) _revertIfBatchActive(key);
         return IHooks.beforeRemoveLiquidity.selector;
     }
 

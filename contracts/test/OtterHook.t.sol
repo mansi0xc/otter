@@ -250,6 +250,24 @@ contract OtterHookTest is Deployers {
         );
     }
 
+    /// @notice Regression: an LP collecting fees (the standard zero-delta
+    ///         `modifyLiquidity` call) must NOT be blocked by the active-batch
+    ///         freeze, even while a batch is genuinely open. Collecting fees
+    ///         changes nothing the mechanism depends on — no price, no
+    ///         liquidity, no curve — so freezing it would only cost LPs their
+    ///         rewards for as long as any batch is outstanding, for zero safety
+    ///         benefit. `beforeRemoveLiquidity` must gate on `liquidityDelta < 0`
+    ///         specifically, not on which callback v4 happened to route the call
+    ///         through.
+    function test_activeBatchDoesNotBlockFeeCollection() public {
+        _submitActiveOrder();
+        modifyLiquidityRouter.modifyLiquidity(
+            otterKey,
+            IPoolManager.ModifyLiquidityParams({tickLower: TICK_LOWER, tickUpper: TICK_UPPER, liquidityDelta: 0, salt: 0}),
+            ZERO_BYTES
+        ); // must not revert
+    }
+
     /// The exploit this closes: a second, narrower position makes `L` change
     /// mid-swap if a batch crosses its boundary, which is exactly the assumption
     /// OtterPoolMath's virtual-reserve math depends on holding everywhere.
