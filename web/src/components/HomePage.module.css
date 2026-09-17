@@ -565,4 +565,18 @@
   .ctaSection {
     padding: 3rem 1rem;
   }
+  /* Visually hidden below this breakpoint, but still in the accessibility
+     tree and document outline — the .sectionLabel above it already carries
+     the visible cue on mobile, where vertical space is tighter. */
+  .srOnlyMobile {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 }

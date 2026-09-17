@@ -12,6 +12,20 @@
 
 .left { flex: 0 0 auto; }
 
+.wordmarkBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  border-radius: 4px;
+}
+
+.wordmarkBtn:hover .name { color: var(--flow); }
+.wordmarkBtn:focus-visible { outline: 2px solid var(--flow); outline-offset: 2px; }
+
 .wordmark {
   display: flex;
   align-items: center;

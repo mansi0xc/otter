@@ -19,7 +19,12 @@ export default function App() {
         <div className={styles.container}>
 
           {/* ── Mode content ── */}
-          {mode === 'demo' ? (
+          {mode === 'home' ? (
+            <HomePage
+              onEnterDemo={() => setMode('demo')}
+              onEnterSepolia={() => setMode('sepolia')}
+            />
+          ) : mode === 'demo' ? (
             <DemoStory />
           ) : (
             <div className={styles.sandboxLayout}>
