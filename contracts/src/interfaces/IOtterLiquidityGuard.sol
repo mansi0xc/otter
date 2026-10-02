@@ -8,4 +8,5 @@ interface IOtterBatchStatus {
 
 interface IOtterLiquidityGuard {
     function assertBatchSupported(bytes32 poolId) external view;
+    function hasUnsupportedFees(bytes32 poolId) external view returns (bool);
 }

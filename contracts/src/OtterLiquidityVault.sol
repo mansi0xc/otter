@@ -87,6 +87,8 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
     error InvalidClaim();
     error UnauthorizedCallback();
     error ReentrantCall();
+    error InFlightLiquidity();
+    error UnsupportedPoolState();
 
     event PositionCreated(
         uint256 indexed positionId, bytes32 indexed poolId, address indexed owner, int24 lower, int24 upper
@@ -119,7 +121,27 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
     /// the tick-aware execution/auction implementation is ready. Concentrated
     /// custody is supported now, without using the old curve to price it.
     function assertBatchSupported(bytes32 poolId) external view {
+        if (_lock != 1) revert InFlightLiquidity();
         if (concentratedPositions[poolId] != 0) revert ConcentratedExecutionUnavailable();
+        PoolKey memory key = _keys[poolId];
+        if (PoolId.unwrap(key.toId()) != poolId) revert UnsupportedPoolState();
+        (uint160 price,, uint24 protocolFee, uint24 lpFee) = poolManager.getSlot0(key.toId());
+        uint128 liquidity = poolManager.getLiquidity(key.toId());
+        if (price < 1 << 64 || price >= 1 << 128 || liquidity == 0 || protocolFee != 0 || lpFee != 0) {
+            revert UnsupportedPoolState();
+        }
+        // Both integer virtual reserves must be nonzero. Bounds keep each below
+        // 2^120, so accepted uint128 asks cannot poison legacy classification.
+        if ((uint256(liquidity) << 96) / price == 0 || (uint256(liquidity) * price) >> 96 == 0) {
+            revert UnsupportedPoolState();
+        }
+    }
+
+    function hasUnsupportedFees(bytes32 poolId) external view returns (bool) {
+        PoolKey memory key = _keys[poolId];
+        if (PoolId.unwrap(key.toId()) != poolId) return false;
+        (,, uint24 protocolFee, uint24 lpFee) = poolManager.getSlot0(key.toId());
+        return protocolFee != 0 || lpFee != 0;
     }
 
     function createPosition(

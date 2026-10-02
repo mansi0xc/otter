@@ -18,7 +18,7 @@ At each checkpoint:
 3. Ask the user to create the commit and stop work at that checkpoint. Do not begin the next step or perform further edits while the commit is pending.
 4. After the user confirms completion, inspect Git status and HEAD to establish the new baseline, then continue. Preserve unrelated changes.
 
-Checkpoint 0 is complete in the user's commit `63ec94e`. The user's commit also includes their corrections document; preserve it. Checkpoint 1 is complete in the user's commit `a7637a9`, and checkpoint 2A in `bc79d64`. Step 2 is split into reviewable code checkpoints: 2A for LP custody/integration, then 2B for trader native/ERC20 escrow. Do not proceed past either pending user commit.
+Checkpoint 0 is complete in the user's commit `63ec94e`. The user's commit also includes their corrections document; preserve it. Checkpoint 1 is complete in the user's commit `a7637a9`, checkpoint 2A in `bc79d64`, and checkpoint 2B in `57bdd33`. Step 2 is split into reviewable code checkpoints: 2A for LP custody/integration, then 2B for trader native/ERC20 escrow. Do not proceed past either pending user commit.
 
 ## Implementation sequence
 
@@ -132,9 +132,31 @@ standard/no-return ERC20 custody, isolated refund/output claims, shared-currency
 backing, and exact PoolManager transfers are implemented locally. Nonzero
 protocol fees and incomplete input consumption explicitly reject settlement
 and preserve timeout recovery. Step 2's custody/asset acceptance is complete;
-no deployment has been performed.
+no deployment has been performed. Status: committed by the user as `57bdd33`;
+clean tree inspected before checkpoint 3A.
 
 R4's recipient veto regression now asserts independent claims. R9's zero-fee
 policy and complete-input rejection are tested, but supported partial execution
-and the exact tick-aware quote remain pending. R3 still reproduces oversized
-atomic timeout replay. Step 3 begins only after the user commits 2B.
+and the exact tick-aware quote remain pending. The original oversized timeout replay
+reproduction remains in that commit's history; checkpoint 3A replaces it with
+admission and independent-recovery prevention regressions.
+
+## Checkpoint 3A: bounded epochs and stored recovery
+
+See [the epoch checkpoint report](./CHECKPOINT_3A.md) for the v2 signature schema,
+clock/state transitions, numeric and wallet limits, recovery API, tests, and
+user-created commit handoff. This slice bounds each batch to 32 orders, binds
+signatures to a configuration/epoch/execution limit, and separates constant-work
+expiry from independent stored refunds and asset delivery. Pause affects only
+admission. An authenticated fee change can expire a batch early.
+
+Step 3 is split into two code checkpoints. **3A is pending the user's commit.**
+3B will implement owner-authorized queued LP exits and block the next epoch
+until reserved exits have been processed. Start 3B only after the user confirms
+3A is committed. Until then, repeated batches can still starve immediate LP
+withdrawals; the existence of constant-work expiry alone does not fix this.
+
+The remaining active exploit reproductions are R2 (solver discretion), R6
+(minority dust IR), and R7 (historical surplus capture). R5's extreme-ask
+admission poison and R8's unbounded execution exposure are prevented locally;
+these changes do not resolve the remaining arithmetic/curve/mechanism work.

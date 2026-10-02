@@ -129,7 +129,10 @@ contract SolverEndToEndTest is Deployers {
                 ask: ask[i],
                 budget: budget[i],
                 deadline: block.timestamp + 1 days,
-                nonce: i
+                nonce: i,
+                configVersion: 1,
+                epoch: book.nextEpochId(PoolId.unwrap(otterId)),
+                maxExecutionTime: block.timestamp + 1 days
             });
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, book.digestOf(orders[i]));
             sigs[i] = abi.encodePacked(r, s, v);

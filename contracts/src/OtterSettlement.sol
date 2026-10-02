@@ -103,6 +103,7 @@ contract OtterSettlement is IUnlockCallback {
     error NoLiquidity();
     error NoSurplus();
     error NotExclusiveSolver(uint256 exclusiveUntil);
+    error InvalidExecutionWindow();
     error NotOwner();
     error HookAlreadySet();
     error InvalidHook(address supplied);
@@ -150,6 +151,7 @@ contract OtterSettlement is IUnlockCallback {
     event HookSet(address indexed hook);
 
     constructor(IPoolManager poolManager_, OtterOrderBook orderBook_, address solver_, uint64 exclusivityWindow_) {
+        if (exclusivityWindow_ >= orderBook_.executionWindow()) revert InvalidExecutionWindow();
         poolManager = poolManager_;
         orderBook = orderBook_;
         owner = msg.sender;

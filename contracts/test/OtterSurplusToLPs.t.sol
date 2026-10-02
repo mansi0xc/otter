@@ -96,10 +96,7 @@ contract OtterSurplusToLPsTest is Deployers {
         _modifyLiquidity(
             otterKey,
             IPoolManager.ModifyLiquidityParams({
-                tickLower: TICK_LOWER,
-                tickUpper: TICK_UPPER,
-                liquidityDelta: delta,
-                salt: 0
+                tickLower: TICK_LOWER, tickUpper: TICK_UPPER, liquidityDelta: delta, salt: 0
             }),
             ZERO_BYTES
         );
@@ -143,7 +140,10 @@ contract OtterSurplusToLPsTest is Deployers {
             ask: 0,
             budget: budget,
             deadline: block.timestamp + 1 days,
-            nonce: nonce
+            nonce: nonce,
+            configVersion: 1,
+            epoch: book.nextEpochId(PoolId.unwrap(otterId)),
+            maxExecutionTime: block.timestamp + 1 days
         });
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, book.digestOf(o));
         sig = abi.encodePacked(r, s, v);

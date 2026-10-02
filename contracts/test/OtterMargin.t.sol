@@ -89,10 +89,7 @@ contract OtterMarginTest is Deployers {
         _modifyLiquidity(
             k,
             IPoolManager.ModifyLiquidityParams({
-                tickLower: lo,
-                tickUpper: hi,
-                liquidityDelta: int256(uint256(liquidity)),
-                salt: 0
+                tickLower: lo, tickUpper: hi, liquidityDelta: int256(uint256(liquidity)), salt: 0
             }),
             ZERO_BYTES
         );
@@ -144,7 +141,10 @@ contract OtterMarginTest is Deployers {
             ask: 0,
             budget: domBudget,
             deadline: block.timestamp + 1 days,
-            nonce: 0
+            nonce: 0,
+            configVersion: 1,
+            epoch: book.nextEpochId(PoolId.unwrap(id)),
+            maxExecutionTime: block.timestamp + 1 days
         });
         orders[1] = OtterOrderBook.Order({
             trader: min,
@@ -153,7 +153,10 @@ contract OtterMarginTest is Deployers {
             ask: 0,
             budget: minBudget,
             deadline: block.timestamp + 1 days,
-            nonce: 0
+            nonce: 0,
+            configVersion: 1,
+            epoch: book.nextEpochId(PoolId.unwrap(id)),
+            maxExecutionTime: block.timestamp + 1 days
         });
         sigs[0] = _sign(domPk, orders[0]);
         sigs[1] = _sign(minPk, orders[1]);

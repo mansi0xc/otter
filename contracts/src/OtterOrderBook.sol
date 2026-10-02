@@ -6,59 +6,13 @@ import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 
 /// @title OtterOrderBook
-/// @notice Collects signed orders into per-pool batch windows and escrows the
-///         funds they sell.
-///
-/// Design notes, both load-bearing:
-///
-/// 1. Orders are not stored. The batch keeps a running commitment
-///    `digest = keccak256(digest, orderHash)` plus a count. Settlement supplies the
-///    full order array back as calldata and `replay` checks it reproduces the
-///    digest. Storing five words per order would cost ~100k gas each and make the
-///    settlement gas curve a measurement of SSTORE rather than of the mechanism.
-///
-/// 2. That commitment is an inclusion guarantee, not just an optimisation. If the
-///    solver chose the batch membership off-chain it could exclude orders — which
-///    is exactly the censorship the paper assumes away at the consensus layer
-///    (Theorem 23), reintroduced inside our own system where there is no excuse
-///    for it. The digest makes omitting a submitted order or inserting an unsigned
-///    one detectable on-chain.
-///
-///    The digest commits to a sequence, not a set, so settlement must replay in
-///    submission order. This establishes committed membership; it does not prove
-///    canonical payments or arrival-independent allocation (see R2 and R6).
-///
-/// 3. ESCROW. `submit` pulls each order's full `budget` in the token it sells,
-///    into this contract, before the order is ever eligible to be filled. This
-///    is what makes the inclusion guarantee in (2) safe to keep unconditional.
-///    Earlier versions of Otter pulled funds from the trader at settlement time
-///    instead — which meant a trader could revoke approval, spend the funds
-///    elsewhere, or simply be broke by the time settlement ran, and because the
-///    digest forbids dropping a committed order, that reverted the ENTIRE batch
-///    and vetoed every other trader in it. Escrowing at submission moves the
-///    only point of failure to the individual `submit` call the trader's own
-///    order is in: a bad pull reverts that call, not batches it never touched.
-///    Settlement releases exactly the filled amount to itself and this contract
-///    credits the rest to the signed trader's withdrawable claim. Settlement
-///    outputs and timeout refunds use the same claim ledger; no trader recipient
-///    is called while processing a batch.
-///
-///    A pool must be registered (`registerPoolCurrencies`) before any order
-///    against it can be escrowed; this contract otherwise has no way to know
-///    which two tokens a `bytes32 poolId` refers to. Registration is called once
-///    by `settlement`, which already depends on v4-core to decode a `PoolKey` —
-///    keeping that decoding out of this contract, at the cost of one more
-///    initialization step, is the trade this design makes to stay free of a
-///    direct v4 dependency.
-///
-/// Known limitation: signatures are ECDSA only. Contract wallets (EIP-1271) cannot
-/// currently trade. Noted in the README rather than silently unsupported.
-///
-/// Known limitations: the legacy signature is not bound to an epoch or maximum
-/// execution time, admission is unbounded, and timeout recovery still needs the
-/// full committed order array. Pull claims remove recipient vetoes after that
-/// replay; they do not resolve the batch/data-availability liveness problem.
-/// Stored per-order recovery and bounded expiry are the next checkpoint.
+/// @notice Bounded, epoch-bound signed escrow with stored individual recovery.
+/// Orders are stored before external asset calls and also committed in submission
+/// order. The commitment binds membership, not canonical economic outcomes.
+/// Expiry changes one epoch state without replay or token calls. Each stored
+/// order can then be recovered independently into its signed trader's claim.
+/// Withdrawals remain isolated by owner/currency. The legacy settlement verifier
+/// and historical LP reward policy still require their separate remediation.
 contract OtterOrderBook {
     // ------------------------------------------------------------------
     // Types
@@ -80,13 +34,40 @@ contract OtterOrderBook {
         uint256 deadline;
         /// unordered nonce — see `nonceBitmap`
         uint256 nonce;
+        uint256 configVersion;
+        uint256 epoch;
+        uint256 maxExecutionTime;
+    }
+
+    enum State {
+        None,
+        Collecting,
+        Closed,
+        Executing,
+        Settled,
+        Refundable
     }
 
     struct Batch {
         uint64 closesAt;
+        uint64 executeUntil;
         uint32 count;
-        bool settled;
-        // remainder of the slot intentionally free
+        State state;
+        uint96 budget0;
+        uint96 budget1;
+    }
+
+    /// @dev Pool, epoch and immutable configuration are implied by the mapping
+    /// keys. Bounds are checked before packing; getters reconstruct signed fields.
+    struct StoredOrder {
+        address trader;
+        uint96 budget;
+        uint128 ask;
+        uint64 deadline;
+        uint64 maxExecutionTime;
+        uint256 nonce;
+        bool sellingCurrency0;
+        bool refunded;
     }
 
     // ------------------------------------------------------------------
@@ -103,13 +84,13 @@ contract OtterOrderBook {
     uint256 public constant MAX_S = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0;
 
     bytes32 public constant ORDER_TYPEHASH = keccak256(
-        "Order(address trader,bytes32 poolId,bool sellingCurrency0,uint256 ask,uint256 budget,uint256 deadline,uint256 nonce)"
+        "Order(address trader,bytes32 poolId,bool sellingCurrency0,uint256 ask,uint256 budget,uint256 deadline,uint256 nonce,uint256 configVersion,uint256 epoch,uint256 maxExecutionTime)"
     );
 
     bytes32 private constant _DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
     bytes32 private constant _NAME_HASH = keccak256("OtterOrderBook");
-    bytes32 private constant _VERSION_HASH = keccak256("1");
+    bytes32 private constant _VERSION_HASH = keccak256("2");
 
     uint256 private immutable _CACHED_CHAIN_ID;
     bytes32 private immutable _CACHED_DOMAIN_SEPARATOR;
@@ -117,18 +98,25 @@ contract OtterOrderBook {
     /// length of a batch window in seconds
     uint64 public immutable windowLength;
 
-    /// @notice Time after a window closes after which anyone may refund an
-    ///         unprocessed batch in full. This is a liveness escape hatch, not a
-    ///         normal cancellation path: preserving the committed batch until the
-    ///         timeout expires is what keeps inclusion meaningful.
-    uint64 public immutable refundDelay;
+    /// @notice Exclusive upper boundary of economic execution after collecting.
+    /// At closesAt + executionWindow settlement is forbidden and expiry is public.
+    uint64 public immutable executionWindow;
+    uint256 public constant MAX_ORDERS = 32;
+    uint256 public constant MAX_BUDGET = type(uint96).max;
+    uint256 public constant MAX_ASK = type(uint128).max;
+    uint256 public constant MAX_SIGNATURE_BYTES = 512;
+    uint256 public constant SIGNATURE_GAS_LIMIT = 100_000;
+    bytes4 private constant _ERC1271_MAGIC = 0x1626ba7e;
 
     /// the only address permitted to mark a batch settled
     address public settlement;
     address public owner;
+    bool public admissionPaused;
 
     mapping(bytes32 poolId => uint256) public currentBatchId;
-    mapping(bytes32 poolId => mapping(uint256 batchId => Batch)) public batches;
+    mapping(bytes32 poolId => mapping(uint256 batchId => Batch)) private _batches;
+    mapping(bytes32 poolId => mapping(uint256 batchId => mapping(uint256 index => StoredOrder))) private _orders;
+    mapping(bytes32 poolId => uint256) public configVersionOf;
     mapping(bytes32 poolId => mapping(uint256 batchId => bytes32)) public batchDigest;
 
     /// @notice Zero currency0 denotes native ETH, so registration uses an
@@ -161,7 +149,17 @@ contract OtterOrderBook {
     // Events / errors
     // ------------------------------------------------------------------
 
-    event OrderSubmitted(bytes32 indexed poolId, uint256 indexed batchId, address indexed trader, bytes32 orderHash);
+    event OrderSubmitted(
+        bytes32 indexed poolId,
+        uint256 indexed batchId,
+        address indexed trader,
+        uint32 index,
+        bytes32 orderHash,
+        Order order
+    );
+    event EpochExpired(bytes32 indexed poolId, uint256 indexed batchId);
+    event OrderRecovered(bytes32 indexed poolId, uint256 indexed batchId, uint256 indexed index, address trader);
+    event NoncesInvalidated(address indexed trader, uint256 word, uint256 mask);
     event BatchSettled(bytes32 indexed poolId, uint256 indexed batchId, uint32 count);
     event BatchRefunded(bytes32 indexed poolId, uint256 indexed batchId, uint32 count);
     event SettlementSet(address settlement);
@@ -198,6 +196,19 @@ contract OtterOrderBook {
     error BudgetExceeded(uint256 i);
     error InvalidClaim();
     error NativeTransferFailed();
+    error BatchFull();
+    error AmountOutOfDomain(uint256 i);
+    error WrongEpoch(uint256 i);
+    error WrongConfiguration(uint256 i);
+    error InsufficientExecutionValidity(uint256 i);
+    error ExecutionExpired(uint256 executeUntil);
+    error InvalidOrderIndex();
+    error AlreadyRecovered();
+    error NotRefundable();
+    error FeesStillSupported();
+    error InvalidClock();
+    error AdmissionPaused();
+    event AdmissionPauseSet(bool paused);
 
     event ClaimCredited(address indexed trader, address indexed currency, uint256 amount);
     event Claimed(address indexed trader, address indexed currency, address indexed recipient, uint256 amount);
@@ -213,11 +224,11 @@ contract OtterOrderBook {
         _reentrancyLock = 1;
     }
 
-    constructor(uint64 windowLength_, uint64 refundDelay_) {
+    constructor(uint64 windowLength_, uint64 executionWindow_) {
         require(windowLength_ > 0, "window");
-        require(refundDelay_ > 0, "refund delay");
+        require(executionWindow_ > 0, "execution window");
         windowLength = windowLength_;
-        refundDelay = refundDelay_;
+        executionWindow = executionWindow_;
         owner = msg.sender;
         _CACHED_CHAIN_ID = block.chainid;
         _CACHED_DOMAIN_SEPARATOR = _buildDomainSeparator();
@@ -226,8 +237,17 @@ contract OtterOrderBook {
     function setSettlement(address settlement_) external {
         if (msg.sender != owner) revert NotOwner();
         if (settlement != address(0)) revert SettlementAlreadySet();
+        require(settlement_ != address(0), "zero settlement");
         settlement = settlement_;
         emit SettlementSet(settlement_);
+    }
+
+    /// @notice Emergency admission pause. It cannot pause expiry, refunds,
+    /// claims or authenticated LP withdrawals, or change an outstanding clock.
+    function setAdmissionPaused(bool paused) external nonReentrant {
+        if (msg.sender != owner) revert NotOwner();
+        admissionPaused = paused;
+        emit AdmissionPauseSet(paused);
     }
 
     /// @notice Register the two tokens a pool trades, so `submit` can escrow
@@ -245,6 +265,7 @@ contract OtterOrderBook {
         ) revert InvalidCurrencies();
         if (liquidityGuard.code.length == 0) revert InvalidLiquidityGuard();
         registered[poolId] = true;
+        configVersionOf[poolId] = 1;
         currency0Of[poolId] = currency0;
         currency1Of[poolId] = currency1;
         liquidityGuardOf[poolId] = liquidityGuard;
@@ -266,7 +287,19 @@ contract OtterOrderBook {
 
     function hashOrder(Order calldata o) public pure returns (bytes32) {
         return keccak256(
-            abi.encode(ORDER_TYPEHASH, o.trader, o.poolId, o.sellingCurrency0, o.ask, o.budget, o.deadline, o.nonce)
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.trader,
+                o.poolId,
+                o.sellingCurrency0,
+                o.ask,
+                o.budget,
+                o.deadline,
+                o.nonce,
+                o.configVersion,
+                o.epoch,
+                o.maxExecutionTime
+            )
         );
     }
 
@@ -278,17 +311,101 @@ contract OtterOrderBook {
     // Submission
     // ------------------------------------------------------------------
 
-    /// @notice Open batch for a pool, rolling over if the previous window has closed.
-    /// @dev View-only variant of the rollover in `submit`, for off-chain callers.
-    function openBatchId(bytes32 poolId) public view returns (uint256 id, uint64 closesAt) {
+    /// @notice Compatibility view: true means terminal, including Refundable.
+    /// Use batchState/executionDeadline to distinguish expiry from settlement.
+    function batches(bytes32 poolId, uint256 epoch)
+        external
+        view
+        returns (uint64 closesAt, uint32 count, bool terminal)
+    {
+        Batch memory b = _batches[poolId][epoch];
+        return (b.closesAt, b.count, _terminal(b.state));
+    }
+
+    function batchState(bytes32 poolId, uint256 epoch) public view returns (State) {
+        Batch memory b = _batches[poolId][epoch];
+        if (b.state == State.Collecting && block.timestamp >= b.closesAt) return State.Closed;
+        return b.state;
+    }
+
+    function executionDeadline(bytes32 poolId, uint256 epoch) external view returns (uint64) {
+        return _batches[poolId][epoch].executeUntil;
+    }
+
+    function nextEpochId(bytes32 poolId) public view returns (uint256 id) {
         id = currentBatchId[poolId];
-        if (executionInProgress[poolId]) revert PreviousBatchUnsettled(id);
-        Batch memory b = batches[poolId][id];
-        if (b.closesAt == 0 || block.timestamp >= b.closesAt) {
-            if (b.closesAt != 0 && !b.settled) revert PreviousBatchUnsettled(id);
-            return (b.closesAt == 0 ? id : id + 1, uint64(block.timestamp) + windowLength);
+        if (_terminal(_batches[poolId][id].state)) ++id;
+    }
+
+    function _terminal(State state) private pure returns (bool) {
+        return state == State.Settled || state == State.Refundable;
+    }
+
+    function _clock() private view returns (uint64 closesAt, uint64 executeUntil) {
+        uint256 duration = uint256(windowLength) + executionWindow;
+        if (duration > type(uint64).max || block.timestamp > type(uint64).max - duration) revert InvalidClock();
+        return (uint64(block.timestamp + windowLength), uint64(block.timestamp + duration));
+    }
+
+    function openBatchId(bytes32 poolId) public view returns (uint256 id, uint64 closesAt) {
+        if (!registered[poolId]) revert PoolNotRegistered();
+        id = currentBatchId[poolId];
+        Batch memory b = _batches[poolId][id];
+        if (b.state == State.Executing) revert PreviousBatchUnsettled(id);
+        if (b.state == State.None || _terminal(b.state)) {
+            (closesAt,) = _clock();
+            return (b.state == State.None ? id : id + 1, closesAt);
         }
+        if (block.timestamp >= b.closesAt) revert PreviousBatchUnsettled(id);
         return (id, b.closesAt);
+    }
+
+    function previewEpoch(bytes32 poolId)
+        external
+        view
+        returns (uint256 id, uint64 closesAt, uint64 executeUntil, uint256 configVersion)
+    {
+        (id, closesAt) = openBatchId(poolId);
+        uint64 storedDeadline = _batches[poolId][id].executeUntil;
+        executeUntil = storedDeadline == 0 ? uint64(uint256(closesAt) + executionWindow) : storedDeadline;
+        configVersion = configVersionOf[poolId];
+    }
+
+    function getOrder(bytes32 poolId, uint256 epoch, uint256 index) public view returns (Order memory o) {
+        if (index >= _batches[poolId][epoch].count) revert InvalidOrderIndex();
+        StoredOrder storage record = _orders[poolId][epoch][index];
+        o = Order(
+            record.trader,
+            poolId,
+            record.sellingCurrency0,
+            record.ask,
+            record.budget,
+            record.deadline,
+            record.nonce,
+            configVersionOf[poolId],
+            epoch,
+            record.maxExecutionTime
+        );
+    }
+
+    function getOrders(bytes32 poolId, uint256 epoch) external view returns (Order[] memory orders) {
+        uint256 count = _batches[poolId][epoch].count;
+        orders = new Order[](count);
+        for (uint256 i; i < count; ++i) {
+            orders[i] = getOrder(poolId, epoch, i);
+        }
+    }
+
+    function orderRecovered(bytes32 poolId, uint256 epoch, uint256 index) external view returns (bool) {
+        if (index >= _batches[poolId][epoch].count) revert InvalidOrderIndex();
+        return _orders[poolId][epoch][index].refunded;
+    }
+
+    /// @notice Invalidate unused signatures in any nonce word. An admitted
+    /// order's escrow/state is not canceled by marking its already-used bit.
+    function invalidateNonces(uint256 word, uint256 mask) external nonReentrant {
+        nonceBitmap[msg.sender][word] |= mask;
+        emit NoncesInvalidated(msg.sender, word, mask);
     }
 
     /// @notice Submit signed orders into the open batch. Anyone may relay, but
@@ -303,6 +420,7 @@ contract OtterOrderBook {
         nonReentrant
         returns (uint256 batchId)
     {
+        if (admissionPaused) revert AdmissionPaused();
         uint256 n = orders.length;
         if (n == 0 || n != signatures.length) revert LengthMismatch();
 
@@ -316,8 +434,9 @@ contract OtterOrderBook {
 
         batchId = _rollover(poolId);
 
-        Batch storage b = batches[poolId][batchId];
+        Batch storage b = _batches[poolId][batchId];
         if (block.timestamp >= b.closesAt) revert WindowClosed();
+        if (n > MAX_ORDERS - b.count) revert BatchFull();
 
         bytes32 acc = batchDigest[poolId][batchId];
         uint256 nativeRequired;
@@ -328,12 +447,35 @@ contract OtterOrderBook {
             if (block.timestamp > o.deadline) revert OrderExpired(i);
             if (o.budget == 0) revert ZeroBudget(i);
             if (o.trader == address(0)) revert InvalidTrader(i);
+            if (o.epoch != batchId) revert WrongEpoch(i);
+            if (o.configVersion != configVersionOf[poolId]) revert WrongConfiguration(i);
+            if (
+                o.budget > MAX_BUDGET || o.ask > MAX_ASK || o.deadline > type(uint64).max
+                    || o.maxExecutionTime > type(uint64).max
+            ) revert AmountOutOfDomain(i);
+            if (o.maxExecutionTime < b.executeUntil) revert InsufficientExecutionValidity(i);
+            if (signatures[i].length > MAX_SIGNATURE_BYTES) revert BadSignature(i);
+            uint256 aggregate = (o.sellingCurrency0 ? b.budget0 : b.budget1) + o.budget;
+            if (aggregate > MAX_BUDGET) revert AmountOutOfDomain(i);
+            if (o.sellingCurrency0) b.budget0 = uint96(aggregate);
+            else b.budget1 = uint96(aggregate);
 
             _useNonce(o.trader, o.nonce, i);
 
             bytes32 h = hashOrder(o);
             bytes32 d = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), h));
-            if (_recover(d, signatures[i]) != o.trader) revert BadSignature(i);
+            if (!_validSignature(o.trader, d, signatures[i])) revert BadSignature(i);
+            uint32 index = b.count++;
+            _orders[poolId][batchId][index] = StoredOrder(
+                o.trader,
+                uint96(o.budget),
+                uint128(o.ask),
+                uint64(o.deadline),
+                uint64(o.maxExecutionTime),
+                o.nonce,
+                o.sellingCurrency0,
+                false
+            );
 
             // Escrow now, while the trader's approval and balance are known
             // good, rather than trusting they will still hold at settlement.
@@ -343,34 +485,29 @@ contract OtterOrderBook {
             totalEscrow[sold] += o.budget;
 
             acc = keccak256(abi.encode(acc, h));
-            emit OrderSubmitted(poolId, batchId, o.trader, h);
+            emit OrderSubmitted(poolId, batchId, o.trader, index, h, o);
         }
 
         if (msg.value != nativeRequired) revert NativeValueMismatch(msg.value, nativeRequired);
         _assertSolvent(c0);
         _assertSolvent(c1);
         batchDigest[poolId][batchId] = acc;
-        b.count += uint32(n);
     }
 
     function _rollover(bytes32 poolId) private returns (uint256 id) {
         id = currentBatchId[poolId];
-        if (executionInProgress[poolId]) revert PreviousBatchUnsettled(id);
-        Batch storage b = batches[poolId][id];
-        if (b.closesAt == 0) {
-            b.closesAt = uint64(block.timestamp) + windowLength;
-            return id;
-        }
-        if (block.timestamp >= b.closesAt) {
-            // Keep at most one unprocessed batch per pool. The hook can then
-            // freeze liquidity based on the current batch without an unbounded
-            // scan over history, and a solver cannot leave batch N exposed while
-            // new orders start batch N+1.
-            if (!b.settled) revert PreviousBatchUnsettled(id);
+        Batch storage b = _batches[poolId][id];
+        if (b.state == State.Executing) revert PreviousBatchUnsettled(id);
+        if (_terminal(b.state)) {
             id += 1;
             currentBatchId[poolId] = id;
-            batches[poolId][id].closesAt = uint64(block.timestamp) + windowLength;
+        } else if (b.state != State.None) {
+            if (block.timestamp >= b.closesAt) revert PreviousBatchUnsettled(id);
+            return id;
         }
+        Batch storage next = _batches[poolId][id];
+        (next.closesAt, next.executeUntil) = _clock();
+        next.state = State.Collecting;
     }
 
     function _useNonce(address trader, uint256 nonce, uint256 i) private {
@@ -391,7 +528,7 @@ contract OtterOrderBook {
     ///      submitted order, reordered the array, or inserted an unsigned one
     ///      cannot reproduce the digest.
     function replay(bytes32 poolId, uint256 batchId, Order[] calldata orders) public view {
-        Batch memory b = batches[poolId][batchId];
+        Batch memory b = _batches[poolId][batchId];
         if (orders.length != b.count) revert CountMismatch(orders.length, b.count);
 
         bytes32 acc;
@@ -407,15 +544,16 @@ contract OtterOrderBook {
     function consume(bytes32 poolId, uint256 batchId, Order[] calldata orders) external nonReentrant {
         if (msg.sender != settlement) revert NotSettlement();
 
-        Batch storage b = batches[poolId][batchId];
-        if (b.settled) revert AlreadySettled();
-        if (b.closesAt == 0 || block.timestamp < b.closesAt) revert WindowStillOpen();
+        Batch storage b = _batches[poolId][batchId];
+        if (b.state != State.Collecting && b.state != State.None) revert AlreadySettled();
+        if (b.state == State.None || block.timestamp < b.closesAt) revert WindowStillOpen();
+        if (block.timestamp >= b.executeUntil) revert ExecutionExpired(b.executeUntil);
+        if (batchId != currentBatchId[poolId]) revert AlreadySettled();
 
         replay(poolId, batchId, orders);
 
-        b.settled = true;
+        b.state = State.Executing;
         executionInProgress[poolId] = true;
-        emit BatchSettled(poolId, batchId, b.count);
     }
 
     /// @dev Keep LP custody frozen through all settlement token callbacks, even
@@ -426,38 +564,72 @@ contract OtterOrderBook {
         if (!executionInProgress[poolId]) revert NotExecuting();
         if (!payoutsCredited[poolId][currentBatchId[poolId]]) revert NotExecuting();
         executionInProgress[poolId] = false;
+        uint256 epoch = currentBatchId[poolId];
+        _batches[poolId][epoch].state = State.Settled;
+        emit BatchSettled(poolId, epoch, _batches[poolId][epoch].count);
     }
 
     function isBatchActive(bytes32 poolId) external view returns (bool) {
-        Batch memory b = batches[poolId][currentBatchId[poolId]];
-        return _reentrancyLock != 1 || executionInProgress[poolId] || (b.closesAt != 0 && b.count != 0 && !b.settled);
+        State state = _batches[poolId][currentBatchId[poolId]].state;
+        return _reentrancyLock != 1 || state == State.Collecting || state == State.Executing;
     }
 
-    /// @notice Refund every order in a committed batch that was not settled in
-    ///         time. The caller supplies the complete committed sequence, which
-    ///         is replayed before any funds move, so no individual order can be
-    ///         omitted or redirected.
-    function refundExpired(bytes32 poolId, uint256 batchId, Order[] calldata orders) external nonReentrant {
-        Batch storage b = batches[poolId][batchId];
-        if (b.settled) revert AlreadySettled();
-        if (b.closesAt == 0) revert WindowStillOpen();
+    /// @notice Constant-work timeout. No order replay, asset query, or transfer.
+    /// Full budgets stay recorded as escrow until each record is recovered.
+    function expire(bytes32 poolId, uint256 epoch) external nonReentrant {
+        _expire(poolId, epoch);
+    }
 
-        uint256 refundableAt = uint256(b.closesAt) + refundDelay;
-        if (block.timestamp < refundableAt) revert RefundTooEarly(refundableAt);
+    function _expire(bytes32 poolId, uint256 epoch) private {
+        Batch storage b = _batches[poolId][epoch];
+        if (b.state != State.Collecting) revert AlreadySettled();
+        if (block.timestamp < b.executeUntil) revert RefundTooEarly(b.executeUntil);
+        b.state = State.Refundable;
+        emit EpochExpired(poolId, epoch);
+    }
 
-        replay(poolId, batchId, orders);
-        b.settled = true;
+    /// @notice Fee drift permits early recovery, authenticated against the
+    /// registered vault's real pool key. A queued exit is not a fee invalidation.
+    function expireUnsupportedFees(bytes32 poolId, uint256 epoch) external nonReentrant {
+        Batch storage b = _batches[poolId][epoch];
+        if (b.state != State.Collecting) revert AlreadySettled();
+        if (!IOtterLiquidityGuard(liquidityGuardOf[poolId]).hasUnsupportedFees(poolId)) revert FeesStillSupported();
+        b.state = State.Refundable;
+        emit EpochExpired(poolId, epoch);
+    }
 
-        address c0 = currency0Of[poolId];
-        address c1 = currency1Of[poolId];
-        _assertSolvent(c0);
-        _assertSolvent(c1);
+    /// @notice Anyone can recover one stored record; ownership is fixed. The
+    /// credit step makes no token call and works after later epochs have opened.
+    function refundOrder(bytes32 poolId, uint256 epoch, uint256 index) external nonReentrant {
+        if (_batches[poolId][epoch].state == State.Collecting) _expire(poolId, epoch);
+        if (_batches[poolId][epoch].state != State.Refundable) revert NotRefundable();
+        _refundOrder(poolId, epoch, index);
+    }
+
+    function _refundOrder(bytes32 poolId, uint256 epoch, uint256 index) private {
+        if (index >= _batches[poolId][epoch].count) revert InvalidOrderIndex();
+        StoredOrder storage record = _orders[poolId][epoch][index];
+        if (record.refunded) revert AlreadyRecovered();
+        record.refunded = true;
+        address sold = record.sellingCurrency0 ? currency0Of[poolId] : currency1Of[poolId];
+        totalEscrow[sold] -= record.budget;
+        _credit(record.trader, sold, record.budget);
+        emit OrderRecovered(poolId, epoch, index, record.trader);
+    }
+
+    /// @notice Bounded convenience wrapper for existing integration fixtures.
+    /// Primary recovery is expire/refundOrder and never requires this array.
+    function refundExpired(bytes32 poolId, uint256 epoch, Order[] calldata orders) external nonReentrant {
+        replay(poolId, epoch, orders);
+        if (_batches[poolId][epoch].state != State.Refundable) _expire(poolId, epoch);
+        bool any;
         for (uint256 i; i < orders.length; ++i) {
-            address sold = orders[i].sellingCurrency0 ? c0 : c1;
-            totalEscrow[sold] -= orders[i].budget;
-            _credit(orders[i].trader, sold, orders[i].budget);
+            if (_orders[poolId][epoch][i].refunded) continue;
+            _refundOrder(poolId, epoch, i);
+            any = true;
         }
-        emit BatchRefunded(poolId, batchId, b.count);
+        if (!any) revert AlreadySettled();
+        emit BatchRefunded(poolId, epoch, _batches[poolId][epoch].count);
     }
 
     /// @notice Release filled input exactly once for the currently executing
@@ -592,6 +764,24 @@ contract OtterOrderBook {
     // ------------------------------------------------------------------
     // ECDSA
     // ------------------------------------------------------------------
+
+    function _validSignature(address trader, bytes32 digest, bytes calldata signature)
+        private
+        view
+        returns (bool valid)
+    {
+        if (trader.code.length == 0) return _recover(digest, signature) == trader;
+        bytes memory data = abi.encodeWithSelector(_ERC1271_MAGIC, digest, signature);
+        uint256 gasLimit = SIGNATURE_GAS_LIMIT;
+        // Copy at most one return word: a contract wallet cannot force the book
+        // to allocate arbitrarily large return data. Staticcall prevents mutation.
+        assembly ("memory-safe") {
+            let output := mload(0x40)
+            mstore(output, 0)
+            let success := staticcall(gasLimit, trader, add(data, 32), mload(data), output, 32)
+            valid := and(success, and(gt(returndatasize(), 31), eq(shr(224, mload(output)), 0x1626ba7e)))
+        }
+    }
 
     function _recover(bytes32 digest, bytes calldata sig) private pure returns (address) {
         if (sig.length != 65) return address(0);

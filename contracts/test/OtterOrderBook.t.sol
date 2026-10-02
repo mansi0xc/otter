@@ -66,7 +66,10 @@ contract OtterOrderBookTest is Test {
             ask: 1e18,
             budget: 100e18,
             deadline: block.timestamp + 1 days,
-            nonce: nonce
+            nonce: nonce,
+            configVersion: 1,
+            epoch: book.nextEpochId(POOL),
+            maxExecutionTime: block.timestamp + 1 days
         });
     }
 
@@ -273,6 +276,10 @@ contract OtterOrderBookTest is Test {
         book.creditPayouts(POOL, os, new uint256[](os.length));
         vm.prank(settlement);
         book.completeExecution(POOL);
+        vm.expectRevert(abi.encodeWithSelector(OtterOrderBook.WrongEpoch.selector, 0));
+        book.submit(os2, sigs2);
+        b.epoch = book.nextEpochId(POOL);
+        (os2, sigs2) = _one(b, _sign(bobPk, b));
         uint256 second = book.submit(os2, sigs2);
 
         assertEq(second, first + 1, "window should roll");
@@ -351,7 +358,7 @@ contract OtterOrderBookTest is Test {
     /// Not an assertion, a measurement. This is the per-order submission cost that
     /// feeds the settlement gas curve; recording it here keeps it honest.
     function test_gas_submissionScaling() public {
-        uint256[4] memory sizes = [uint256(1), 5, 25, 100];
+        uint256[4] memory sizes = [uint256(1), 5, 16, 32];
         for (uint256 s; s < 4; ++s) {
             uint256 n = sizes[s];
             OtterOrderBook.Order[] memory os = new OtterOrderBook.Order[](n);

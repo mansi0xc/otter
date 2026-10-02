@@ -46,9 +46,9 @@ import {HookMiner} from "../test/utils/HookMiner.sol";
 ///                         TRUST MODEL note for why this exists and what it does
 ///                         NOT do.
 ///   EXCLUSIVITY_WINDOW    seconds of SOLVER exclusivity after a window closes,
-///                         after which settlement is permissionless. Default 300.
-///   REFUND_DELAY           seconds after close before anyone can refund a
-///                          batch that was never settled. Default 900.
+///                         after which settlement is permissionless. Default 60.
+///   EXECUTION_WINDOW       seconds after close before permissionless expiry.
+///                          Default 300. Must exceed EXCLUSIVITY_WINDOW.
 ///
 /// POOL_MANAGER is deliberately NOT hardcoded per chain. The Uniswap docs warn
 /// that v4 addresses differ between chains and the published table has been
@@ -84,7 +84,7 @@ contract Deploy is Script {
         require(pmAddress.code.length > 0, "no code at POOL_MANAGER: wrong address or wrong chain");
         IPoolManager manager = IPoolManager(pmAddress);
 
-        uint64 window = uint64(vm.envOr("WINDOW", uint256(60)));
+        uint64 window = _duration("WINDOW", 60);
         bool nativePair = vm.envOr("NATIVE_ETH", false);
         uint256 liquidity = vm.envOr("LIQUIDITY", nativePair ? uint256(1e18) : uint256(1e21));
         require(liquidity > 0 && liquidity <= (uint256(1) << 88) - 1, "unsupported liquidity");
@@ -101,8 +101,9 @@ contract Deploy is Script {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(privateKey);
         address solver = vm.envOr("SOLVER", deployer);
-        uint64 exclusivityWindow = uint64(vm.envOr("EXCLUSIVITY_WINDOW", uint256(300)));
-        uint64 refundDelay = uint64(vm.envOr("REFUND_DELAY", uint256(900)));
+        uint64 exclusivityWindow = _duration("EXCLUSIVITY_WINDOW", 60);
+        uint64 executionWindow = _duration("EXECUTION_WINDOW", 300);
+        require(exclusivityWindow < executionWindow, "no public fallback interval");
 
         vm.startBroadcast(privateKey);
 
@@ -111,7 +112,7 @@ contract Deploy is Script {
             _resolveTokens(deployer, nativePair, amount0 > amount1 ? amount0 : amount1);
 
         // --- core -----------------------------------------------------
-        OtterOrderBook book = new OtterOrderBook(window, refundDelay);
+        OtterOrderBook book = new OtterOrderBook(window, executionWindow);
         OtterSettlement settlement = new OtterSettlement(manager, book, solver, exclusivityWindow);
         book.setSettlement(address(settlement));
 
@@ -154,12 +155,18 @@ contract Deploy is Script {
 
         vm.stopBroadcast();
 
-        _report(key, book, settlement, hook, vault, window, refundDelay, liquidity, solver, exclusivityWindow);
+        _report(key, book, settlement, hook, vault, window, executionWindow, liquidity, solver, exclusivityWindow);
         console2.log("sqrtPriceX96   ", rawPrice);
         console2.log("seed amount0   ", amount0);
         console2.log("seed amount1   ", amount1);
         console2.log("LP position ID ", positionId);
         console2.log("LP owner       ", deployer);
+    }
+
+    function _duration(string memory name, uint256 defaultValue) private view returns (uint64) {
+        uint256 value = vm.envOr(name, defaultValue);
+        require(value <= type(uint64).max, "duration overflow");
+        return uint64(value);
     }
 
     function _resolveTokens(address deployer, bool nativePair, uint256 seedAmount)
@@ -202,7 +209,7 @@ contract Deploy is Script {
         OtterHook hook,
         OtterLiquidityVault vault,
         uint64 window,
-        uint64 refundDelay,
+        uint64 executionWindow,
         uint256 liquidity,
         address solver,
         uint64 exclusivityWindow
@@ -220,7 +227,7 @@ contract Deploy is Script {
         console2.log("currency0      ", Currency.unwrap(key.currency0));
         console2.log("currency1      ", Currency.unwrap(key.currency1));
         console2.log("window (s)     ", window);
-        console2.log("refund delay (s)", refundDelay);
+        console2.log("execute window (s)", executionWindow);
         console2.log("liquidity      ", liquidity);
         console2.log("solver         ", solver);
         console2.log("exclusivity (s)", exclusivityWindow);

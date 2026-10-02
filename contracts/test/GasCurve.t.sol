@@ -76,12 +76,7 @@ contract GasCurveTest is Deployers {
         settlement.registerPool(otterKey);
         _modifyLiquidity(
             otterKey,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: -887272,
-                tickUpper: 887272,
-                liquidityDelta: 1e24,
-                salt: 0
-            }),
+            IPoolManager.ModifyLiquidityParams({tickLower: -887272, tickUpper: 887272, liquidityDelta: 1e24, salt: 0}),
             ZERO_BYTES
         );
     }
@@ -116,7 +111,10 @@ contract GasCurveTest is Deployers {
                 ask: 0,
                 budget: PER_ORDER_BUDGET,
                 deadline: block.timestamp + 1 days,
-                nonce: 0
+                nonce: 0,
+                configVersion: 1,
+                epoch: book.nextEpochId(PoolId.unwrap(otterId)),
+                maxExecutionTime: block.timestamp + 1 days
             });
             (uint8 v, bytes32 r, bytes32 ss) = vm.sign(pk, book.digestOf(orders[i]));
             sigs[i] = abi.encodePacked(r, ss, v);
@@ -142,12 +140,10 @@ contract GasCurveTest is Deployers {
             y[i] = PER_ORDER_BUDGET;
             x[i] = available - OtterMath.fTildeUp(c, total - PER_ORDER_BUDGET);
         }
-        OtterSettlement.Outcome memory outcome =
-            OtterSettlement.Outcome({dominantSellsCurrency0: true, y: y, x: x});
+        OtterSettlement.Outcome memory outcome = OtterSettlement.Outcome({dominantSellsCurrency0: true, y: y, x: x});
 
-        (cdGas,) = _calldataGas(
-            abi.encodeWithSelector(OtterSettlement.settle.selector, otterKey, batchId, orders, outcome)
-        );
+        (cdGas,) =
+            _calldataGas(abi.encodeWithSelector(OtterSettlement.settle.selector, otterKey, batchId, orders, outcome));
 
         g0 = gasleft();
         settlement.settle(otterKey, batchId, orders, outcome);
@@ -155,11 +151,9 @@ contract GasCurveTest is Deployers {
     }
 
     function test_gasCurve() public {
-        // 300/400/500 exist so the plotted curve has data across the region where
-        // memory expansion starts to bite. Without them a chart interpolates a
-        // straight line from 200 to 610 and visually contradicts the superlinearity
-        // the numbers actually show.
-        uint256[11] memory sizes = [uint256(1), 2, 5, 10, 25, 50, 100, 200, 300, 400, 500];
+        // The hardened order book has a 32-order admission cap. These probes
+        // measure supported sizes; archived larger-batch results are historical.
+        uint256[7] memory sizes = [uint256(1), 2, 5, 10, 16, 24, 32];
 
         string memory csv = "orders,submit_gas,settle_gas,calldata_gas,total_gas,total_per_order,pct_of_block\n";
         console2.log("orders | settle gas | calldata gas");
@@ -178,13 +172,20 @@ contract GasCurveTest is Deployers {
 
             csv = string.concat(
                 csv,
-                vm.toString(n), ",",
-                vm.toString(submitGas), ",",
-                vm.toString(settleGas), ",",
-                vm.toString(cdGas), ",",
-                vm.toString(totalGas), ",",
-                vm.toString(totalGas / n), ",",
-                vm.toString(pctOfBlock), "\n"
+                vm.toString(n),
+                ",",
+                vm.toString(submitGas),
+                ",",
+                vm.toString(settleGas),
+                ",",
+                vm.toString(cdGas),
+                ",",
+                vm.toString(totalGas),
+                ",",
+                vm.toString(totalGas / n),
+                ",",
+                vm.toString(pctOfBlock),
+                "\n"
             );
         }
 
@@ -192,26 +193,10 @@ contract GasCurveTest is Deployers {
         console2.log("wrote harness/results/gas-curve.csv");
     }
 
-    /// @notice Locate the largest batch that fits in a block BY MEASUREMENT.
-    ///
-    /// Settlement cost is SUPERLINEAR in batch size, which a linear fit hides. Over
-    /// n = 100..200 the marginal cost is ~41,300 gas per order and looks flat. It
-    /// is not:
-    ///
-    ///     n = 600    41,885 avg     ~42,000 marginal
-    ///     n = 700    44,734 avg      61,830 marginal
-    ///     n = 720    47,626 avg     148,822 marginal
-    ///
-    /// The cause is EVM memory expansion, which costs words^2/512 — the Fill[]
-    /// array and the two outcome arrays grow linearly in n, so their memory cost
-    /// grows quadratically. Extrapolating the flat region predicted a ceiling of
-    /// 726; the true ceiling is materially lower. Anyone quoting a batch-AMM
-    /// capacity from a linear fit over small batches is overstating it.
-    ///
-    /// This probes the 600-700 band directly. The ceiling is the one number
-    /// idea.md correctly identified as not existing anywhere, so it gets measured.
+    /// @notice Measure supported sizes against the example 30M gas envelope.
+    /// This does not find a maximum beyond the configured admission cap.
     function test_blockCeiling() public {
-        uint256[5] memory probes = [uint256(610), 630, 650, 670, 690];
+        uint256[5] memory probes = [uint256(8), 16, 24, 28, 32];
         uint256 largestFitting;
         string memory csv = "orders,total_gas,gas_per_order,pct_of_block,fits\n";
 
@@ -230,11 +215,16 @@ contract GasCurveTest is Deployers {
             console2.log("   pct of block", totalGas * 100 / BLOCK_GAS_LIMIT);
             csv = string.concat(
                 csv,
-                vm.toString(probes[i]), ",",
-                vm.toString(totalGas), ",",
-                vm.toString(totalGas / probes[i]), ",",
-                vm.toString(totalGas * 100 / BLOCK_GAS_LIMIT), ",",
-                fits ? "yes" : "no", "\n"
+                vm.toString(probes[i]),
+                ",",
+                vm.toString(totalGas),
+                ",",
+                vm.toString(totalGas / probes[i]),
+                ",",
+                vm.toString(totalGas * 100 / BLOCK_GAS_LIMIT),
+                ",",
+                fits ? "yes" : "no",
+                "\n"
             );
         }
 

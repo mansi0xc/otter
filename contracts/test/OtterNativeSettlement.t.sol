@@ -69,10 +69,28 @@ contract OtterNativeSettlementTest is OtterHookFixture {
         orders = new OtterOrderBook.Order[](2);
         bytes[] memory sigs = new bytes[](2);
         orders[0] = OtterOrderBook.Order(
-            alice, PoolId.unwrap(nativeId), dominantNative, 0, domBudget, block.timestamp + 1 days, 0
+            alice,
+            PoolId.unwrap(nativeId),
+            dominantNative,
+            0,
+            domBudget,
+            block.timestamp + 1 days,
+            0,
+            1,
+            book.nextEpochId(PoolId.unwrap(nativeId)),
+            block.timestamp + 1 days
         );
         orders[1] = OtterOrderBook.Order(
-            bob, PoolId.unwrap(nativeId), !dominantNative, 0, minBudget, block.timestamp + 1 days, 0
+            bob,
+            PoolId.unwrap(nativeId),
+            !dominantNative,
+            0,
+            minBudget,
+            block.timestamp + 1 days,
+            0,
+            1,
+            book.nextEpochId(PoolId.unwrap(nativeId)),
+            block.timestamp + 1 days
         );
         for (uint256 i; i < 2; ++i) {
             if (!orders[i].sellingCurrency0) {
@@ -224,7 +242,18 @@ contract OtterNativeSettlementTest is OtterHookFixture {
         vault.createPosition{value: nativeDebt}(key, TICK_LOWER, TICK_UPPER, 1e21, type(uint256).max, type(uint256).max);
         OtterOrderBook.Order[] memory os = new OtterOrderBook.Order[](1);
         bytes[] memory sigs = new bytes[](1);
-        os[0] = OtterOrderBook.Order(alice, PoolId.unwrap(id), sellsNative, 0, 10e18, block.timestamp + 1 days, 0);
+        os[0] = OtterOrderBook.Order(
+            alice,
+            PoolId.unwrap(id),
+            sellsNative,
+            0,
+            10e18,
+            block.timestamp + 1 days,
+            0,
+            1,
+            book.nextEpochId(PoolId.unwrap(id)),
+            block.timestamp + 1 days
+        );
         if (!sellsNative) {
             asset.mint(alice, 10e18);
             // Approval belongs to the funded token-input trader.
@@ -278,8 +307,8 @@ contract OtterNativeSettlementTest is OtterHookFixture {
         vault.createPosition{value: nativeDebt}(
             ethKey, TICK_LOWER, TICK_UPPER, smallL, type(uint256).max, type(uint256).max
         );
-        uint256 budget = 1e30;
-        vm.deal(address(this), 2e30);
+        uint256 budget = 7e28;
+        vm.deal(address(this), 2e29);
         if (!sellsNative) {
             deal(Currency.unwrap(currency1), alice, budget);
             vm.prank(alice);
@@ -287,8 +316,18 @@ contract OtterNativeSettlementTest is OtterHookFixture {
         }
         OtterOrderBook.Order[] memory os = new OtterOrderBook.Order[](1);
         bytes[] memory sigs = new bytes[](1);
-        os[0] =
-            OtterOrderBook.Order(alice, PoolId.unwrap(nativeId), sellsNative, 0, budget, block.timestamp + 1 days, 0);
+        os[0] = OtterOrderBook.Order(
+            alice,
+            PoolId.unwrap(nativeId),
+            sellsNative,
+            0,
+            budget,
+            block.timestamp + 1 days,
+            0,
+            1,
+            book.nextEpochId(PoolId.unwrap(nativeId)),
+            block.timestamp + 1 days
+        );
         (uint8 v, bytes32 r, bytes32 sigS) = vm.sign(0xA11CE, book.digestOf(os[0]));
         sigs[0] = abi.encodePacked(r, sigS, v);
         uint256 id = book.submit{value: sellsNative ? budget : 0}(os, sigs);
@@ -338,7 +377,18 @@ contract OtterNativeSettlementTest is OtterHookFixture {
         asset.approve(address(book), 10e18);
         OtterOrderBook.Order[] memory os = new OtterOrderBook.Order[](1);
         bytes[] memory sigs = new bytes[](1);
-        os[0] = OtterOrderBook.Order(alice, PoolId.unwrap(id), false, 0, 10e18, block.timestamp + 1 days, 0);
+        os[0] = OtterOrderBook.Order(
+            alice,
+            PoolId.unwrap(id),
+            false,
+            0,
+            10e18,
+            block.timestamp + 1 days,
+            0,
+            1,
+            book.nextEpochId(PoolId.unwrap(id)),
+            block.timestamp + 1 days
+        );
         (uint8 v, bytes32 r, bytes32 sigS) = vm.sign(0xA11CE, book.digestOf(os[0]));
         sigs[0] = abi.encodePacked(r, sigS, v);
         uint256 batchId = book.submit(os, sigs);

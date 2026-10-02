@@ -106,7 +106,10 @@ contract OtterSettlementSellXTest is Deployers {
             ask: 0,
             budget: budget,
             deadline: block.timestamp + 1 days,
-            nonce: nonce
+            nonce: nonce,
+            configVersion: 1,
+            epoch: book.nextEpochId(PoolId.unwrap(otterId)),
+            maxExecutionTime: block.timestamp + 1 days
         });
     }
 

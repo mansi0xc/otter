@@ -62,8 +62,18 @@ abstract contract OtterHookFixture is OtterTestDeployers {
         deal(Currency.unwrap(currency0), trader, 10e18);
         vm.prank(trader);
         IFixtureToken(Currency.unwrap(currency0)).approve(address(book), type(uint256).max);
-        OtterOrderBook.Order memory order =
-            OtterOrderBook.Order(trader, PoolId.unwrap(otterId), true, 0, 1e18, block.timestamp + 1 days, 0);
+        OtterOrderBook.Order memory order = OtterOrderBook.Order(
+            trader,
+            PoolId.unwrap(otterId),
+            true,
+            0,
+            1e18,
+            block.timestamp + 1 days,
+            0,
+            1,
+            book.nextEpochId(PoolId.unwrap(otterId)),
+            block.timestamp + 1 days
+        );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, book.digestOf(order));
         os = new OtterOrderBook.Order[](1);
         signatures = new bytes[](1);

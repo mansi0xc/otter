@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-// R1, R4 and the protocol-fee policy are now prevention regressions. Other review reproductions still assert
+// R1, R3, R4, R5, R8 and fee policy now assert prevention. R2/R6/R7 remain open. Other review reproductions still assert
 // unsafe behavior and remain open until their owning remediation step lands.
 import {OtterSettlementTest, IERC20Minimal} from "./OtterSettlement.t.sol";
 import {OtterOrderBookTest} from "./OtterOrderBook.t.sol";
@@ -46,22 +46,18 @@ contract GrantReviewSettlementTest is OtterSettlementTest {
         assertEq(manager.getLiquidity(otterId), 1e21);
     }
 
-    function test_review_ExpiredOrderCanStillSettle() public {
-        OtterOrderBook.Order[] memory os = new OtterOrderBook.Order[](2);
-        bytes[] memory sigs = new bytes[](2);
-        (os[0],) = _order(dom, domPk, true, DOM_BUDGET, 0);
-        (os[1],) = _order(min, minPk, false, MIN_BUDGET, 0);
-        os[0].deadline = block.timestamp + 1;
-        os[1].deadline = block.timestamp + 1;
-        for (uint256 i; i < 2; i++) {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(i == 0 ? domPk : minPk, book.digestOf(os[i]));
-            sigs[i] = abi.encodePacked(r, s, v);
-        }
-        uint256 id = book.submit(os, sigs);
-        vm.warp(block.timestamp + 1 days);
-        settlement.settle(otterKey, id, os, _outcome(_curve(), 1e15));
-        _claimAllTraders(book, otterKey, os);
-        assertGt(IERC20Minimal(Currency.unwrap(currency1)).balanceOf(dom), 0);
+    function test_review_ExpiredExecutionCannotSettleAndStoredOrdersRefund() public {
+        (uint256 id, OtterOrderBook.Order[] memory os) = _openBatch();
+        uint256 until = book.executionDeadline(PoolId.unwrap(otterId), id);
+        vm.warp(until);
+        OtterSettlement.Outcome memory out = _outcome(_curve(), 1e15);
+        vm.expectRevert(abi.encodeWithSelector(OtterOrderBook.ExecutionExpired.selector, until));
+        settlement.settle(otterKey, id, os, out);
+        book.expire(PoolId.unwrap(otterId), id);
+        book.refundOrder(PoolId.unwrap(otterId), id, 0);
+        book.refundOrder(PoolId.unwrap(otterId), id, 1);
+        assertEq(book.claimable(dom, Currency.unwrap(currency0)), DOM_BUDGET);
+        assertEq(book.claimable(min, Currency.unwrap(currency1)), MIN_BUDGET);
     }
 
     function test_review_SolverCanPayAskAndCaptureSurplusAsLP() public {
@@ -95,25 +91,30 @@ contract GrantReviewSettlementTest is OtterSettlementTest {
         assertApproxEqAbs(collected, pot, 2);
     }
 
-    function test_review_ExtremeAskPoisonsClassification() public {
+    function test_review_ExtremeAskRejectedBeforeEscrowAndBoundedAskClassifies() public {
         OtterOrderBook.Order[] memory os = new OtterOrderBook.Order[](2);
         bytes[] memory sigs = new bytes[](2);
         (os[0], sigs[0]) = _order(dom, domPk, true, DOM_BUDGET, 0);
         (os[1],) = _order(min, minPk, false, 1, 0);
         os[1].ask = type(uint256).max;
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(minPk, book.digestOf(os[1]));
-        sigs[1] = abi.encodePacked(r, s, v);
+        (uint8 v, bytes32 r, bytes32 sigS) = vm.sign(minPk, book.digestOf(os[1]));
+        sigs[1] = abi.encodePacked(r, sigS, v);
+        vm.expectRevert(abi.encodeWithSelector(OtterOrderBook.AmountOutOfDomain.selector, 1));
+        book.submit(os, sigs);
+        assertEq(book.nonceBitmap(dom, 0), 0);
+        assertEq(book.nonceBitmap(min, 0), 0);
+        os[1].ask = type(uint128).max;
+        (v, r, sigS) = vm.sign(minPk, book.digestOf(os[1]));
+        sigs[1] = abi.encodePacked(r, sigS, v);
         uint256 id = book.submit(os, sigs);
         vm.warp(block.timestamp + WINDOW);
         uint256[] memory y = new uint256[](2);
         uint256[] memory x = new uint256[](2);
         y[0] = DOM_BUDGET;
         x[0] = 9e18;
-        vm.expectRevert();
         settlement.settle(otterKey, id, os, OtterSettlement.Outcome(true, y, x));
-        _claimAllTraders(book, otterKey, os);
-        (,, bool spent) = book.batches(PoolId.unwrap(otterId), id);
-        assertFalse(spent);
+        assertEq(book.claimable(min, Currency.unwrap(currency1)), 1);
+        assertEq(uint8(book.batchState(PoolId.unwrap(otterId), id)), uint8(OtterOrderBook.State.Settled));
     }
 
     function test_review_MinorityCanReceiveZeroBelowItsAsk() public {
@@ -211,35 +212,24 @@ contract GrantReviewRefundTest is OtterOrderBookTest {
         assertEq(currency1.balanceOf(address(0xCAFE)), os[1].budget);
     }
 
-    function test_review_UnboundedBatchExceedsRefundGasBudget() public {
-        uint256 n = 1800;
-        OtterOrderBook.Order[] memory all = new OtterOrderBook.Order[](n);
-        // Independent submit calls model submissions accumulated over a window.
-        for (uint256 start; start < n; start += 100) {
-            OtterOrderBook.Order[] memory os = new OtterOrderBook.Order[](100);
-            bytes[] memory sigs = new bytes[](100);
-            for (uint256 j; j < 100; j++) {
-                uint256 pk = 100000 + start + j;
-                address trader = vm.addr(pk);
-                currency0.mint(trader, 1);
-                vm.prank(trader);
-                currency0.approve(address(book), 1);
-                os[j] = _order(trader, 0, true);
-                os[j].budget = 1;
-                sigs[j] = _sign(pk, os[j]);
-                all[start + j] = os[j];
-            }
+    function test_review_BatchBoundAndIndependentRecoveryFitFixedGas() public {
+        for (uint256 i; i < 32; ++i) {
+            OtterOrderBook.Order memory o = _order(alice, i, true);
+            o.budget = 1;
+            (OtterOrderBook.Order[] memory os, bytes[] memory sigs) = _one(o, _sign(alicePk, o));
             book.submit(os, sigs);
         }
-        vm.warp(block.timestamp + WINDOW + REFUND_DELAY);
-        (bool ok,) = address(book).call{gas: 30_000_000}(abi.encodeCall(book.refundExpired, (POOL, 0, all)));
-        assertFalse(ok, "atomic refund must exceed the example 30M gas budget");
-        (, uint32 count, bool spent) = book.batches(POOL, 0);
-        assertEq(count, n);
-        assertFalse(spent);
-        // The same committed batch is refundable with an artificial larger budget.
-        book.refundExpired{gas: 80_000_000}(POOL, 0, all);
-        (,, spent) = book.batches(POOL, 0);
-        assertTrue(spent);
+        OtterOrderBook.Order memory extra = _order(alice, 32, true);
+        (OtterOrderBook.Order[] memory extraOs, bytes[] memory extraSigs) = _one(extra, _sign(alicePk, extra));
+        vm.expectRevert(OtterOrderBook.BatchFull.selector);
+        book.submit(extraOs, extraSigs);
+        assertEq(book.nonceBitmap(alice, 0), type(uint32).max);
+        vm.warp(book.executionDeadline(POOL, 0));
+        book.expire{gas: 100_000}(POOL, 0);
+        assertFalse(book.isBatchActive(POOL));
+        book.refundOrder{gas: 150_000}(POOL, 0, 31);
+        assertEq(book.claimable(alice, address(currency0)), 1);
+        assertFalse(book.orderRecovered(POOL, 0, 0));
+        assertTrue(book.orderRecovered(POOL, 0, 31));
     }
 }

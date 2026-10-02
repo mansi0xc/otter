@@ -3,7 +3,7 @@
 Prepared 2 October 2026. Baseline: user-created commit `63ec94e`.
 Sources: [grant readiness review](./GRANT_READINESS_REVIEW_2026-10-02.md), [remediation plan](./REMEDIATION_PLAN.md), the pinned v4 core, and [the paper](https://arxiv.org/html/2609.03474v1).
 
-**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling in the local checkout; the remaining v2 state machine and mechanism are still pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
+**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. Queued exits, pool/reward snapshots, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
 
 The user has selected **native ETH and concentrated liquidity support now**. These belong to this remediation, including contracts, the integer solver, recovery, deployment, and wallet flows. Supporting WETH alone or removing the full-range check alone does not meet this scope.
 
@@ -66,7 +66,7 @@ Decimals are display metadata. `ask = minimum raw output per raw input * 10^18`;
 
 The v2 typed order includes trader, pool ID, pool-configuration version, epoch ID, selling direction, ask, budget, admission deadline, maximum execution time, and unordered nonce. The EIP-712 domain includes chain ID, order-book address, and version. Use EOA signature validation and EIP-1271 validation for contract traders at admission. A later signature revocation does not revoke already committed escrow.
 
-Expose a preview of the next/current epoch and its configuration. The first accepted order fixes the epoch's pool snapshot and clock. Initial clock parameters are a 60-second collection interval and a further 300-second execution interval, replacing the current 300-second exclusive solver period. These are prototype parameters to evaluate, not latency claims.
+Expose a preview of the next/current epoch and its configuration. The first accepted order fixes the epoch's pool snapshot and clock. Initial clock parameters are a 60-second collection interval and a further 300-second execution interval. These are prototype parameters to evaluate, not latency claims. Checkpoint 3A uses those deployment defaults and temporarily retains the legacy feasible-outcome solver with a 60-second exclusive period; its constructor requires exclusivity to end strictly before expiry. Step 5 removes exclusivity together with enforcing canonical results.
 
 Admission requires all of:
 
@@ -75,7 +75,7 @@ Admission requires all of:
 - The order's maximum execution time is at least the epoch's fixed `executeUntil`. An order with insufficient validity is rejected before escrow, rather than later vetoing a batch.
 - The nonce is unused and all asset, amount, and signature checks pass. Record and consume the nonce atomically with escrow.
 
-For a not-yet-open epoch, calculate its fixed clock from the actual admission timestamp; a stale preview may cause rejection rather than extending the trader's signed exposure. Store each admitted order under `(poolId, epochId, index)`, together with its hash. Emit the complete admitted fields and stable index. Keep a digest for outcome binding, but do not require its replay for refunds.
+For a not-yet-open epoch, calculate its fixed clock from the actual admission timestamp; a stale preview may cause rejection rather than extending the trader's signed exposure. Store each admitted order under `(poolId, epochId, index)`; expose its reconstructable hash and emit that hash. Emit the complete admitted fields and stable index. Keep a digest for outcome binding, but do not require its replay for refunds.
 
 Set the economic lock before the first external escrow call, reverting it if admission fails. Count or token callbacks must not expose a transient state in which the epoch exists but LP changes are allowed.
 
@@ -210,15 +210,17 @@ Contract invariants must cover many users, pools sharing currencies, failed clai
 
 ## 9. Checkpoint and next implementation
 
-The user committed the specification as `a7637a9` and authenticated LP custody
-as `bc79d64`. Checkpoint 2B supplies direct native/ERC20 trader escrow, backed
-pull claims, exact transfer checks, and explicit zero-fee/complete-input policy.
-See its report for verification and the pending user-created commit. The legacy
-order signature, unbounded digest replay, payment discretion, and delayed
-surplus donations remain in that checkpoint; it is not the complete v2 system.
+The user committed the specification as `a7637a9`, authenticated LP custody
+as `bc79d64`, and native/ERC20 custody as `57bdd33`. Checkpoint 3A supplies bounded
+v2 signatures, stored records, explicit execution deadlines, constant-work
+expiry, independently credited refunds, and bounded EIP-1271 validation.
+Its report records validation and the pending user-created commit. The old
+order ABI/domain is incompatible; the dashboard and published contracts are
+still the earlier prototype.
 
-After the 2B commit, step 3 implements bounded admission, epoch/execution-bound
-signatures, stored independent recovery, constant-work expiry, and queued LP
-exits. Preserve the custody/claim accounting and avoid recipient calls during
-finalization. Canonical settlement and concentrated execution still require
-sections 5–7; a correct claim ledger does not resolve G1–G3.
+The next checkpoint, 3B, implements queued LP exits and priority before new
+admission. Preserve custody and claim accounting and avoid recipient calls
+during finalization. The complete target also requires opening pool/reward
+snapshots, exact quotes, canonical results, and historical rewards. Canonical
+settlement and concentrated execution still require sections 5–7; a correct
+claim ledger does not resolve G1–G3.

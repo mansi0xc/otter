@@ -498,7 +498,10 @@ contract SandwichHarness is Deployers {
             ask: 0,
             budget: budget,
             deadline: block.timestamp + 1 days,
-            nonce: 0
+            nonce: 0,
+            configVersion: 1,
+            epoch: book.nextEpochId(PoolId.unwrap(otterId)),
+            maxExecutionTime: block.timestamp + 1 days
         });
     }
 

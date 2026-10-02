@@ -312,7 +312,10 @@ contract OtterLiquidityVaultTest is OtterHookFixture {
             0,
             1e18,
             block.timestamp + 1 days,
-            0
+            0,
+            1,
+            book.nextEpochId(PoolId.unwrap(tokenKey.toId())),
+            block.timestamp + 1 days
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, book.digestOf(os[0]));
         bytes[] memory sigs = new bytes[](1);

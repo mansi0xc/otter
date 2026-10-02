@@ -48,7 +48,10 @@ contract OtterOrderBookViewTest is Test {
             ask: 1e18,
             budget: 100e18,
             deadline: block.timestamp + 1 days,
-            nonce: nonce
+            nonce: nonce,
+            configVersion: 1,
+            epoch: book.nextEpochId(POOL),
+            maxExecutionTime: block.timestamp + 1 days
         });
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, book.digestOf(o));
         os = new OtterOrderBook.Order[](1);

@@ -118,7 +118,18 @@ contract OtterAssetsTest is Test {
     {
         os = new OtterOrderBook.Order[](1);
         sigs = new bytes[](1);
-        os[0] = OtterOrderBook.Order(alice, pool, nativeInput, 0, budget, block.timestamp + 1 days, nonce);
+        os[0] = OtterOrderBook.Order(
+            alice,
+            pool,
+            nativeInput,
+            0,
+            budget,
+            block.timestamp + 1 days,
+            nonce,
+            1,
+            book.nextEpochId(pool),
+            block.timestamp + 1 days
+        );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ALICE_PK, book.digestOf(os[0]));
         sigs[0] = abi.encodePacked(r, s, v);
     }

@@ -130,7 +130,10 @@ contract OtterSettlementTest is Deployers {
             ask: 0, // always eligible; keeps this test about plumbing, not pricing
             budget: budget,
             deadline: block.timestamp + 1 days,
-            nonce: nonce
+            nonce: nonce,
+            configVersion: 1,
+            epoch: book.nextEpochId(PoolId.unwrap(otterId)),
+            maxExecutionTime: block.timestamp + 1 days
         });
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, book.digestOf(o));
         sig = abi.encodePacked(r, s, v);
