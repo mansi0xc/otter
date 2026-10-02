@@ -59,12 +59,19 @@ contract OtterHook is IHooks {
     address public immutable settlement;
     IOtterBatchStatus public immutable orderBook;
     OtterLiquidityVault public immutable liquidityVault;
+    /// @notice Aggregate uncollected donation ceiling per pool/currency. Fees
+    /// harvested by the vault release capacity; principal and fee delivery do
+    /// not. This prevents core's signed accrued-fee delta from overflowing.
+    uint256 public constant MAX_UNCOLLECTED_DONATIONS = (1 << 120) - 1;
+    mapping(PoolId => uint256) public totalDonated0;
+    mapping(PoolId => uint256) public totalDonated1;
 
     error NotPoolManager();
     error BatchOnly(address sender);
     error VaultOnly(address sender);
     error ActiveBatch(bytes32 poolId, uint256 batchId);
     error HookNotImplemented();
+    error DonationLimit();
 
     constructor(IPoolManager poolManager_, address settlement_) {
         poolManager = poolManager_;
@@ -159,8 +166,22 @@ contract OtterHook is IHooks {
         revert HookNotImplemented();
     }
 
-    function beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata) external pure returns (bytes4) {
-        revert HookNotImplemented();
+    function beforeDonate(address, PoolKey calldata key, uint256 amount0, uint256 amount1, bytes calldata)
+        external
+        onlyPoolManager
+        returns (bytes4)
+    {
+        PoolId id = key.toId();
+        uint256 donated0 = totalDonated0[id];
+        uint256 donated1 = totalDonated1[id];
+        uint256 outstanding0 = donated0 - liquidityVault.totalFeesCollected0(id);
+        uint256 outstanding1 = donated1 - liquidityVault.totalFeesCollected1(id);
+        if (amount0 > MAX_UNCOLLECTED_DONATIONS - outstanding0 || amount1 > MAX_UNCOLLECTED_DONATIONS - outstanding1) {
+            revert DonationLimit();
+        }
+        totalDonated0[id] = donated0 + amount0;
+        totalDonated1[id] = donated1 + amount1;
+        return IHooks.beforeDonate.selector;
     }
 
     function afterDonate(address, PoolKey calldata, uint256, uint256, bytes calldata) external pure returns (bytes4) {

@@ -150,13 +150,34 @@ signatures to a configuration/epoch/execution limit, and separates constant-work
 expiry from independent stored refunds and asset delivery. Pause affects only
 admission. An authenticated fee change can expire a batch early.
 
-Step 3 is split into two code checkpoints. **3A is pending the user's commit.**
-3B will implement owner-authorized queued LP exits and block the next epoch
-until reserved exits have been processed. Start 3B only after the user confirms
-3A is committed. Until then, repeated batches can still starve immediate LP
-withdrawals; the existence of constant-work expiry alone does not fix this.
+Step 3 is split into two code checkpoints. **3A was committed by the user as `3518355`; clean tree inspected before 3B.**
+3B implements owner-authorized queued LP exits and blocks the next epoch
+until reserved exits have been processed. The committed 3A snapshot still lacks
+this barrier; its constant-work expiry alone does not fix exit starvation.
 
 The remaining active exploit reproductions are R2 (solver discretion), R6
 (minority dust IR), and R7 (historical surplus capture). R5's extreme-ask
 admission poison and R8's unbounded execution exposure are prevented locally;
 these changes do not resolve the remaining arithmetic/curve/mechanism work.
+
+## Checkpoint 3B: queued LP exit priority
+
+See [the exit checkpoint report](./CHECKPOINT_3B.md) for owner reservations,
+permissionless per-position processing, current-versus-next-epoch admission,
+donation accounting, tests, and the pending user-created commit. An active
+exit request does not change pricing liquidity, truncate current collection,
+or prevent the current batch's swap. It blocks the next epoch until processing
+credits the owner's actual principal and accrued core fees.
+
+This checkpoint also bounds uncollected donations to prevent accrued fees
+from overflowing core's signed returned delta and blocking exits. Only actual
+core fee harvesting releases that capacity; principal is not a fee offset.
+Withdrawal credits retain all amounts representable by core even after a final
+legacy swap moves beyond the deposit-price domain. Those credits can be claimed
+in chunks. The before-donate permission requires newly mined hook addresses.
+
+Step 3's local custody/recovery/exit acceptance is complete after validation.
+**3B is pending the user's commit.** Begin step 4 only after confirmation: exact
+tick-aware quoting, matched numerical domains, and the discrete-mechanism
+research gates. Canonical payments, minority dust IR, historical rewards,
+concentrated batch execution, wallet migration, and independent reviews remain.

@@ -10,6 +10,7 @@ contract MockLiquidityGuard {
         unsupportedFees = value;
     }
     function assertBatchSupported(bytes32) external pure {}
+    function assertAdmissionSupported(bytes32) external pure {}
 
     function hasUnsupportedFees(bytes32) external view returns (bool) {
         return unsupportedFees;

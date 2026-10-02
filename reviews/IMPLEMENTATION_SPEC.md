@@ -3,7 +3,7 @@
 Prepared 2 October 2026. Baseline: user-created commit `63ec94e`.
 Sources: [grant readiness review](./GRANT_READINESS_REVIEW_2026-10-02.md), [remediation plan](./REMEDIATION_PLAN.md), the pinned v4 core, and [the paper](https://arxiv.org/html/2609.03474v1).
 
-**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. Queued exits, pool/reward snapshots, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
+**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. [3B](./CHECKPOINT_3B.md) implements queued exit priority and bounded donation accrual. Pool/reward snapshots, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
 
 The user has selected **native ETH and concentrated liquidity support now**. These belong to this remediation, including contracts, the integer solver, recovery, deployment, and wallet flows. Supporting WETH alone or removing the full-range check alone does not meet this scope.
 
@@ -51,8 +51,9 @@ These are conservative starting limits to implement and benchmark, **not measure
 | Sum of all position liquidity in a pool | At most `2^88 - 1`, including inactive ranges | Bound liquidity and signed crossing arithmetic |
 | Executable sqrt price | `2^64 <= sqrtPriceX96 < 2^128`, also strictly inside core's legal swap limits | Give an explicit supported raw price interval, including ordinary 6/18 decimal pairs |
 | Bitmap words visited by a swap trace | At most 16; count empty words too | Bound traversal, including liquidity gaps |
-| Ordinary principal, quote amount, or individual claim | At most `2^120 - 1` and representable by the relevant core signed delta; unsolicited fee credits may exceed that operation cap and be claimed in chunks | Keep transfers and casts bounded without letting external donations or accumulated claims veto exits |
+| Deposit principal, quote amount, or individual claim delivery | At most `2^120 - 1` and representable by the relevant core signed delta; withdrawal principal/fee credits retain all core-representable amounts and can be claimed in chunks | Keep transfers and casts bounded without letting external donations or accumulated claims veto exits |
 | Signature byte length | Bounded at admission; initial cap 512 bytes | Bound smart-wallet validation input |
+| Uncollected donations per pool/currency | At most `2^120 - 1`; cumulative donations minus fee-only credits harvested from core | Prevent accrued fees from overflowing core deltas while allowing capacity after collection |
 
 Do not cast first and validate later. Check aggregate amounts, quote outputs, netting, reward weights, and manager deltas before narrowing. A pool outside the price/liquidity domain cannot open a batch. Configured price limits constrain execution; full-range positions may extend beyond those execution limits. The exact quote defines the available capacity before a price or traversal limit. Amounts above that capacity are not assumed consumed.
 
@@ -108,19 +109,19 @@ The vault owns the underlying v4 positions; its ledger identifies the beneficial
 
 Concentrated positions use valid ordered, tick-spacing-aligned bounds and checked aggregate liquidity. Overlapping ranges are allowed. Full-range positions remain supported. The active-liquidity sum and every crossed `liquidityNet` must match the real pool; range endpoints and bitmap contents cannot be supplied unauthenticated by a keeper.
 
-During an outstanding epoch, freeze deposit, withdrawal, ownership changes, and fee collection. Accept a withdrawal request without modifying the pool: the owner reserves a specified amount of their unreserved liquidity, once per open position. No outsider can queue someone else's withdrawal or reserve more than they own.
+During an outstanding epoch, freeze deposit, withdrawal, ownership changes, and fee collection. Accept a withdrawal request without modifying the pool: the owner reserves a specified amount of their unreserved liquidity, with at most one pending request per funded position. No outsider can queue someone else's withdrawal or reserve more than they own. Requests are irrevocable authorizations; they are also allowed while Idle and can then be processed immediately. An Idle owner can still directly withdraw unreserved liquidity using ordinary slippage bounds.
 
 After settlement or expiry, a permissionless processor removes each queued position's reserved liquidity using bounded per-position work, records the actual returned amounts, and backs the owner's claims with manager credits. It does not push ERC20/ETH to the owner. Claims for prior LP rewards remain separate from principal. Empty positions can free a participation slot without recycling their ID.
 
-New admission is blocked while queued exits remain to process. This establishes a finite opportunity to exit before another attacker-created batch starts. It does **not** promise wall-clock inclusion without anyone submitting the processing transactions. The UI must distinguish waiting for epoch resolution, permissionless exit processing, and delivery of assets. A recovery/keeper service must demonstrate all three.
+Opening the next epoch and adding LP capital are blocked while queued exits remain to process. Appending orders during the current collection window and settling that epoch remain allowed; an LP exit request cannot truncate the current auction. This establishes a finite opportunity to exit before another attacker-created batch starts. It does **not** promise wall-clock inclusion without anyone submitting the processing transactions. The UI must distinguish waiting for epoch resolution, permissionless exit processing, and delivery of assets. A recovery/keeper service must demonstrate all three.
 
-Queued exits execute at the epoch boundary's resulting state. The withdrawal request is authorization to remove that liquidity at that state; an owner-supplied impossible output minimum must not veto every other exit or next-epoch admission. Immediate withdrawals while Idle can use ordinary transaction slippage bounds. Pause-admission powers cannot pause claims or authenticated exit processing.
+Queued exits execute at the idle pool state after economic completion. Exits can be processed in any order; removal preserves pricing state for the other positions. The withdrawal request is authorization to remove that liquidity at that state; an owner-supplied impossible output minimum must not veto every other exit or next-epoch admission. Immediate withdrawals while Idle can use ordinary transaction slippage bounds. Pause-admission powers cannot pause claims or authenticated exit processing.
 
 ## 5. Tick-aware pool model and actual settlement
 
 ### Snapshot and quote
 
-At epoch opening, record the pool key/configuration, sqrt price, tick, active liquidity, zero fee fields, and the vault's position schedule/ownership version. Authenticate the bounded tick/bitmap state from PoolManager. LP mutations and swaps remain gated throughout the outstanding epoch, so its pricing state cannot drift through another router. Direct donations may change fee-growth accounting; they are not Otter batch surplus and cannot change the pricing model or create vault ownership.
+At epoch opening, record the pool key/configuration, sqrt price, tick, active liquidity, zero fee fields, and the vault's position schedule/ownership version. Authenticate the bounded tick/bitmap state from PoolManager. LP mutations and swaps remain gated throughout the outstanding epoch, so its pricing state cannot drift through another router. Direct donations may change fee-growth accounting; they are not Otter batch surplus and cannot change the pricing model or create vault ownership. The hook's before-donate gate bounds aggregate uncollected inflows. The vault records fee-only credits actually harvested from core, which release capacity without waiting for delivery. Principal never releases fee capacity. Rounding dust remains in that aggregate; exceeding capacity rejects a donation atomically.
 
 Implement a read-only quote matching the pinned [Pool.swap source](../contracts/lib/v4-core/src/libraries/Pool.sol) using core `SwapMath`, `SqrtPriceMath`, `TickMath`, and bitmap traversal. The trace must reproduce:
 
@@ -218,9 +219,11 @@ Its report records validation and the pending user-created commit. The old
 order ABI/domain is incompatible; the dashboard and published contracts are
 still the earlier prototype.
 
-The next checkpoint, 3B, implements queued LP exits and priority before new
-admission. Preserve custody and claim accounting and avoid recipient calls
-during finalization. The complete target also requires opening pool/reward
-snapshots, exact quotes, canonical results, and historical rewards. Canonical
+Checkpoint 3A was committed as `3518355`. Checkpoint 3B implements queued LP
+exits, priority before the next epoch, bounded uncollected donations, and full
+core-representable withdrawal credits. Its report records validation and the
+pending user-created commit. The next step supplies opening pool/curve state,
+exact tick-aware quotes, matched integer domains, and discrete research evidence.
+Canonical results and historical rewards remain separate work. Canonical
 settlement and concentrated execution still require sections 5–7; a correct
-claim ledger does not resolve G1–G3.
+claim ledger and exit barrier do not resolve G1–G3.

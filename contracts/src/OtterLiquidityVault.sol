@@ -15,8 +15,8 @@ import {IOtterBatchStatus, IOtterLiquidityGuard} from "./interfaces/IOtterLiquid
 
 /// @notice Owner-authenticated, nontransferable v4 range positions. Principal and
 /// fees become individual claims backed by PoolManager ERC6909 credits; removing
-/// liquidity never calls the beneficiary. Historical Otter rewards and queued
-/// exits are separate remediation steps, not supplied by v4 fee growth here.
+/// liquidity never calls the beneficiary. Owner-reserved exits precede new
+/// admission; historical Otter rewards remain a separate remediation step.
 contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
@@ -65,6 +65,13 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
     mapping(bytes32 => uint256) public concentratedPositions;
     mapping(address => mapping(Currency => uint256)) public claims;
     mapping(Currency => uint256) public totalClaims;
+    /// @notice Cumulative fee-only credits harvested from core. Principal must
+    /// never reduce the hook's uncollected-donation accounting.
+    mapping(PoolId => uint256) public totalFeesCollected0;
+    mapping(PoolId => uint256) public totalFeesCollected1;
+    mapping(uint256 => uint128) public queuedLiquidity;
+    mapping(bytes32 => uint256[]) private _queuedExits;
+    mapping(uint256 => uint256) private _exitIndex;
 
     uint256 private _lock = 1;
     bytes32 private _callbackHash;
@@ -89,6 +96,9 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
     error ReentrantCall();
     error InFlightLiquidity();
     error UnsupportedPoolState();
+    error PendingExits();
+    error ExitAlreadyQueued();
+    error ExitNotQueued();
 
     event PositionCreated(
         uint256 indexed positionId, bytes32 indexed poolId, address indexed owner, int24 lower, int24 upper
@@ -96,6 +106,15 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
     event LiquidityChanged(uint256 indexed positionId, uint128 liquidity);
     event ClaimCredited(address indexed owner, Currency indexed currency, uint256 amount);
     event Claimed(address indexed owner, Currency indexed currency, address indexed recipient, uint256 amount);
+    event ExitRequested(uint256 indexed positionId, bytes32 indexed poolId, address indexed owner, uint128 liquidity);
+    event ExitProcessed(
+        uint256 indexed positionId,
+        bytes32 indexed poolId,
+        address indexed owner,
+        uint128 liquidity,
+        uint256 credited0,
+        uint256 credited1
+    );
 
     modifier nonReentrant() {
         if (_lock != 1) revert ReentrantCall();
@@ -117,10 +136,29 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
         return _openPositions[poolId];
     }
 
+    function queuedExitIds(bytes32 poolId) external view returns (uint256[] memory) {
+        return _queuedExits[poolId];
+    }
+
+    function pendingExitCount(bytes32 poolId) external view returns (uint256) {
+        return _queuedExits[poolId].length;
+    }
+
+    /// @notice Exit priority applies to admission, never to the current batch's
+    /// swap. Requests change no pricing state and cannot veto settlement.
+    function assertAdmissionSupported(bytes32 poolId) external view {
+        _assertBatchSupported(poolId);
+        _requireNoExits(poolId);
+    }
+
     /// @dev Admission and swaps stay restricted to full-range liquidity until
     /// the tick-aware execution/auction implementation is ready. Concentrated
     /// custody is supported now, without using the old curve to price it.
     function assertBatchSupported(bytes32 poolId) external view {
+        _assertBatchSupported(poolId);
+    }
+
+    function _assertBatchSupported(bytes32 poolId) private view {
         if (_lock != 1) revert InFlightLiquidity();
         if (concentratedPositions[poolId] != 0) revert ConcentratedExecutionUnavailable();
         PoolKey memory key = _keys[poolId];
@@ -154,6 +192,7 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
     ) external payable nonReentrant returns (uint256 id) {
         bytes32 poolId = PoolId.unwrap(key.toId());
         _requireIdle(poolId);
+        _requireNoExits(poolId);
         _validatePool(key);
         if (
             lower >= upper || lower < TickMath.MIN_TICK || upper > TickMath.MAX_TICK || lower % key.tickSpacing != 0
@@ -182,6 +221,7 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
     {
         Position storage p = _ownedPosition(id);
         _requireIdle(p.poolId);
+        _requireNoExits(p.poolId);
         _validatePool(_keys[p.poolId]);
         _checkAddition(p.poolId, liquidity);
         if (p.liquidity == 0) {
@@ -204,14 +244,48 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
     {
         Position storage p = _ownedPosition(id);
         _requireIdle(p.poolId);
+        if (liquidity == 0 || liquidity > p.liquidity - queuedLiquidity[id]) revert InvalidLiquidity();
+        _removeLiquidity(id, liquidity, amount0Min, amount1Min);
+    }
+
+    /// @notice Irrevocably authorize this amount to exit at the next idle pool
+    /// state. One pending request per funded position; no caller-chosen minimum
+    /// or recipient can hold the rest of the pool's exit barrier hostage.
+    function requestExit(uint256 id, uint128 liquidity) external nonReentrant {
+        Position storage p = _ownedPosition(id);
+        if (queuedLiquidity[id] != 0) revert ExitAlreadyQueued();
         if (liquidity == 0 || liquidity > p.liquidity) revert InvalidLiquidity();
+        queuedLiquidity[id] = liquidity;
+        _queuedExits[p.poolId].push(id);
+        _exitIndex[id] = _queuedExits[p.poolId].length;
+        emit ExitRequested(id, p.poolId, p.owner, liquidity);
+    }
+
+    /// @notice Anyone processes one reserved exit after economic completion.
+    /// Only manager credits are minted; no asset or beneficiary is called.
+    function processExit(uint256 id) external nonReentrant returns (uint256 credited0, uint256 credited1) {
+        uint128 liquidity = queuedLiquidity[id];
+        if (liquidity == 0) revert ExitNotQueued();
+        Position storage p = positions[id];
+        _requireIdle(p.poolId);
+        delete queuedLiquidity[id];
+        _removeQueuedExit(id, p.poolId);
+        (credited0, credited1) = _removeLiquidity(id, liquidity, 0, 0);
+        emit ExitProcessed(id, p.poolId, p.owner, liquidity, credited0, credited1);
+    }
+
+    function _removeLiquidity(uint256 id, uint128 liquidity, uint256 amount0Min, uint256 amount1Min)
+        private
+        returns (uint256 credited0, uint256 credited1)
+    {
+        Position storage p = positions[id];
         p.liquidity -= liquidity;
         totalLiquidity[p.poolId] -= liquidity;
         if (p.liquidity == 0) {
             _removeOpenPosition(id, p.poolId);
             if (!_isFullRange(_keys[p.poolId], p.tickLower, p.tickUpper)) concentratedPositions[p.poolId]--;
         }
-        _modify(id, -int256(uint256(liquidity)), amount0Min, amount1Min, 0);
+        (credited0, credited1) = _modify(id, -int256(uint256(liquidity)), amount0Min, amount1Min, 0);
         emit LiquidityChanged(id, p.liquidity);
     }
 
@@ -247,6 +321,10 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
         if (orderBook.isBatchActive(poolId)) revert ActiveBatch();
     }
 
+    function _requireNoExits(bytes32 poolId) private view {
+        if (_queuedExits[poolId].length != 0) revert PendingExits();
+    }
+
     function _validatePool(PoolKey memory key) private view {
         if (address(key.hooks) != hook || key.fee != 0 || key.tickSpacing <= 0 || !(key.currency0 < key.currency1)) {
             revert InvalidPool();
@@ -279,7 +357,20 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
         delete _positionIndex[id];
     }
 
-    function _modify(uint256 id, int256 delta, uint256 bound0, uint256 bound1, uint256 nativeValue) private {
+    function _removeQueuedExit(uint256 id, bytes32 poolId) private {
+        uint256 index = _exitIndex[id] - 1;
+        uint256[] storage ids = _queuedExits[poolId];
+        uint256 last = ids[ids.length - 1];
+        ids[index] = last;
+        _exitIndex[last] = index + 1;
+        ids.pop();
+        delete _exitIndex[id];
+    }
+
+    function _modify(uint256 id, int256 delta, uint256 bound0, uint256 bound1, uint256 nativeValue)
+        private
+        returns (uint256 credited0, uint256 credited1)
+    {
         Position storage p = positions[id];
         CallbackArgs memory a;
         a.key = _keys[p.poolId];
@@ -288,13 +379,13 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
         a.bound0 = bound0;
         a.bound1 = bound1;
         a.nativeValue = nativeValue;
-        _unlock(a);
+        return abi.decode(_unlock(a), (uint256, uint256));
     }
 
-    function _unlock(CallbackArgs memory a) private {
+    function _unlock(CallbackArgs memory a) private returns (bytes memory result) {
         bytes memory data = abi.encode(a);
         _callbackHash = keccak256(data);
-        poolManager.unlock(data);
+        result = poolManager.unlock(data);
         if (_callbackHash != bytes32(0)) revert UnauthorizedCallback();
     }
 
@@ -333,8 +424,8 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
                 || (!adding && (p0 < 0 || p1 < 0))
         ) revert InvalidDelta();
 
-        uint256 amount0 = _magnitude(p0);
-        uint256 amount1 = _magnitude(p1);
+        uint256 amount0 = _magnitude(p0, adding);
+        uint256 amount1 = _magnitude(p1, adding);
         if (adding ? amount0 > a.bound0 || amount1 > a.bound1 : amount0 < a.bound0 || amount1 < a.bound1) {
             revert SlippageExceeded();
         }
@@ -347,14 +438,21 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
             _settleDebt(a.key.currency0, a.owner, amount0);
             _settleDebt(a.key.currency1, a.owner, amount1);
         }
-        _credit(a.owner, a.key.currency0, (adding ? 0 : amount0) + uint128(fees.amount0()));
-        _credit(a.owner, a.key.currency1, (adding ? 0 : amount1) + uint128(fees.amount1()));
-        return "";
+        uint256 credited0 = (adding ? 0 : amount0) + uint128(fees.amount0());
+        uint256 credited1 = (adding ? 0 : amount1) + uint128(fees.amount1());
+        PoolId id = a.key.toId();
+        totalFeesCollected0[id] += uint128(fees.amount0());
+        totalFeesCollected1[id] += uint128(fees.amount1());
+        _credit(a.owner, a.key.currency0, credited0);
+        _credit(a.owner, a.key.currency1, credited1);
+        return abi.encode(credited0, credited1);
     }
 
-    function _magnitude(int128 delta) private pure returns (uint256 amount) {
+    function _magnitude(int128 delta, bool adding) private pure returns (uint256 amount) {
         amount = uint256(delta < 0 ? -int256(delta) : int256(delta));
-        if (amount > MAX_AMOUNT) revert AmountOutOfRange();
+        // An exit must preserve every principal credit representable by core,
+        // even if a final price move exceeded the ordinary deposit domain.
+        if (adding && amount > MAX_AMOUNT) revert AmountOutOfRange();
     }
 
     function _settleDebt(Currency currency, address payer, uint256 amount) private {

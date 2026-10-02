@@ -7,15 +7,17 @@ Surplus Redistribution*](https://eprint.iacr.org/2026/1877) (Shi, Zhang, Chung, 
 3 September 2026) as a Uniswap v4 hook with an off-chain VCG solver.
 
 The local remediation now has authenticated LP custody, native ETH/ERC20
-trader escrow, bounded v2 signed epochs, and independent stored-order recovery.
-See [checkpoint 3A](./reviews/CHECKPOINT_3A.md) for the current contract API and
-validation, and [checkpoint 2B](./reviews/CHECKPOINT_2B.md) for asset handling. These
+trader escrow, bounded v2 signed epochs, independent stored-order recovery, and
+queued LP exits that precede the next epoch. See [checkpoint 3B](./reviews/CHECKPOINT_3B.md)
+for exit processing and donation limits, [checkpoint 3A](./reviews/CHECKPOINT_3A.md)
+for order recovery, and [checkpoint 2B](./reviews/CHECKPOINT_2B.md) for assets. These
 changes have not been deployed, and the existing wallet dashboard and published
 Sepolia addresses still target the earlier prototype.
 
 The current settlement verifier accepts feasible allocations without enforcing
-the paper's canonical allocation/payments. Integer incentive guarantees,
-historical LP rewards, and queued LP exit priority remain unfinished. Concentrated positions can be custodied, but concentrated
+the paper's canonical allocation/payments. Integer incentive guarantees
+and historical LP rewards remain unfinished. Concentrated positions can be
+custodied, but concentrated
 batch execution is blocked pending the exact tick-aware model and mechanism
 gates. This checkout does not establish optimal trading or truthfulness.
 
@@ -70,10 +72,16 @@ The current hook enforces the following integration rules:
   first accepted order through complete settlement or explicit expiry.
   Anyone can expire an epoch at its fixed execution deadline without token
   calls, then credit each stored refund independently. Callback guards preserve
-  the freeze during asset transfers. Queued exits
-  and protection against repeated-batch exit starvation remain planned.
+  the freeze during asset transfers. Owners can reserve an irrevocable exit
+  during collection; it changes no liquidity or current admission. After economic
+  completion, anyone can process each exit into owner claims. Next-epoch admission
+  and new LP deposits wait until the queue is empty.
 - **Explicit permissions.** The hook address carries only before-swap,
-  before-add-liquidity, and before-remove-liquidity flags.
+  before-add-liquidity, before-remove-liquidity, and before-donate flags.
+- **Bounded donation accrual.** Uncollected donations per pool/currency cannot
+  exceed `2^120 - 1`. Harvested fee credits release capacity; principal withdrawals
+  and claim delivery do not. This prevents donations from overflowing core fee
+  deltas and blocking LP exits.
 - **Zero swap fees.** Registration and settlement reject nonzero LP or protocol
   fees. An authenticated later fee change permits immediate epoch expiry and
   stored refunds.

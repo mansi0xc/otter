@@ -37,8 +37,10 @@ abstract contract OtterHookFixture is OtterTestDeployers {
         book = new OtterOrderBook(60, 900);
         settlement = new OtterSettlement(manager, book, address(this), 300);
         book.setSettlement(address(settlement));
-        uint160 flags =
-            uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG);
+        uint160 flags = uint160(
+            Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
+                | Hooks.BEFORE_DONATE_FLAG
+        );
         (address predicted, bytes32 salt) =
             HookMiner.find(address(this), flags, type(OtterHook).creationCode, abi.encode(manager, address(settlement)));
         hook = new OtterHook{salt: salt}(manager, address(settlement));

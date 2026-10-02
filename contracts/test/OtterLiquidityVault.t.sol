@@ -192,14 +192,14 @@ contract OtterLiquidityVaultTest is OtterHookFixture {
     }
 
     function test_largeExternalFeeCreditsCannotBlockExitAndCanBeClaimedInChunks() public {
-        uint256 donated = 1 << 121;
+        uint256 donated = hook.MAX_UNCOLLECTED_DONATIONS();
         MockERC20(Currency.unwrap(currency0)).mint(address(this), donated);
         MockERC20(Currency.unwrap(currency1)).mint(address(this), donated);
         donateRouter.donate(otterKey, donated, donated, ZERO_BYTES);
         vault.removeLiquidity(1, 1e21, 0, 0);
         assertEq(manager.getLiquidity(otterId), 0);
         assertGt(vault.claims(address(this), currency0), vault.MAX_AMOUNT());
-        for (uint256 i; i < 3; ++i) {
+        while (vault.claims(address(this), currency0) != 0) {
             uint256 remaining = vault.claims(address(this), currency0);
             uint256 cap = vault.MAX_AMOUNT();
             vault.claim(currency0, remaining > cap ? cap : remaining, address(0xBEEF));

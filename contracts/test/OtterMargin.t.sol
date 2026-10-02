@@ -57,7 +57,10 @@ contract OtterMarginTest is Deployers {
 
         (address predicted, bytes32 salt) = HookMiner.find(
             address(this),
-            uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG),
+            uint160(
+                Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
+                    | Hooks.BEFORE_DONATE_FLAG
+            ),
             type(OtterHook).creationCode,
             abi.encode(manager, address(settlement))
         );

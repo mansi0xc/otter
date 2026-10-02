@@ -118,8 +118,10 @@ contract Deploy is Script {
 
         // --- hook: mine a salt carrying swap + add/remove-liquidity permissions ---
         bytes memory args = abi.encode(manager, address(settlement));
-        uint160 hookFlags =
-            uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG);
+        uint160 hookFlags = uint160(
+            Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
+                | Hooks.BEFORE_DONATE_FLAG
+        );
         (address predicted, bytes32 salt) =
             HookMiner.find(CREATE2_DEPLOYER, hookFlags, type(OtterHook).creationCode, args);
 

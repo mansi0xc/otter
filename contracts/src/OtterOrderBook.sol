@@ -428,7 +428,12 @@ contract OtterOrderBook {
         address c0 = currency0Of[poolId];
         address c1 = currency1Of[poolId];
         if (!registered[poolId]) revert PoolNotRegistered();
-        IOtterLiquidityGuard(liquidityGuardOf[poolId]).assertBatchSupported(poolId);
+        // Reserved LP exits precede the next epoch. They cannot truncate the
+        // current collection window or veto its swaps by blocking later orders.
+        State currentState = _batches[poolId][currentBatchId[poolId]].state;
+        IOtterLiquidityGuard guard = IOtterLiquidityGuard(liquidityGuardOf[poolId]);
+        if (currentState == State.None || _terminal(currentState)) guard.assertAdmissionSupported(poolId);
+        else guard.assertBatchSupported(poolId);
         _assertSolvent(c0);
         _assertSolvent(c1);
 

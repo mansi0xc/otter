@@ -21,7 +21,10 @@ contract OtterHookTest is OtterHookFixture {
     function test_hookAddressCarriesAllRequiredPermissions() public view {
         assertEq(
             uint160(address(hook)) & Hooks.ALL_HOOK_MASK,
-            uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG)
+            uint160(
+                Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
+                    | Hooks.BEFORE_DONATE_FLAG
+            )
         );
     }
 
