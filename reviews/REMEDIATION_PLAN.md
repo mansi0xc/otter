@@ -164,7 +164,7 @@ these changes do not resolve the remaining arithmetic/curve/mechanism work.
 
 See [the exit checkpoint report](./CHECKPOINT_3B.md) for owner reservations,
 permissionless per-position processing, current-versus-next-epoch admission,
-donation accounting, tests, and the pending user-created commit. An active
+donation accounting, tests, and the user-created commit. An active
 exit request does not change pricing liquidity, truncate current collection,
 or prevent the current batch's swap. It blocks the next epoch until processing
 credits the owner's actual principal and accrued core fees.
@@ -177,7 +177,28 @@ legacy swap moves beyond the deposit-price domain. Those credits can be claimed
 in chunks. The before-donate permission requires newly mined hook addresses.
 
 Step 3's local custody/recovery/exit acceptance is complete after validation.
-**3B is pending the user's commit.** Begin step 4 only after confirmation: exact
-tick-aware quoting, matched numerical domains, and the discrete-mechanism
-research gates. Canonical payments, minority dust IR, historical rewards,
-concentrated batch execution, wallet migration, and independent reviews remain.
+**3B was committed by the user as `eee2aeb`; clean tree inspected before 4A.**
+Canonical payments, minority dust IR, historical rewards, concentrated batch
+execution, wallet migration, and independent reviews remain.
+
+## Checkpoint 4A: bounded exact execution quote
+
+See [the oracle checkpoint report](./CHECKPOINT_4A.md) for the read-only API,
+supported statuses/domain, real-core differential tests, cold gas measurements,
+limitations, and the pending user-created commit. This slice authenticates live
+PoolManager state and models zero-fee exact-input execution through initialized
+ticks, empty bitmap boundaries, zero-liquidity gaps, and finite price limits.
+It reports actual consumption, output, final state, and bounded traversal usage.
+
+Only `Complete` and `PriceLimit` are usable quote statuses. A traversal/domain
+failure is explicitly unsupported; its prefix is not an executable quote.
+Zero input is a model no-op and requires skipping the public manager swap.
+The oracle neither reserves a snapshot nor changes settlement or admission.
+Concentrated custody remains available and concentrated batches remain gated.
+
+Step 4 is not complete. After the user's 4A commit, continue with an independent
+BigInt execution reference and matched domains, explicit opening snapshots,
+and small-domain discrete mechanism/capacity research under G1–G3. One bounded
+quote's cost is not a bound for an auction with counterfactual quotes. Do not
+integrate the new oracle by merely replacing the old constant-product formula
+or lifting the concentrated execution gate.

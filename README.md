@@ -8,7 +8,9 @@ Surplus Redistribution*](https://eprint.iacr.org/2026/1877) (Shi, Zhang, Chung, 
 
 The local remediation now has authenticated LP custody, native ETH/ERC20
 trader escrow, bounded v2 signed epochs, independent stored-order recovery, and
-queued LP exits that precede the next epoch. See [checkpoint 3B](./reviews/CHECKPOINT_3B.md)
+queued LP exits that precede the next epoch, and a bounded read-only execution
+oracle. See [checkpoint 4A](./reviews/CHECKPOINT_4A.md) for authenticated exact
+quotes and real-core differential tests, [checkpoint 3B](./reviews/CHECKPOINT_3B.md)
 for exit processing and donation limits, [checkpoint 3A](./reviews/CHECKPOINT_3A.md)
 for order recovery, and [checkpoint 2B](./reviews/CHECKPOINT_2B.md) for assets. These
 changes have not been deployed, and the existing wallet dashboard and published
@@ -18,8 +20,10 @@ The current settlement verifier accepts feasible allocations without enforcing
 the paper's canonical allocation/payments. Integer incentive guarantees
 and historical LP rewards remain unfinished. Concentrated positions can be
 custodied, but concentrated
-batch execution is blocked pending the exact tick-aware model and mechanism
-gates. This checkout does not establish optimal trading or truthfulness.
+batch execution is blocked pending the matched reference model, integration,
+and mechanism gates. The quote alone does not implement canonical payments or
+enable concentrated auctions. This checkout does not establish optimal trading
+or truthfulness.
 
 ---
 
@@ -68,6 +72,12 @@ The current hook enforces the following integration rules:
 - **Concentrated execution gate.** Range positions are supported for custody.
   Order admission and swaps reject pools containing funded concentrated
   positions while the legacy auction still uses constant-product reserves.
+- **Exact read-only execution quote.** `OtterExecutionOracle` authenticates
+  live pool/tick/bitmap state and models zero-fee core swaps through tick
+  crossings, empty words, gaps, and price limits. It reports consumed input,
+  output, and final state. Only `Complete`/`PriceLimit` results are usable;
+  traversal failures are unsupported. It does not change settlement, reserve
+  liquidity, or model arbitrary hooks or token delivery.
 - **Batch-active guards.** LP changes and fee collection are frozen from the
   first accepted order through complete settlement or explicit expiry.
   Anyone can expire an epoch at its fixed execution deadline without token

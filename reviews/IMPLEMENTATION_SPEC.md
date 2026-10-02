@@ -3,7 +3,7 @@
 Prepared 2 October 2026. Baseline: user-created commit `63ec94e`.
 Sources: [grant readiness review](./GRANT_READINESS_REVIEW_2026-10-02.md), [remediation plan](./REMEDIATION_PLAN.md), the pinned v4 core, and [the paper](https://arxiv.org/html/2609.03474v1).
 
-**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. [3B](./CHECKPOINT_3B.md) implements queued exit priority and bounded donation accrual. Pool/reward snapshots, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
+**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. [3B](./CHECKPOINT_3B.md) implements queued exit priority and bounded donation accrual. [4A](./CHECKPOINT_4A.md) adds a bounded read-only exact execution quote. Pool/reward snapshots, the matched BigInt reference, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
 
 The user has selected **native ETH and concentrated liquidity support now**. These belong to this remediation, including contracts, the integer solver, recovery, deployment, and wallet flows. Supporting WETH alone or removing the full-range check alone does not meet this scope.
 
@@ -50,8 +50,10 @@ These are conservative starting limits to implement and benchmark, **not measure
 | Ask | `uint128`, scaled by `10^18` in raw output/raw input units | Bound representation; an unfillable high ask is ineligible, not a batch poison |
 | Sum of all position liquidity in a pool | At most `2^88 - 1`, including inactive ranges | Bound liquidity and signed crossing arithmetic |
 | Executable sqrt price | `2^64 <= sqrtPriceX96 < 2^128`, also strictly inside core's legal swap limits | Give an explicit supported raw price interval, including ordinary 6/18 decimal pairs |
-| Bitmap words visited by a swap trace | At most 16; count empty words too | Bound traversal, including liquidity gaps |
-| Deposit principal, quote amount, or individual claim delivery | At most `2^120 - 1` and representable by the relevant core signed delta; withdrawal principal/fee credits retain all core-representable amounts and can be claimed in chunks | Keep transfers and casts bounded without letting external donations or accumulated claims veto exits |
+| Bitmap words visited by a swap trace | At most 16 distinct words; count empty words too | Bound traversal, including liquidity gaps |
+| Initialized tick crossings / total swap steps | At most 64 crossings and 80 steps; an unfinished trace at a cap is unsupported | Bound endpoints for 32 positions and per-word rounding work |
+| Quote exact input | At most `2^96 - 1`, including zero as a model no-op | Match the admitted aggregate budget domain without narrowing first |
+| Deposit principal, quote output, or individual claim delivery | At most `2^120 - 1` and representable by the relevant core signed delta; withdrawal principal/fee credits retain all core-representable amounts and can be claimed in chunks | Keep transfers and casts bounded without letting external donations or accumulated claims veto exits |
 | Signature byte length | Bounded at admission; initial cap 512 bytes | Bound smart-wallet validation input |
 | Uncollected donations per pool/currency | At most `2^120 - 1`; cumulative donations minus fee-only credits harvested from core | Prevent accrued fees from overflowing core deltas while allowing capacity after collection |
 
@@ -135,6 +137,36 @@ A sorted list of initialized ticks alone is insufficient for exactness: the actu
 
 The quote returns requested input, actual consumed input, output, final state, and traversal usage. Outside the supported domain it returns a specified unsupported result rather than an arbitrary arithmetic panic. This exact execution oracle is separate from the discrete auction optimizer. A correct quote does not establish the auction's incentive theorem.
 
+Checkpoint 4A implements this as the standalone `OtterExecutionOracle`, bound to
+one trusted manager using the pinned core storage layout. It reads live slot0,
+active liquidity, cached bitmap words, and crossed tick gross/net liquidity.
+It accepts no keeper-provided tick list. `Complete` means all requested input
+was consumed; `PriceLimit` means execution reached the valid configured limit
+with some input unconsumed. Both include the exact final core state. Every
+other status is unsupported: any returned amounts/state are a diagnostic
+prefix and must not be accepted as a complete or partial execution quote.
+The quote bounds active liquidity and each crossed tick's gross/post-crossing
+liquidity. It does not scan all inactive ranges to prove aggregate liquidity or
+the position count; the authenticated vault enforces those separate limits.
+
+The read-only model permits zero active liquidity and faithfully traverses
+empty gaps; this does not relax the nonzero-liquidity epoch-opening policy.
+Zero input returns an unchanged model state without validating the price limit,
+as `Pool.swap` does. The public `PoolManager.swap` rejects zero input, so a
+settlement with no residual input must skip that swap. Pool/key LP and protocol
+fees must all be zero; dynamic-fee keys remain unsupported even with zero stored
+fee. Both the starting price and nonzero-input limit must be in the selected
+price domain, and the limit must lie strictly in the requested direction.
+
+The oracle models core math only. It does not predict arbitrary hook accounting,
+fee overrides, token transfers, or callback side effects, reserve a historical
+snapshot, or prove that a later transaction can execute. Otter's configured hook
+has no swap-return delta and does not modify the fee/amount, but concentrated
+execution is still prohibited while the legacy auction remains. Integration
+must bind and revalidate the opening snapshot, enforce the configured hook,
+accept only supported statuses, skip zero swaps, and reconcile actual signed
+manager deltas. Read-only quoting does not implement those settlement changes.
+
 ### Execution and accounting
 
 Verify the complete stored batch, canonical direction/allocation/payments, snapshot, capacity, and claim amounts before executing. No keeper-controlled payment interval or alternative feasible vector is accepted. Re-read execution-critical pool state and fee fields before the actual swap. A mismatch produces no economic completion and retains timeout recovery.
@@ -215,15 +247,17 @@ The user committed the specification as `a7637a9`, authenticated LP custody
 as `bc79d64`, and native/ERC20 custody as `57bdd33`. Checkpoint 3A supplies bounded
 v2 signatures, stored records, explicit execution deadlines, constant-work
 expiry, independently credited refunds, and bounded EIP-1271 validation.
-Its report records validation and the pending user-created commit. The old
+Its report records validation and the user-created commit. The old
 order ABI/domain is incompatible; the dashboard and published contracts are
 still the earlier prototype.
 
-Checkpoint 3A was committed as `3518355`. Checkpoint 3B implements queued LP
+Checkpoint 3A was committed as `3518355`. Checkpoint 3B was committed as `eee2aeb` and implements queued LP
 exits, priority before the next epoch, bounded uncollected donations, and full
 core-representable withdrawal credits. Its report records validation and the
-pending user-created commit. The next step supplies opening pool/curve state,
-exact tick-aware quotes, matched integer domains, and discrete research evidence.
-Canonical results and historical rewards remain separate work. Canonical
+user-created commit. Checkpoint 4A implements authenticated bounded read-only
+quotes and differential execution evidence; its report records the pending
+user-created commit. The next slice supplies the independent BigInt execution
+reference, matched integer domains, opening snapshot work, and discrete research
+evidence. Canonical results and historical rewards remain separate work. Canonical
 settlement and concentrated execution still require sections 5–7; a correct
 claim ledger and exit barrier do not resolve G1–G3.

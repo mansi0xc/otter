@@ -1,7 +1,7 @@
 # Checkpoint 3B — queued LP exits before the next epoch
 
 Prepared 2 October 2026. Starting revision: user-created commit `3518355`.
-Status: implemented and validated locally, pending the user-created commit.
+Status: committed by the user as `eee2aeb`; clean tree inspected before checkpoint 4A.
 The user creates every commit. No deployment or live transaction is included.
 
 ## Exit authorization and processing
