@@ -5,6 +5,8 @@ Starting revision: `6c54695e1c7a534afa9f69ba8f08705a2a8a4830`.
 
 The review supplies the findings and reproductions needed to begin. This plan supplies the implementation order, design gates, acceptance evidence, and user-created commit checkpoints. A separate full project-planning workflow is unnecessary at this stage.
 
+User-selected scope: **expand asset and liquidity support now**, including direct native ETH and concentrated liquidity. These are part of the remediation rather than deferred follow-ups. [The v2 implementation specification](./IMPLEMENTATION_SPEC.md) records the selected custody, recovery, liquidity, and execution rules, together with the numerical research gates.
+
 ## Commit protocol
 
 The user creates every commit. The assistant must not create or amend a commit.
@@ -16,7 +18,7 @@ At each checkpoint:
 3. Ask the user to create the commit and stop work at that checkpoint. Do not begin the next step or perform further edits while the commit is pending.
 4. After the user confirms completion, inspect Git status and HEAD to establish the new baseline, then continue. Preserve unrelated changes.
 
-Checkpoint 0 is ready now: commit the review, the reproduction tests, and this plan before implementation starts. The pre-existing untracked `contracts/CORRECTIONS.md 21-03-23-628.md` is unrelated to this checkpoint and must not be included automatically.
+Checkpoint 0 is complete in the user's commit `63ec94e`. The user's commit also includes their corrections document; preserve it. Checkpoint 1 is the current commit handoff. Do not begin contract edits while that commit is pending.
 
 ## Implementation sequence
 
@@ -25,18 +27,20 @@ Each numbered step ends in a user-created commit. If a step grows too large to r
 | Step | Scope and purpose | Acceptance evidence |
 |---|---|---|
 | 0 | Preserve the review and reproducible counterexamples | Existing review records 80 passing baseline contract tests, nine Solidity reproductions, solver checks, and successful web build; clearly label reproductions whose passing assertions demonstrate unsafe behavior |
-| 1 | Define the implementation contract: integer mechanism, token semantics, supported numeric ranges, expiry, tie policy, recovery state machine, and surplus eligibility | A precise specification identifies enforceable guarantees and unresolved research questions; every review finding has a planned regression test and owning component |
-| 2 | Replace unsafe deployment liquidity custody and enforce supported escrow-token behavior | An outsider cannot remove or collect another user's position; received escrow matches the credited amount; supported optional-return ERC20s work; unsupported semantics fail before commitment |
-| 3 | Bound admission and deliver independent recovery with explicit expiry and LP exit behavior | An oversized batch cannot be admitted; one failed recipient does not prevent other claims; no double claim or settlement/refund overlap; economic completion and LP exits remain bounded during solver outages |
-| 4 | Correct numerical handling in Solidity and the integer solver | Extreme asks classify safely; both sides satisfy specified integer IR; an empty payment interval is handled by the specified allocation rule; tied inputs follow the specified policy; oracle and Solidity agree at numeric boundaries |
-| 5 | Enforce the prescribed allocation and payment rule in settlement | Incorrect feasible outcomes, zero-fill griefing, and solver underpayment are rejected; valid outcomes settle in both directions; fallback callers receive no weaker correctness checks; supported fees and actual swap deltas are handled |
-| 6 | Replace captureable donation rewards with the specified historical LP/community distribution | Newly added liquidity cannot claim past surplus; prior eligible LPs retain their entitlement after exit; same-transaction flushes cannot bypass eligibility; bidder/solver/LP overlap is explicitly tested |
-| 7 | Make testnet operation and wallet flows usable | Live solving and independent recovery are demonstrated; wallet state follows successful receipts; nonces work across bitmap words; batch IDs and claim/refund states appear correctly; outages and reorg handling are exercised |
-| 8 | Produce reproducible economic evidence and a grant application package | Compare complete costs, execution, fill rates, latency, and LP returns; accurately describe demonstration data and guarantee limits; publish milestones, actual cost estimates, and independent-review scope |
+| 1 | Define the implementation contract: native/ERC20 semantics, concentrated execution, numeric limits, expiry, ties, recovery, historical rewards, and discrete mechanism gates | A precise specification identifies enforceable guarantees and unresolved research questions; every review finding and expanded support requirement has regression ownership |
+| 2 | Replace unsafe deployment custody with an authenticated range-position vault and native/ERC20 escrow | An outsider cannot remove or collect another user's position; full-range and concentrated deposits enforce ownership/slippage; ETH value and received ERC20 escrow match credited amounts; optional-return tokens work |
+| 3 | Bound admission and deliver independent recovery with explicit expiry and queued LP exits | An oversized batch cannot be admitted; blocked ERC20/ETH recipients do not veto finalization or unrelated claims; no double claim or settlement/refund overlap; exits precede next admission after settlement or expiry |
+| 4 | Implement the exact tick-aware execution oracle and correct arithmetic in Solidity/BigInt; resolve the discrete rule | Match real PoolManager input/output and final state through ticks, empty words, gaps, and price limits; domain boundaries agree; both-side integer IR, empty intervals, ties, and finite capacity have a complete tested rule |
+| 5 | Enforce canonical allocation and payments after specification gates G1–G3 pass | Reject incorrect feasible vectors, noncanonical zero fills, and solver underpayment; settle both directions and native pairs with actual deltas; callers have identical checks; fee drift retains recovery |
+| 6 | Replace captureable donations with snapshot ownership and capital-weighted historical rewards | New liquidity gets no past surplus; prior owners retain claims after exit; different ranges use specified weights; same-transaction claims cannot bypass eligibility; strategic LP overlap and rounding are evaluated |
+| 7 | Make expanded testnet and wallet flows usable | Live native/ERC20 and concentrated batches, independent recovery, and LP exit processing are demonstrated; receipt-based wallet state, EIP-1271, multiword nonces, epoch/claim display, outages, and reorgs work |
+| 8 | Produce reproducible economic evidence and a grant application package | Compare all-in costs, execution, fills, latency, and LP returns across ranges; accurately distinguish proof/test assumptions and demo data; estimate expanded engineering/review costs rather than reuse the original timing guess |
 
 ## Design gates before implementation
 
 Step 1 should resolve implementation choices using the codebase and documented tradeoffs. Ask the user only for decisions that change the intended product, asset support, or funding scope; routine engineering choices can be made within the authorized scope.
+
+That product-scope decision is now recorded: native ETH and concentrated liquidity are included. The implementation specification selects a dedicated vault compatible with the pinned core, stored independent claims, a fixed execution window, permissionless canonical settlement, and capital-weighted historical LP rewards. Its engineering limits are provisional until measured. Its G1–G3 gates distinguish the unresolved discrete mechanism, concentrated-curve assumptions, and affordable verification. Safety work may proceed while those are researched; canonical settlement cannot be declared finished without resolving them.
 
 ### Canonical settlement and the discrete mechanism
 
@@ -68,6 +72,8 @@ Specify the supported price, liquidity, amount, and decimal ranges. Use overflow
 
 Define protocol-fee handling separately from LP fees and account for the PoolManager's actual returned deltas. Test finite full-range endpoints and partial input consumption. A fee change during an active batch must have a specified safe outcome.
 
+The expanded version must reproduce actual v4 tick traversal and step rounding, including empty bitmap words and zero-liquidity gaps. Full-range constant-product virtual reserves cannot be reused as the global concentrated curve. Native settlement must explicitly sync the native currency and settle with the actual debt as value. Supported zero-fee execution is checked against both LP and protocol fee fields.
+
 ## Validation and regression discipline
 
 - For each finding, retain the original reproduction in history and change the active regression to require the corrected behavior once its fix lands. A test that continues asserting an exploit succeeds is not evidence of a fix.
@@ -77,7 +83,7 @@ Define protocol-fee handling separately from LP fees and account for the PoolMan
 - Apply checks appropriate to each checkpoint. Do not repeatedly run broad suites without a change or unresolved concern that justifies them.
 - Publish what is proven, what is tested, and what remains an assumption. An external contract review and a mechanism/economic review are separate deliverables.
 
-## Checkpoint 0 commit handoff
+## Completed checkpoint 0
 
 Include exactly these newly created review artifacts:
 
@@ -94,4 +100,21 @@ Suggested explanation:
 
 > Document grant readiness and a staged remediation plan. Add nine contract reproductions and solver boundary counterexamples covering liquidity ownership, settlement discretion, refunds, arithmetic, expiry, fees, ties, and surplus capture.
 
-Status: awaiting the user's checkpoint 0 commit. Implementation has not begun.
+Status: committed by the user as `63ec94e`; inspected clean working tree before checkpoint 1.
+
+## Checkpoint 1 commit handoff
+
+Include these documentation changes:
+
+```text
+reviews/IMPLEMENTATION_SPEC.md
+reviews/REMEDIATION_PLAN.md
+```
+
+Suggested title: `docs: specify Otter v2 safety and expanded pool support`
+
+Suggested explanation:
+
+> Define native ETH escrow, tick-aware execution, authenticated LP custody, independent claims, queued exits, and historical reward accounting. Map findings to regression requirements and identify the discrete-mechanism and verification gates before canonical settlement changes.
+
+Status: specification prepared; awaiting the user's checkpoint 1 commit. No production source changed and no finding is closed yet. Next work is step 2, subject to the same user-created commit protocol.
