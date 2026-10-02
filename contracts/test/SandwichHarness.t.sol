@@ -2,7 +2,7 @@
 pragma solidity 0.8.26;
 
 import {console2} from "forge-std/Test.sol";
-import {Deployers} from "@uniswap/v4-core/test/utils/Deployers.sol";
+import {OtterTestDeployers as Deployers} from "./utils/OtterTestDeployers.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -136,7 +136,7 @@ contract SandwichHarness is Deployers {
     }
 
     function _addLiquidity(PoolKey memory k) internal {
-        modifyLiquidityRouter.modifyLiquidity(
+        _modifyLiquidity(
             k,
             IPoolManager.ModifyLiquidityParams({
                 tickLower: LO,

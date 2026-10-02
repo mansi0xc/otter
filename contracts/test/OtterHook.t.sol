@@ -1,93 +1,28 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {console2} from "forge-std/Test.sol";
-import {Deployers} from "@uniswap/v4-core/test/utils/Deployers.sol";
+import {OtterHookFixture} from "./utils/OtterHookFixture.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
-import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
-import {CustomRevert} from "@uniswap/v4-core/src/libraries/CustomRevert.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
-
 import {OtterHook, OtterPoolMath} from "../src/OtterHook.sol";
+import {OtterLiquidityVault} from "../src/OtterLiquidityVault.sol";
 import {OtterOrderBook} from "../src/OtterOrderBook.sol";
-import {OtterSettlement} from "../src/OtterSettlement.sol";
-import {HookMiner} from "./utils/HookMiner.sol";
 
-interface IERC20HookTest {
-    function approve(address spender, uint256 amount) external returns (bool);
-}
-
-contract OtterHookTest is Deployers {
+contract OtterHookTest is OtterHookFixture {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
 
-    OtterHook hook;
-    OtterOrderBook book;
-    OtterSettlement settlement;
-
-    PoolKey otterKey;
-    PoolId otterId;
-
-    /// full range for tickSpacing 1
-    int24 constant TICK_LOWER = -887272;
-    int24 constant TICK_UPPER = 887272;
-
-    function setUp() public {
-        deployFreshManagerAndRouters();
-        deployMintAndApprove2Currencies();
-
-        book = new OtterOrderBook(60, 900);
-        settlement = new OtterSettlement(manager, book, address(this), 300);
-        book.setSettlement(address(settlement));
-
-        // Mine a CREATE2 salt whose low 14 bits carry BEFORE_SWAP and
-        // BEFORE_ADD_LIQUIDITY and BEFORE_REMOVE_LIQUIDITY.
-        uint160 flags = uint160(
-            Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
-        );
-        (address predicted, bytes32 salt) = HookMiner.find(
-            address(this), flags, type(OtterHook).creationCode, abi.encode(manager, address(settlement))
-        );
-        hook = new OtterHook{salt: salt}(manager, address(settlement));
-        assertEq(address(hook), predicted, "mined address mismatch");
-        settlement.setApprovedHook(address(hook));
-
-        // fee 0 and tickSpacing 1: see the note in OtterPoolMath
-        (otterKey, otterId) = initPool(currency0, currency1, IHooks(address(hook)), 0, 1, SQRT_PRICE_1_1);
-        settlement.registerPool(otterKey);
-
-        modifyLiquidityRouter.modifyLiquidity(
-            otterKey,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: TICK_LOWER,
-                tickUpper: TICK_UPPER,
-                liquidityDelta: 1e21,
-                salt: 0
-            }),
-            ZERO_BYTES
-        );
-    }
-
-    // ------------------------------------------------------------------
-    // permissions
-    // ------------------------------------------------------------------
-
-    /// plan.md standing rule: verify the flag against v4-core, never a table.
-    function test_hookAddressCarriesBeforeSwapAndBeforeAddLiquidity() public view {
-        uint160 bits = uint160(address(hook)) & Hooks.ALL_HOOK_MASK;
+    function test_hookAddressCarriesAllRequiredPermissions() public view {
         assertEq(
-            bits,
-            uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG),
-            "hook address must encode swap and both liquidity permissions"
+            uint160(address(hook)) & Hooks.ALL_HOOK_MASK,
+            uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG)
         );
-        console2.log("hook address", address(hook));
-        console2.log("permission bits", uint256(bits));
     }
 
     function test_hookRejectsDirectCalls() public {
@@ -95,286 +30,110 @@ contract OtterHookTest is Deployers {
         hook.beforeSwap(address(settlement), otterKey, SWAP_PARAMS, ZERO_BYTES);
     }
 
-    // ------------------------------------------------------------------
-    // batch-only gating — this is the reason the hook exists
-    // ------------------------------------------------------------------
-
-    /// A searcher cannot sandwich a pool it cannot swap against.
     function test_ordinarySwapIsRejected() public {
         vm.expectRevert();
         swapRouter.swap(
             otterKey,
-            IPoolManager.SwapParams({
-                zeroForOne: true,
-                amountSpecified: -1e18,
-                sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
-            }),
-            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            IPoolManager.SwapParams(true, -1e18, TickMath.MIN_SQRT_PRICE + 1),
+            PoolSwapTest.TestSettings(false, false),
             ZERO_BYTES
         );
     }
 
-    /// The same swap through a control pool with no hook succeeds, so the
-    /// rejection above is the hook and not a broken test setup.
     function test_controlPoolWithoutHookAcceptsSwap() public {
         (PoolKey memory plainKey,) = initPool(currency0, currency1, IHooks(address(0)), 0, 1, SQRT_PRICE_1_1);
-        modifyLiquidityRouter.modifyLiquidity(
-            plainKey,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: TICK_LOWER,
-                tickUpper: TICK_UPPER,
-                liquidityDelta: 1e21,
-                salt: 0
-            }),
-            ZERO_BYTES
-        );
-
+        _modifyLiquidity(plainKey, IPoolManager.ModifyLiquidityParams(TICK_LOWER, TICK_UPPER, 1e21, 0), ZERO_BYTES);
         swapRouter.swap(
             plainKey,
-            IPoolManager.SwapParams({
-                zeroForOne: true,
-                amountSpecified: -1e18,
-                sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
-            }),
-            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            IPoolManager.SwapParams(true, -1e18, TickMath.MIN_SQRT_PRICE + 1),
+            PoolSwapTest.TestSettings(false, false),
             ZERO_BYTES
         );
     }
 
-    // ------------------------------------------------------------------
-    // liquidity gate — task 6: enforce, not just document, single full range
-    // ------------------------------------------------------------------
-
-    /// @dev PoolManager's `Hooks.callHook` does not let a hook's revert reason
-    ///      bubble up raw — it re-wraps it as an ERC-7751 `CustomRevert.WrappedError`
-    ///      carrying the hook address, the called selector, the original reason,
-    ///      and `Hooks.HookCallFailed.selector` as additional context (see
-    ///      `CustomRevert.bubbleUpAndRevertWith`). Matching that wrapper exactly,
-    ///      rather than a bare `vm.expectRevert()`, is what proves the rejection
-    ///      came from OUR `NotFullRange` check and not some unrelated revert.
-    function _wrappedNotFullRange(int24 tickLower, int24 tickUpper, int24 requiredLower, int24 requiredUpper)
-        internal
-        view
-        returns (bytes memory)
-    {
-        bytes memory reason =
-            abi.encodeWithSelector(OtterHook.NotFullRange.selector, tickLower, tickUpper, requiredLower, requiredUpper);
-        return abi.encodeWithSelector(
-            CustomRevert.WrappedError.selector,
-            address(hook),
-            IHooks.beforeAddLiquidity.selector,
-            reason,
-            abi.encodePacked(Hooks.HookCallFailed.selector)
-        );
+    function test_unapprovedRouterCannotAddRemoveOrCollect() public {
+        int256[3] memory deltas = [int256(1e18), -int256(1e18), int256(0)];
+        for (uint256 i; i < deltas.length; ++i) {
+            vm.expectRevert(
+                _wrappedVaultOnly(i == 0 ? IHooks.beforeAddLiquidity.selector : IHooks.beforeRemoveLiquidity.selector)
+            );
+            modifyLiquidityRouter.modifyLiquidity(
+                otterKey, IPoolManager.ModifyLiquidityParams(TICK_LOWER, TICK_UPPER, deltas[i], 0), ZERO_BYTES
+            );
+        }
     }
 
-    function _wrappedActiveBatch(bytes4 selector, uint256 batchId) internal view returns (bytes memory) {
-        bytes memory reason = abi.encodeWithSelector(OtterHook.ActiveBatch.selector, PoolId.unwrap(otterId), batchId);
-        return abi.encodeWithSelector(
-            CustomRevert.WrappedError.selector,
-            address(hook),
-            selector,
-            reason,
-            abi.encodePacked(Hooks.HookCallFailed.selector)
-        );
-    }
-
-    function _submitActiveOrder() internal returns (uint256 batchId) {
-        uint256 traderPk = 0xA11CE;
-        address trader = vm.addr(traderPk);
-        address token = Currency.unwrap(currency0);
-        deal(token, trader, 10e18);
-        vm.prank(trader);
-        IERC20HookTest(token).approve(address(book), type(uint256).max);
-
-        OtterOrderBook.Order memory order = OtterOrderBook.Order({
-            trader: trader,
-            poolId: PoolId.unwrap(otterId),
-            sellingCurrency0: true,
-            ask: 0,
-            budget: 1e18,
-            deadline: block.timestamp + 1 days,
-            nonce: 0
-        });
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(traderPk, book.digestOf(order));
-        OtterOrderBook.Order[] memory orders = new OtterOrderBook.Order[](1);
-        bytes[] memory signatures = new bytes[](1);
-        orders[0] = order;
-        signatures[0] = abi.encodePacked(r, s, v);
-        batchId = book.submit(orders, signatures);
-    }
-
-
-    /// LPs still move freely between batches — the gate restricts the SHAPE of
-    /// a position, not whether one can be added at all.
-    function test_fullRangeAddSucceeds() public {
-        modifyLiquidityRouter.modifyLiquidity(
-            otterKey,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: TICK_LOWER,
-                tickUpper: TICK_UPPER,
-                liquidityDelta: 1e20,
-                salt: 0
-            }),
-            ZERO_BYTES
-        );
-    }
-
-    function test_activeBatchBlocksLiquidityAdd() public {
-        uint256 batchId = _submitActiveOrder();
-        vm.expectRevert(_wrappedActiveBatch(IHooks.beforeAddLiquidity.selector, batchId));
-        modifyLiquidityRouter.modifyLiquidity(
-            otterKey,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: TICK_LOWER,
-                tickUpper: TICK_UPPER,
-                liquidityDelta: 1e20,
-                salt: 0
-            }),
-            ZERO_BYTES
-        );
-    }
-
-    function test_activeBatchBlocksLiquidityRemoval() public {
-        uint256 batchId = _submitActiveOrder();
-        vm.expectRevert(_wrappedActiveBatch(IHooks.beforeRemoveLiquidity.selector, batchId));
-        modifyLiquidityRouter.modifyLiquidity(
-            otterKey,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: TICK_LOWER,
-                tickUpper: TICK_UPPER,
-                liquidityDelta: -1e20,
-                salt: 0
-            }),
-            ZERO_BYTES
-        );
-    }
-
-    /// @notice Regression: an LP collecting fees (the standard zero-delta
-    ///         `modifyLiquidity` call) must NOT be blocked by the active-batch
-    ///         freeze, even while a batch is genuinely open. Collecting fees
-    ///         changes nothing the mechanism depends on — no price, no
-    ///         liquidity, no curve — so freezing it would only cost LPs their
-    ///         rewards for as long as any batch is outstanding, for zero safety
-    ///         benefit. `beforeRemoveLiquidity` must gate on `liquidityDelta < 0`
-    ///         specifically, not on which callback v4 happened to route the call
-    ///         through.
-    function test_activeBatchDoesNotBlockFeeCollection() public {
+    function test_activeBatchBlocksOwnerAddRemoveAndFeeCollection() public {
         _submitActiveOrder();
-        modifyLiquidityRouter.modifyLiquidity(
-            otterKey,
-            IPoolManager.ModifyLiquidityParams({tickLower: TICK_LOWER, tickUpper: TICK_UPPER, liquidityDelta: 0, salt: 0}),
-            ZERO_BYTES
-        ); // must not revert
+        vm.expectRevert(OtterLiquidityVault.ActiveBatch.selector);
+        vault.increaseLiquidity(1, 1e18, type(uint256).max, type(uint256).max);
+        vm.expectRevert(OtterLiquidityVault.ActiveBatch.selector);
+        vault.removeLiquidity(1, 1e18, 0, 0);
+        vm.expectRevert(OtterLiquidityVault.ActiveBatch.selector);
+        vault.collectFees(1);
     }
 
-    /// The exploit this closes: a second, narrower position makes `L` change
-    /// mid-swap if a batch crosses its boundary, which is exactly the assumption
-    /// OtterPoolMath's virtual-reserve math depends on holding everywhere.
-    function test_narrowerRangeAddIsRejected() public {
-        int24 lo = TICK_LOWER + 1000;
-        int24 hi = TICK_UPPER - 1000;
-        vm.expectRevert(_wrappedNotFullRange(lo, hi, TICK_LOWER, TICK_UPPER));
-        modifyLiquidityRouter.modifyLiquidity(
-            otterKey,
-            IPoolManager.ModifyLiquidityParams({tickLower: lo, tickUpper: hi, liquidityDelta: 1e20, salt: 0}),
-            ZERO_BYTES
+    function test_consumeDoesNotReleaseEconomicFreezeBeforeCompletion() public {
+        uint256 id = _submitActiveOrder();
+        vm.warp(block.timestamp + 60);
+        vm.prank(address(settlement));
+        book.consume(PoolId.unwrap(otterId), id, submittedOrders);
+        assertTrue(book.isBatchActive(PoolId.unwrap(otterId)));
+        vm.expectRevert(OtterLiquidityVault.ActiveBatch.selector);
+        vault.removeLiquidity(1, 1e18, 0, 0);
+        vm.prank(address(settlement));
+        book.completeExecution(PoolId.unwrap(otterId));
+        vault.removeLiquidity(1, 1e18, 0, 0);
+    }
+
+    function test_concentratedPositionCanBeCustodiedButLegacyBatchCannotOpen() public {
+        vault.createPosition(otterKey, -120, 120, 1e18, type(uint256).max, type(uint256).max);
+        assertEq(vault.concentratedPositions(PoolId.unwrap(otterId)), 1);
+        (OtterOrderBook.Order[] memory os, bytes[] memory sigs) = _prepareActiveOrder();
+        vm.expectRevert(OtterLiquidityVault.ConcentratedExecutionUnavailable.selector);
+        book.submit(os, sigs);
+        (uint64 closesAt, uint32 count,) = book.batches(PoolId.unwrap(otterId), 0);
+        assertEq(closesAt, 0);
+        assertEq(count, 0);
+        assertEq(book.nonceBitmap(vm.addr(0xA11CE), 0), 0);
+    }
+
+    function test_concentratedSwapCannotUseLegacyCurveEvenForSettlementSender() public {
+        vault.createPosition(otterKey, -120, 120, 1e18, type(uint256).max, type(uint256).max);
+        vm.prank(address(manager));
+        vm.expectRevert(OtterLiquidityVault.ConcentratedExecutionUnavailable.selector);
+        hook.beforeSwap(address(settlement), otterKey, SWAP_PARAMS, ZERO_BYTES);
+    }
+
+    function test_removingConcentratedPositionRestoresLegacyAdmission() public {
+        uint256 id = vault.createPosition(otterKey, 120, 240, 1e18, type(uint256).max, type(uint256).max);
+        vault.removeLiquidity(id, 1e18, 0, 0);
+        assertEq(vault.concentratedPositions(PoolId.unwrap(otterId)), 0);
+        _submitActiveOrder();
+    }
+
+    function test_rangesMustMatchTickSpacing() public {
+        (PoolKey memory key60,) = initPool(currency0, currency1, IHooks(address(hook)), 0, 60, SQRT_PRICE_1_1);
+        vm.expectRevert(OtterLiquidityVault.InvalidRange.selector);
+        vault.createPosition(key60, -121, 120, 1e18, type(uint256).max, type(uint256).max);
+        vault.createPosition(key60, -120, 120, 1e18, type(uint256).max, type(uint256).max);
+        vault.createPosition(
+            key60, TickMath.minUsableTick(60), TickMath.maxUsableTick(60), 1e18, type(uint256).max, type(uint256).max
         );
     }
 
-    /// A one-sided range (e.g. a limit-order-style position skewed to one side)
-    /// is exactly as disallowed as a symmetric narrow one — either tick alone
-    /// being off the full range must revert.
-    function test_oneSidedRangeAddIsRejected() public {
-        vm.expectRevert(_wrappedNotFullRange(TICK_LOWER, TICK_UPPER - 1, TICK_LOWER, TICK_UPPER));
-        modifyLiquidityRouter.modifyLiquidity(
-            otterKey,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: TICK_LOWER,
-                tickUpper: TICK_UPPER - 1,
-                liquidityDelta: 1e20,
-                salt: 0
-            }),
-            ZERO_BYTES
-        );
-    }
-
-    /// The required range is derived from `key.tickSpacing`, not hardcoded — a
-    /// pool at a different spacing has a different full range, and the gate
-    /// must track it rather than silently requiring the tickSpacing-1 range at
-    /// every pool.
-    function test_gateTracksTickSpacing() public {
-        int24 spacing = 60;
-        (PoolKey memory key60,) = initPool(currency0, currency1, IHooks(address(hook)), 0, spacing, SQRT_PRICE_1_1);
-        int24 lo60 = TickMath.minUsableTick(spacing);
-        int24 hi60 = TickMath.maxUsableTick(spacing);
-
-        // The tickSpacing=1 full range is not a valid range at tickSpacing=60.
-        vm.expectRevert(_wrappedNotFullRange(TICK_LOWER, TICK_UPPER, lo60, hi60));
-        modifyLiquidityRouter.modifyLiquidity(
-            key60,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: TICK_LOWER,
-                tickUpper: TICK_UPPER,
-                liquidityDelta: 1e20,
-                salt: 0
-            }),
-            ZERO_BYTES
-        );
-
-        // The actual full range at spacing 60 is accepted.
-        modifyLiquidityRouter.modifyLiquidity(
-            key60,
-            IPoolManager.ModifyLiquidityParams({tickLower: lo60, tickUpper: hi60, liquidityDelta: 1e20, salt: 0}),
-            ZERO_BYTES
-        );
-    }
-
-    /// Removing from the (only ever full-range) position must still work — the
-    /// gate must not have accidentally blocked `beforeRemoveLiquidity`, which v4
-    /// never even routes through it (see the LIQUIDITY GATE note), but this
-    /// pins the end-to-end behaviour rather than trusting that reasoning alone.
-    function test_removingFullRangeLiquidityStillWorks() public {
-        modifyLiquidityRouter.modifyLiquidity(
-            otterKey,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: TICK_LOWER,
-                tickUpper: TICK_UPPER,
-                liquidityDelta: -1e20,
-                salt: 0
-            }),
-            ZERO_BYTES
-        );
-    }
-
-    // ------------------------------------------------------------------
-    // virtual reserves
-    // ------------------------------------------------------------------
-
-    function test_virtualReservesSatisfyConstantProduct() public view {
-        (uint160 sqrtPriceX96,,,) = manager.getSlot0(otterId);
-        uint128 L = manager.getLiquidity(otterId);
-        (uint256 r0, uint256 r1) = OtterPoolMath.virtualReserves(sqrtPriceX96, L);
-
-        console2.log("sqrtPriceX96", uint256(sqrtPriceX96));
-        console2.log("liquidity   ", uint256(L));
-        console2.log("r0          ", r0);
-        console2.log("r1          ", r1);
-
-        // at 1:1 the two virtual reserves coincide
-        assertApproxEqRel(r0, r1, 1e12, "1:1 price should give equal reserves");
-
-        // r0 * r1 == L^2, within rounding
-        uint256 k = r0 * r1;
-        uint256 lSquared = uint256(L) * uint256(L);
-        assertApproxEqRel(k, lSquared, 1e12, "r0*r1 must equal L^2");
+    function test_virtualReservesSatisfyConstantProductWithinConstantLiquidity() public view {
+        (uint160 price,,,) = manager.getSlot0(otterId);
+        uint128 liquidity = manager.getLiquidity(otterId);
+        (uint256 r0, uint256 r1) = OtterPoolMath.virtualReserves(price, liquidity);
+        assertApproxEqRel(r0, r1, 1e12);
+        assertApproxEqRel(r0 * r1, uint256(liquidity) * liquidity, 1e12);
     }
 
     function testFuzz_virtualReservesTrackPrice(uint96 rawLiquidity) public pure {
-        uint128 L = uint128(bound(uint256(rawLiquidity), 1e12, type(uint96).max));
-        uint160 p = uint160(1 << 96); // 1:1
-        (uint256 r0, uint256 r1) = OtterPoolMath.virtualReserves(p, L);
-        assertEq(r0, uint256(L));
-        assertEq(r1, uint256(L));
+        uint128 liquidity = uint128(bound(uint256(rawLiquidity), 1e12, type(uint96).max));
+        (uint256 r0, uint256 r1) = OtterPoolMath.virtualReserves(uint160(1 << 96), liquidity);
+        assertEq(r0, liquidity);
+        assertEq(r1, liquidity);
     }
 }

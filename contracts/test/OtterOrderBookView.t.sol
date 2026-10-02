@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 import {OtterOrderBook} from "../src/OtterOrderBook.sol";
+import {MockLiquidityGuard} from "./utils/MockLiquidityGuard.sol";
 
 /// @notice Covers `openBatchId`, which nothing else calls.
 ///
@@ -27,10 +28,11 @@ contract OtterOrderBookViewTest is Test {
         book.setSettlement(address(0x5E77));
         alice = vm.addr(alicePk);
 
+        address liquidityGuard = address(new MockLiquidityGuard());
         currency0 = new MockERC20("TEST0", "T0", 18);
         currency1 = new MockERC20("TEST1", "T1", 18);
         vm.prank(address(0x5E77));
-        book.registerPoolCurrencies(POOL, address(currency0), address(currency1));
+        book.registerPoolCurrencies(POOL, address(currency0), address(currency1), liquidityGuard);
 
         currency0.mint(alice, 100_000_000e18);
         vm.prank(alice);
@@ -58,6 +60,8 @@ contract OtterOrderBookViewTest is Test {
     function _consume(uint256 batchId, OtterOrderBook.Order[] memory os) internal {
         vm.prank(address(0x5E77));
         book.consume(POOL, batchId, os);
+        vm.prank(address(0x5E77));
+        book.completeExecution(POOL);
     }
 
     function _append(OtterOrderBook.Order[] memory existing, OtterOrderBook.Order[] memory one)

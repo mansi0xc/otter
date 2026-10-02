@@ -8,12 +8,14 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
-import {PoolModifyLiquidityTest} from "@uniswap/v4-core/src/test/PoolModifyLiquidityTest.sol";
 import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
+import {ERC20} from "solmate/src/tokens/ERC20.sol";
+import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 
 import {OtterHook} from "../src/OtterHook.sol";
 import {OtterOrderBook} from "../src/OtterOrderBook.sol";
 import {OtterSettlement} from "../src/OtterSettlement.sol";
+import {OtterLiquidityVault} from "../src/OtterLiquidityVault.sol";
 import {HookMiner} from "../test/utils/HookMiner.sol";
 
 /// @title Deploy
@@ -124,28 +126,17 @@ contract Deploy is Script {
         settlement.registerPool(key);
 
         // --- liquidity ------------------------------------------------
-        // PoolModifyLiquidityTest ships in v4-core's src/test. It is a testnet
-        // convenience: with v4-periphery dropped (CORRECTIONS.md C9) there is no
-        // PositionManager here, and Otter needs exactly one full-range position.
-        // Do not use this on mainnet.
-        PoolModifyLiquidityTest lpRouter = new PoolModifyLiquidityTest(manager);
-        MockERC20(Currency.unwrap(currency0)).approve(address(lpRouter), type(uint256).max);
-        MockERC20(Currency.unwrap(currency1)).approve(address(lpRouter), type(uint256).max);
-
-        lpRouter.modifyLiquidity(
-            key,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: TICK_LOWER,
-                tickUpper: TICK_UPPER,
-                liquidityDelta: int256(liquidity),
-                salt: 0
-            }),
-            ""
-        );
+        OtterLiquidityVault vault = hook.liquidityVault();
+        require(liquidity > 0 && liquidity <= vault.MAX_POOL_LIQUIDITY(), "unsupported liquidity");
+        SafeTransferLib.safeApprove(ERC20(Currency.unwrap(currency0)), address(vault), liquidity);
+        SafeTransferLib.safeApprove(ERC20(Currency.unwrap(currency1)), address(vault), liquidity);
+        uint256 positionId = vault.createPosition(key, TICK_LOWER, TICK_UPPER, uint128(liquidity), liquidity, liquidity);
 
         vm.stopBroadcast();
 
-        _report(key, book, settlement, hook, lpRouter, window, refundDelay, liquidity, solver, exclusivityWindow);
+        _report(key, book, settlement, hook, vault, window, refundDelay, liquidity, solver, exclusivityWindow);
+        console2.log("LP position ID ", positionId);
+        console2.log("LP owner       ", deployer);
     }
 
     function _resolveTokens(address deployer, uint256 liquidity)
@@ -175,7 +166,7 @@ contract Deploy is Script {
         OtterOrderBook book,
         OtterSettlement settlement,
         OtterHook hook,
-        PoolModifyLiquidityTest lpRouter,
+        OtterLiquidityVault vault,
         uint64 window,
         uint64 refundDelay,
         uint256 liquidity,
@@ -191,7 +182,7 @@ contract Deploy is Script {
         console2.log("OtterSettlement", address(settlement));
         console2.log("OtterHook      ", address(hook));
         console2.log("  permissions  ", uint256(uint160(address(hook)) & Hooks.ALL_HOOK_MASK));
-        console2.log("lpRouter       ", address(lpRouter));
+        console2.log("LiquidityVault ", address(vault));
         console2.log("currency0      ", Currency.unwrap(key.currency0));
         console2.log("currency1      ", Currency.unwrap(key.currency1));
         console2.log("window (s)     ", window);

@@ -18,7 +18,7 @@ At each checkpoint:
 3. Ask the user to create the commit and stop work at that checkpoint. Do not begin the next step or perform further edits while the commit is pending.
 4. After the user confirms completion, inspect Git status and HEAD to establish the new baseline, then continue. Preserve unrelated changes.
 
-Checkpoint 0 is complete in the user's commit `63ec94e`. The user's commit also includes their corrections document; preserve it. Checkpoint 1 is the current commit handoff. Do not begin contract edits while that commit is pending.
+Checkpoint 0 is complete in the user's commit `63ec94e`. The user's commit also includes their corrections document; preserve it. Checkpoint 1 is complete in the user's commit `a7637a9`. Step 2 is split into reviewable code checkpoints: 2A for LP custody/integration, then 2B for trader native/ERC20 escrow. Do not proceed past either pending user commit.
 
 ## Implementation sequence
 
@@ -117,4 +117,8 @@ Suggested explanation:
 
 > Define native ETH escrow, tick-aware execution, authenticated LP custody, independent claims, queued exits, and historical reward accounting. Map findings to regression requirements and identify the discrete-mechanism and verification gates before canonical settlement changes.
 
-Status: specification prepared; awaiting the user's checkpoint 1 commit. No production source changed and no finding is closed yet. Next work is step 2, subject to the same user-created commit protocol.
+Status: committed by the user as `a7637a9`. The working tree was clean before starting checkpoint 2A.
+
+## Checkpoint 2A: authenticated LP custody
+
+See [the code checkpoint report](./CHECKPOINT_2A.md) for scope, acceptance evidence, limitations, and the user-created commit handoff. This slice replaces the shared test-router position with an owner-authenticated vault, credits LP exits/fees without recipient transfers, and protects the economic freeze during callbacks. Native and concentrated LP custody is implemented; native trader escrow is checkpoint 2B, and concentrated batch execution remains blocked pending step 4. Step 2 is not complete until 2B passes its acceptance checks.

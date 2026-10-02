@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {IOtterLiquidityGuard} from "./interfaces/IOtterLiquidityGuard.sol";
+
 /// @title OtterOrderBook
 /// @notice Collects signed orders into per-pool batch windows and escrows the
 ///         funds they sell.
@@ -21,8 +23,8 @@ pragma solidity 0.8.26;
 ///    one detectable on-chain.
 ///
 ///    The digest commits to a sequence, not a set, so settlement must replay in
-///    submission order. That is not a constraint on the outcome: the mechanism is
-///    order-insensitive by construction and the solver test suite asserts it.
+///    submission order. This establishes committed membership; it does not prove
+///    canonical payments or arrival-independent allocation (see R2 and R6).
 ///
 /// 3. ESCROW. `submit` pulls each order's full `budget` in the token it sells,
 ///    into this contract, before the order is ever eligible to be filled. This
@@ -135,6 +137,8 @@ contract OtterOrderBook {
     ///         Zero until `registerPoolCurrencies` is called for that pool.
     mapping(bytes32 poolId => address) public currency0Of;
     mapping(bytes32 poolId => address) public currency1Of;
+    mapping(bytes32 poolId => address) public liquidityGuardOf;
+    mapping(bytes32 poolId => bool) public executionInProgress;
 
     /// Permit2-style unordered nonces: 256 nonces share one slot, so a trader
     /// submitting repeatedly pays one cold SSTORE per 256 orders rather than each.
@@ -178,6 +182,8 @@ contract OtterOrderBook {
     error ZeroCurrency();
     error TransferFailed();
     error ReentrantCall();
+    error InvalidLiquidityGuard();
+    error NotExecuting();
 
     event PoolRegistered(bytes32 indexed poolId, address currency0, address currency1);
 
@@ -210,12 +216,14 @@ contract OtterOrderBook {
     /// @notice Register the two tokens a pool trades, so `submit` can escrow
     ///         against it. Callable once per pool, only by `settlement` (which
     ///         holds the v4 `PoolKey` this `poolId` was derived from).
-    function registerPoolCurrencies(bytes32 poolId, address currency0, address currency1) external {
+    function registerPoolCurrencies(bytes32 poolId, address currency0, address currency1, address liquidityGuard) external {
         if (msg.sender != settlement) revert NotSettlement();
         if (currency0Of[poolId] != address(0)) revert PoolAlreadyRegistered();
         if (currency0 == address(0) || currency1 == address(0)) revert ZeroCurrency();
+        if (liquidityGuard.code.length == 0) revert InvalidLiquidityGuard();
         currency0Of[poolId] = currency0;
         currency1Of[poolId] = currency1;
+        liquidityGuardOf[poolId] = liquidityGuard;
         emit PoolRegistered(poolId, currency0, currency1);
     }
 
@@ -250,6 +258,7 @@ contract OtterOrderBook {
     /// @dev View-only variant of the rollover in `submit`, for off-chain callers.
     function openBatchId(bytes32 poolId) public view returns (uint256 id, uint64 closesAt) {
         id = currentBatchId[poolId];
+        if (executionInProgress[poolId]) revert PreviousBatchUnsettled(id);
         Batch memory b = batches[poolId][id];
         if (b.closesAt == 0 || block.timestamp >= b.closesAt) {
             if (b.closesAt != 0 && !b.settled) revert PreviousBatchUnsettled(id);
@@ -275,6 +284,7 @@ contract OtterOrderBook {
         address c0 = currency0Of[poolId];
         address c1 = currency1Of[poolId];
         if (c0 == address(0)) revert PoolNotRegistered();
+        IOtterLiquidityGuard(liquidityGuardOf[poolId]).assertBatchSupported(poolId);
 
         batchId = _rollover(poolId);
 
@@ -310,6 +320,7 @@ contract OtterOrderBook {
 
     function _rollover(bytes32 poolId) private returns (uint256 id) {
         id = currentBatchId[poolId];
+        if (executionInProgress[poolId]) revert PreviousBatchUnsettled(id);
         Batch storage b = batches[poolId][id];
         if (b.closesAt == 0) {
             b.closesAt = uint64(block.timestamp) + windowLength;
@@ -368,7 +379,23 @@ contract OtterOrderBook {
         replay(poolId, batchId, orders);
 
         b.settled = true;
+        executionInProgress[poolId] = true;
         emit BatchSettled(poolId, batchId, b.count);
+    }
+
+    /// @dev Keep LP custody frozen through all settlement token callbacks, even
+    /// after consume has marked the batch spent. Completion itself transfers no
+    /// tokens and is called only after the complete settlement succeeds.
+    function completeExecution(bytes32 poolId) external {
+        if (msg.sender != settlement) revert NotSettlement();
+        if (!executionInProgress[poolId]) revert NotExecuting();
+        executionInProgress[poolId] = false;
+    }
+
+    function isBatchActive(bytes32 poolId) external view returns (bool) {
+        Batch memory b = batches[poolId][currentBatchId[poolId]];
+        return _reentrancyLock != 1 || executionInProgress[poolId]
+            || (b.closesAt != 0 && b.count != 0 && !b.settled);
     }
 
     /// @notice Refund every order in a committed batch that was not settled in

@@ -51,7 +51,7 @@ These are conservative starting limits to implement and benchmark, **not measure
 | Sum of all position liquidity in a pool | At most `2^88 - 1`, including inactive ranges | Bound liquidity and signed crossing arithmetic |
 | Executable sqrt price | `2^64 <= sqrtPriceX96 < 2^128`, also strictly inside core's legal swap limits | Give an explicit supported raw price interval, including ordinary 6/18 decimal pairs |
 | Bitmap words visited by a swap trace | At most 16; count empty words too | Bound traversal, including liquidity gaps |
-| Currency amount credited/debited in a successful operation | At most `2^120 - 1` and representable by the relevant core signed delta | Keep transfers, payouts, and casts within a checked domain |
+| Ordinary principal, quote amount, or individual claim | At most `2^120 - 1` and representable by the relevant core signed delta; unsolicited fee credits may exceed that operation cap and be claimed in chunks | Keep transfers and casts bounded without letting external donations or accumulated claims veto exits |
 | Signature byte length | Bounded at admission; initial cap 512 bytes | Bound smart-wallet validation input |
 
 Do not cast first and validate later. Check aggregate amounts, quote outputs, netting, reward weights, and manager deltas before narrowing. A pool outside the price/liquidity domain cannot open a batch. Configured price limits constrain execution; full-range positions may extend beyond those execution limits. The exact quote defines the available capacity before a price or traversal limit. Amounts above that capacity are not assumed consumed.
@@ -182,7 +182,7 @@ Three gates remain. These are technical acceptance gates, not requests for anoth
 
 **G3 — Choose enforceable verification within measured resources.** Begin by benchmarking direct recomputation on bounded batches and traces, including counterfactuals. If it cannot fit, lower measured limits or specify a complete authenticated witness/proof design. The witness must bind G1's full computation and G2's real curve, not just feasibility or welfare. Do not introduce a TEE, bond, or optimistic dispute period and call it equivalent to immediate trustless verification. Any changed trust/delivery model requires a revised specification and disclosed funding scope.
 
-Custody, independent recovery, and the exact quote can proceed while these gates are researched. Step 5 cannot be considered complete until G1–G3 have an implementation-ready rule and acceptance evidence. If the extension fails a claimed incentive property, report that result and adjust the claim; do not hide it with more randomized passing tests.
+Custody, independent recovery, and the exact quote can proceed while these gates are researched. During their implementation, concentrated positions may be custodied, but admission and swaps must reject concentrated pools before escrow until their execution model is supported. Step 5 cannot be considered complete until G1–G3 have an implementation-ready rule and acceptance evidence. If the extension fails a claimed incentive property, report that result and adjust the claim; do not hide it with more randomized passing tests.
 
 ## 8. Regression ownership and acceptance evidence
 

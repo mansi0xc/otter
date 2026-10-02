@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import {Test, console2} from "forge-std/Test.sol";
 import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 import {OtterOrderBook} from "../src/OtterOrderBook.sol";
+import {MockLiquidityGuard} from "./utils/MockLiquidityGuard.sol";
 
 contract OtterOrderBookTest is Test {
     OtterOrderBook book;
@@ -27,12 +28,13 @@ contract OtterOrderBookTest is Test {
         alice = vm.addr(alicePk);
         bob = vm.addr(bobPk);
 
+        address liquidityGuard = address(new MockLiquidityGuard());
         currency0 = new MockERC20("TEST0", "T0", 18);
         currency1 = new MockERC20("TEST1", "T1", 18);
         vm.prank(settlement);
-        book.registerPoolCurrencies(POOL, address(currency0), address(currency1));
+        book.registerPoolCurrencies(POOL, address(currency0), address(currency1), liquidityGuard);
         vm.prank(settlement);
-        book.registerPoolCurrencies(OTHER_POOL, address(currency0), address(currency1));
+        book.registerPoolCurrencies(OTHER_POOL, address(currency0), address(currency1), liquidityGuard);
 
         _fund(alice);
         _fund(bob);
@@ -264,6 +266,8 @@ contract OtterOrderBookTest is Test {
 
         vm.prank(settlement);
         book.consume(POOL, first, os);
+        vm.prank(settlement);
+        book.completeExecution(POOL);
         uint256 second = book.submit(os2, sigs2);
 
         assertEq(second, first + 1, "window should roll");
@@ -359,6 +363,8 @@ contract OtterOrderBookTest is Test {
             vm.warp(block.timestamp + WINDOW); // fresh batch each round
             vm.prank(settlement);
             book.consume(POOL, s, os);
+            vm.prank(settlement);
+            book.completeExecution(POOL);
         }
     }
 }

@@ -12,45 +12,23 @@ import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {FixedPointMathLib} from "solmate/src/utils/FixedPointMathLib.sol";
 
 import {OtterMath} from "./OtterMath.sol";
-import {OtterPoolMath} from "./OtterHook.sol";
+import {OtterHook, OtterPoolMath} from "./OtterHook.sol";
 import {OtterOrderBook} from "./OtterOrderBook.sol";
 
 /// @title OtterSettlement
 /// @notice Settles one Otter batch: validates the solver's proposed outcome, runs
 ///         the residual imbalance through the v4 pool, and distributes.
 ///
-/// TRUST MODEL — read this before believing anything about the guarantees.
+/// TRUST MODEL: this remains the legacy feasibility verifier. It does not
+/// enforce the canonical allocation or pivot payments, and minority dust can
+/// violate integer IR. A solver can choose a lower feasible trader payment and
+/// divert the residual to LPs it controls. Exclusivity selects a caller; it does
+/// not resolve that economic discretion. See the review and specification gates.
 ///
-/// The solver computes the allocation and the Clarke pivots off-chain. This
-/// contract verifies feasibility, individual rationality, budget bounds, minority
-/// pricing, dominance, and that the pool actually yielded enough to cover every
-/// obligation. It does NOT verify that the allocation maximises welfare — that is
-/// asserted by the solver. A dishonest solver cannot steal funds or pay a user
-/// less than their reported value, but it can propose a suboptimal allocation.
-/// Recomputation on-chain, fraud proofs, or a TEE would close this; none are
-/// implemented. Stated in the README as a limitation, not buried.
-///
-/// `settle` itself is exclusive to `solver` for `exclusivityWindow` seconds after
-/// a batch's window closes, then permissionless. This is not a second, separate
-/// trust assumption on top of the one above — it is a fix for one this contract
-/// would otherwise reintroduce. `verify` bounds a proposed outcome, it does not
-/// pick a unique one: an all-zero allocation, or one that fills only the minimum
-/// required to pass every check, is feasible and passes every check just as
-/// legitimately as an optimal one, and dumps the difference into the burn (see
-/// CORRECTIONS.md). Fully permissionless settlement lets whoever is fastest
-/// choose which feasible outcome executes, which is exactly the kind of race
-/// this mechanism exists to remove from trading. Exclusivity does not make the
-/// solver trusted with anything it doesn't already touch — `verify` still runs
-/// against whatever outcome it submits — it just means the party with an
-/// incentive to submit the fully-optimal one gets there first.
-///
-/// SCOPE
-/// - ERC20 pairs only. Native ETH is not supported; `Currency.isAddressZero()`
-///   pools will revert on the pull, which is deliberate rather than silent.
-/// - Traders approve `orderBook`, not this contract, for the token they are
-///   selling — funds are escrowed at `submit`, not pulled here. See
-///   OtterOrderBook's ESCROW note.
-/// - The pool must be a zero-fee, single full-range position — see OtterPoolMath.
+/// SCOPE: ERC20 batch settlement with zero-fee, full-range liquidity. The vault
+/// supports native/range custody, but native trader escrow is a later checkpoint
+/// and concentrated admission/swaps remain blocked until tick-aware settlement.
+/// Traders approve the order book for escrow, not this contract.
 contract OtterSettlement is IUnlockCallback {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
@@ -59,6 +37,7 @@ contract OtterSettlement is IUnlockCallback {
     IPoolManager public immutable poolManager;
     OtterOrderBook public immutable orderBook;
     address public immutable owner;
+    uint256 private _reentrancyLock = 1;
 
     /// @notice The sole hook implementation whose pools may be registered. It is
     ///         set once after deployment because the hook constructor itself
@@ -69,18 +48,8 @@ contract OtterSettlement is IUnlockCallback {
     ///         window after a batch's window closes. After the window elapses,
     ///         `settle` is permissionless — anyone can and should call it if the
     ///         solver goes offline, so a batch can never be stuck forever.
-    /// @dev EXCLUSIVITY, not gatekeeping: this address never decides an
-    ///      allocation and never touches funds it isn't itself owed — `settle`
-    ///      still runs every check in the TRUST MODEL note above no matter who
-    ///      calls it. It only decides who gets first crack at paying the gas.
-    ///      Without it, `settle` is fully permissionless from t=closesAt, and
-    ///      a searcher can win the race to submit a WORSE-for-everyone-but-itself
-    ///      feasible outcome — see CORRECTIONS.md. Immutable rather than
-    ///      owner-rotatable: this is the hackathon-scope version of that fix, not
-    ///      the production one. A single fixed key that goes offline needs a
-    ///      redeploy to replace; a permissioned solver SET, or a bond-and-slash
-    ///      scheme, would remove that dependency without reintroducing the race.
-    ///      Neither is implemented.
+    /// @dev Immutable prototype caller preference. This does not prove the
+    /// submitted allocation or payments are canonical; R2 remains open.
     address public immutable solver;
 
     /// @notice Seconds after a batch's window closes during which only `solver`
@@ -92,28 +61,11 @@ contract OtterSettlement is IUnlockCallback {
     ///         denominated in, because which token the surplus lands in depends
     ///         on which side was dominant in the batch that produced it.
     ///
-    /// SURPLUS REDISTRIBUTION — §3.6 lists LP rewards first among the permitted
-    /// destinations, and this is the destination that makes the pool better off
-    /// rather than merely making an address richer.
-    ///
-    /// The surplus is donated with a ONE-BATCH LAG: settling batch N donates
-    /// whatever batch N-1 and earlier left behind, and batch N's own surplus is
-    /// added to the pot for the next settlement to move. The lag is the whole
-    /// point. Theorem 22 permits a payment out of the mechanism only if it is
-    /// independent of the current batch's outcome; donating batch N's own
-    /// surplus inside batch N would make an LP-bidder's payout a function of its
-    /// own report, which is exactly the outcome-dependent transfer the theorem
-    /// rules out. The lagged pot is fixed before batch N's reports exist.
-    ///
-    /// Honest limitation, stated rather than buried: the lag removes
-    /// within-batch outcome dependence, not cross-batch. A bidder who is also an
-    /// LP can still raise batch N's surplus by accepting less compensation, and
-    /// see a share of it back at batch N+1. That deviation costs one unit of
-    /// compensation to recover its liquidity share of one unit, so it is
-    /// strictly unprofitable for any LP holding less than the entire pool, and
-    /// break-even only for an LP that holds all of it. The paper's guarantees
-    /// are stated per batch and are untouched; this is a weaker cross-batch
-    /// statement that the paper does not make and neither do we.
+    /// Legacy distribution: a subsequent settlement or flush donates this
+    /// pot to the liquidity present at that time. Newly arrived LPs can capture
+    /// it, and caller/LP overlap can exploit payment discretion. The vault's
+    /// principal/fee claims do not supply historical batch reward eligibility;
+    /// R7 remains open until the snapshot reward ledger replaces this policy.
     mapping(PoolId poolId => mapping(Currency currency => uint256)) public pendingSurplus;
 
     /// @param dominantSellsCurrency0 which side of the book is the dominant side
@@ -151,6 +103,14 @@ contract OtterSettlement is IUnlockCallback {
     error InvalidHook(address supplied);
     error NonZeroFee(uint24 fee);
     error NativeCurrencyUnsupported();
+    error ReentrantCall();
+
+    modifier nonReentrant() {
+        if (_reentrancyLock != 1) revert ReentrantCall();
+        _reentrancyLock = 2;
+        _;
+        _reentrancyLock = 1;
+    }
 
     /// @notice The modelled burn (F~s(Y) - sum x*_i) alongside what was actually
     ///         realised. They differ by the part of the discretisation allowance
@@ -202,7 +162,8 @@ contract OtterSettlement is IUnlockCallback {
         if (key.fee != 0) revert NonZeroFee(key.fee);
         if (key.currency0.isAddressZero() || key.currency1.isAddressZero()) revert NativeCurrencyUnsupported();
         orderBook.registerPoolCurrencies(
-            PoolId.unwrap(key.toId()), Currency.unwrap(key.currency0), Currency.unwrap(key.currency1)
+            PoolId.unwrap(key.toId()), Currency.unwrap(key.currency0), Currency.unwrap(key.currency1),
+            address(OtterHook(address(key.hooks)).liquidityVault())
         );
     }
 
@@ -215,7 +176,7 @@ contract OtterSettlement is IUnlockCallback {
         uint256 batchId,
         OtterOrderBook.Order[] calldata orders,
         Outcome calldata outcome
-    ) external {
+    ) external nonReentrant {
         uint256 n = orders.length;
         if (n == 0) revert EmptyBatch();
         if (outcome.y.length != n || outcome.x.length != n) revert LengthMismatch();
@@ -259,6 +220,8 @@ contract OtterSettlement is IUnlockCallback {
         // outcome owes, so it absorbs any unused discretisation allowance.
         uint256 realisedBurn =
             _executeAndDistribute(key, orders, outcome, totalIn, minorityPaid, dMinority, totalPaid);
+
+        orderBook.completeExecution(poolId);
 
         emit Settled(
             key.toId(), batchId, outcome.dominantSellsCurrency0, totalIn, totalPaid, realisedBurn
@@ -429,10 +392,9 @@ contract OtterSettlement is IUnlockCallback {
     ///      problem and it applies to the donation inside `settle` too. It costs
     ///      the batch's traders nothing — the surplus is already theirs to give
     ///      up — but it does defeat the intent of paying LPs who actually carried
-    ///      the pool. Vesting the donation over a window, or paying it into a
-    ///      fixed protocol-owned position, would close it. Neither is
-    ///      implemented.
-    function flushSurplus(PoolKey calldata key) external {
+    ///      the pool. Historical eligibility or a specified independent
+    ///      destination is needed; a delay or vesting alone does not fix it.
+    function flushSurplus(PoolKey calldata key) external nonReentrant {
         PoolId id = key.toId();
         uint256 donate0 = pendingSurplus[id][key.currency0];
         uint256 donate1 = pendingSurplus[id][key.currency1];

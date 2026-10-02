@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-// Review reproductions: PASS means the documented unsafe behavior exists.
-// Local tests only; no deployment or production contract changes.
+// R1 is now a prevention regression. Other review reproductions still assert
+// unsafe behavior and remain open until their owning remediation step lands.
 import {OtterSettlementTest, IERC20Minimal} from "./OtterSettlement.t.sol";
 import {OtterOrderBookTest} from "./OtterOrderBook.t.sol";
 import {OtterOrderBook} from "../src/OtterOrderBook.sol";
 import {OtterSettlement} from "../src/OtterSettlement.sol";
 import {OtterMath} from "../src/OtterMath.sol";
+import {OtterHook} from "../src/OtterHook.sol";
+import {OtterLiquidityVault} from "../src/OtterLiquidityVault.sol";
+import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {CustomRevert} from "@uniswap/v4-core/src/libraries/CustomRevert.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolIdLibrary, PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
@@ -18,16 +22,19 @@ contract GrantReviewSettlementTest is OtterSettlementTest {
     using PoolIdLibrary for *;
     using StateLibrary for IPoolManager;
 
-    function test_review_UnauthorizedRouterWithdrawal() public {
+    function test_review_UnauthorizedRouterWithdrawalIsRejected() public {
         address attacker = address(0xBAD);
-        assertEq(IERC20Minimal(Currency.unwrap(currency0)).balanceOf(attacker), 0);
+        vm.expectRevert(abi.encodeWithSelector(CustomRevert.WrappedError.selector, address(hook),
+            IHooks.beforeRemoveLiquidity.selector,
+            abi.encodeWithSelector(OtterHook.VaultOnly.selector, address(modifyLiquidityRouter)),
+            abi.encodePacked(Hooks.HookCallFailed.selector)));
         vm.prank(attacker);
         modifyLiquidityRouter.modifyLiquidity(otterKey, IPoolManager.ModifyLiquidityParams({
             tickLower: TICK_LOWER, tickUpper: TICK_UPPER, liquidityDelta: -int256(1e21), salt: 0
         }), ZERO_BYTES);
-        assertGt(IERC20Minimal(Currency.unwrap(currency0)).balanceOf(attacker), 999e18);
-        assertGt(IERC20Minimal(Currency.unwrap(currency1)).balanceOf(attacker), 999e18);
-        assertEq(manager.getLiquidity(otterId), 0);
+        assertEq(IERC20Minimal(Currency.unwrap(currency0)).balanceOf(attacker), 0);
+        assertEq(IERC20Minimal(Currency.unwrap(currency1)).balanceOf(attacker), 0);
+        assertEq(manager.getLiquidity(otterId), 1e21);
     }
 
     function test_review_ExpiredOrderCanStillSettle() public {
@@ -66,7 +73,7 @@ contract GrantReviewSettlementTest is OtterSettlementTest {
         assertGt(pot, 8e18);
         settlement.flushSurplus(otterKey);
         uint256 before = IERC20Minimal(Currency.unwrap(currency1)).balanceOf(address(this));
-        modifyLiquidityRouter.modifyLiquidity(otterKey, IPoolManager.ModifyLiquidityParams({
+        _modifyLiquidity(otterKey, IPoolManager.ModifyLiquidityParams({
             tickLower: TICK_LOWER, tickUpper: TICK_UPPER, liquidityDelta: 0, salt: 0
         }), ZERO_BYTES);
         uint256 collected = IERC20Minimal(Currency.unwrap(currency1)).balanceOf(address(this)) - before;
@@ -96,7 +103,7 @@ contract GrantReviewSettlementTest is OtterSettlementTest {
     function test_review_MinorityCanReceiveZeroBelowItsAsk() public {
         (otterKey, otterId) = initPool(currency0, currency1, IHooks(address(hook)), 0, 2, SQRT_PRICE_1_1 * 2);
         settlement.registerPool(otterKey);
-        modifyLiquidityRouter.modifyLiquidity(otterKey, IPoolManager.ModifyLiquidityParams({
+        _modifyLiquidity(otterKey, IPoolManager.ModifyLiquidityParams({
             tickLower: TICK_LOWER, tickUpper: TICK_UPPER, liquidityDelta: 1e21, salt: 0
         }), ZERO_BYTES);
         OtterOrderBook.Order[] memory os = new OtterOrderBook.Order[](2);
@@ -132,22 +139,17 @@ contract GrantReviewSettlementTest is OtterSettlementTest {
         address attacker = address(0xBADE);
         _fund(currency0, attacker, 20000e18);
         _fund(currency1, attacker, 20000e18);
+        OtterLiquidityVault vault = hook.liquidityVault();
         vm.startPrank(attacker);
-        IERC20Minimal(Currency.unwrap(currency0)).approve(address(modifyLiquidityRouter), type(uint256).max);
-        IERC20Minimal(Currency.unwrap(currency1)).approve(address(modifyLiquidityRouter), type(uint256).max);
-        modifyLiquidityRouter.modifyLiquidity(otterKey, IPoolManager.ModifyLiquidityParams({
-            tickLower: TICK_LOWER, tickUpper: TICK_UPPER, liquidityDelta: 9e21, salt: bytes32(uint256(1))
-        }), ZERO_BYTES);
+        IERC20Minimal(Currency.unwrap(currency0)).approve(address(vault), type(uint256).max);
+        IERC20Minimal(Currency.unwrap(currency1)).approve(address(vault), type(uint256).max);
+        uint256 lpId = vault.createPosition(otterKey, TICK_LOWER, TICK_UPPER, 9e21, type(uint256).max, type(uint256).max);
         settlement.flushSurplus(otterKey);
-        uint256 before = IERC20Minimal(Currency.unwrap(currency1)).balanceOf(attacker);
-        modifyLiquidityRouter.modifyLiquidity(otterKey, IPoolManager.ModifyLiquidityParams({
-            tickLower: TICK_LOWER, tickUpper: TICK_UPPER, liquidityDelta: 0, salt: bytes32(uint256(1))
-        }), ZERO_BYTES);
-        uint256 reward = IERC20Minimal(Currency.unwrap(currency1)).balanceOf(attacker) - before;
+        vault.collectFees(lpId);
+        uint256 reward = vault.claims(attacker, currency1);
         assertApproxEqAbs(reward, pot * 9 / 10, 2);
-        modifyLiquidityRouter.modifyLiquidity(otterKey, IPoolManager.ModifyLiquidityParams({
-            tickLower: TICK_LOWER, tickUpper: TICK_UPPER, liquidityDelta: -int256(9e21), salt: bytes32(uint256(1))
-        }), ZERO_BYTES);
+        vault.claim(currency1, reward, attacker);
+        vault.removeLiquidity(lpId, 9e21, 0, 0);
         vm.stopPrank();
     }
 }
