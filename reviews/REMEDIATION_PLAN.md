@@ -18,7 +18,7 @@ At each checkpoint:
 3. Ask the user to create the commit and stop work at that checkpoint. Do not begin the next step or perform further edits while the commit is pending.
 4. After the user confirms completion, inspect Git status and HEAD to establish the new baseline, then continue. Preserve unrelated changes.
 
-Checkpoint 0 is complete in the user's commit `63ec94e`. The user's commit also includes their corrections document; preserve it. Checkpoint 1 is complete in the user's commit `a7637a9`. Step 2 is split into reviewable code checkpoints: 2A for LP custody/integration, then 2B for trader native/ERC20 escrow. Do not proceed past either pending user commit.
+Checkpoint 0 is complete in the user's commit `63ec94e`. The user's commit also includes their corrections document; preserve it. Checkpoint 1 is complete in the user's commit `a7637a9`, and checkpoint 2A in `bc79d64`. Step 2 is split into reviewable code checkpoints: 2A for LP custody/integration, then 2B for trader native/ERC20 escrow. Do not proceed past either pending user commit.
 
 ## Implementation sequence
 
@@ -121,4 +121,20 @@ Status: committed by the user as `a7637a9`. The working tree was clean before st
 
 ## Checkpoint 2A: authenticated LP custody
 
-See [the code checkpoint report](./CHECKPOINT_2A.md) for scope, acceptance evidence, limitations, and the user-created commit handoff. This slice replaces the shared test-router position with an owner-authenticated vault, credits LP exits/fees without recipient transfers, and protects the economic freeze during callbacks. Native and concentrated LP custody is implemented; native trader escrow is checkpoint 2B, and concentrated batch execution remains blocked pending step 4. Step 2 is not complete until 2B passes its acceptance checks.
+See [the code checkpoint report](./CHECKPOINT_2A.md) for scope, acceptance evidence, limitations, and the user-created commit handoff. This slice replaces the shared test-router position with an owner-authenticated vault, credits LP exits/fees without recipient transfers, and protects the economic freeze during callbacks. Status: committed by the user as `bc79d64`; clean tree inspected before 2B. Native and concentrated LP custody is implemented. Concentrated batch execution remains blocked pending step 4.
+
+
+## Checkpoint 2B: trader assets and isolated claims
+
+See [the asset checkpoint report](./CHECKPOINT_2B.md) for implementation, API,
+validation, limits, and the user-created commit handoff. Native trader escrow,
+standard/no-return ERC20 custody, isolated refund/output claims, shared-currency
+backing, and exact PoolManager transfers are implemented locally. Nonzero
+protocol fees and incomplete input consumption explicitly reject settlement
+and preserve timeout recovery. Step 2's custody/asset acceptance is complete;
+no deployment has been performed.
+
+R4's recipient veto regression now asserts independent claims. R9's zero-fee
+policy and complete-input rejection are tested, but supported partial execution
+and the exact tick-aware quote remain pending. R3 still reproduces oversized
+atomic timeout replay. Step 3 begins only after the user commits 2B.

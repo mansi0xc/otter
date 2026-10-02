@@ -70,10 +70,7 @@ contract OtterSettlementTest is Deployers {
         _modifyLiquidity(
             otterKey,
             IPoolManager.ModifyLiquidityParams({
-                tickLower: TICK_LOWER,
-                tickUpper: TICK_UPPER,
-                liquidityDelta: 1e21,
-                salt: 0
+                tickLower: TICK_LOWER, tickUpper: TICK_UPPER, liquidityDelta: 1e21, salt: 0
             }),
             ZERO_BYTES
         );
@@ -92,24 +89,15 @@ contract OtterSettlementTest is Deployers {
     }
 
     function test_registerRejectsPoolWithoutApprovedHook() public {
-        PoolKey memory unprotected = PoolKey({
-            currency0: currency0,
-            currency1: currency1,
-            fee: 0,
-            tickSpacing: 1,
-            hooks: IHooks(address(0))
-        });
+        PoolKey memory unprotected =
+            PoolKey({currency0: currency0, currency1: currency1, fee: 0, tickSpacing: 1, hooks: IHooks(address(0))});
         vm.expectRevert(abi.encodeWithSelector(OtterSettlement.InvalidHook.selector, address(0)));
         settlement.registerPool(unprotected);
     }
 
     function test_registerRejectsNonZeroFeePool() public {
         PoolKey memory feePool = PoolKey({
-            currency0: currency0,
-            currency1: currency1,
-            fee: 3000,
-            tickSpacing: 60,
-            hooks: IHooks(address(hook))
+            currency0: currency0, currency1: currency1, fee: 3000, tickSpacing: 60, hooks: IHooks(address(hook))
         });
         vm.expectRevert(abi.encodeWithSelector(OtterSettlement.NonZeroFee.selector, uint24(3000)));
         settlement.registerPool(feePool);
@@ -197,6 +185,7 @@ contract OtterSettlementTest is Deployers {
         vm.prank(rando);
         vm.expectRevert(abi.encodeWithSelector(OtterSettlement.NotExclusiveSolver.selector, block.timestamp + 300));
         settlement.settle(otterKey, batchId, orders, o);
+        _claimAllTraders(book, otterKey, orders);
     }
 
     /// @notice The designated solver may always settle, including at the very
@@ -209,6 +198,7 @@ contract OtterSettlementTest is Deployers {
 
         // settlement's solver is address(this) — see setUp.
         settlement.settle(otterKey, batchId, orders, o);
+        _claimAllTraders(book, otterKey, orders);
         assertEq(orders.length, 2, "sanity: batch had orders");
     }
 
@@ -223,7 +213,8 @@ contract OtterSettlementTest is Deployers {
 
         address rando = address(0xBEEF);
         vm.prank(rando);
-        settlement.settle(otterKey, batchId, orders, o); // does not revert
+        settlement.settle(otterKey, batchId, orders, o);
+        _claimAllTraders(book, otterKey, orders); // does not revert
 
         assertEq(
             IERC20Minimal(Currency.unwrap(currency1)).balanceOf(dom),
@@ -265,6 +256,7 @@ contract OtterSettlementTest is Deployers {
 
         // Settlement succeeds anyway: the funds were already escrowed at submit.
         settlement.settle(otterKey, batchId, orders, o);
+        _claimAllTraders(book, otterKey, orders);
 
         assertEq(
             IERC20Minimal(Currency.unwrap(currency1)).balanceOf(dom),
@@ -291,14 +283,11 @@ contract OtterSettlementTest is Deployers {
         uint256 minOutBefore = IERC20Minimal(Currency.unwrap(currency0)).balanceOf(min);
 
         settlement.settle(otterKey, batchId, orders, o);
+        _claimAllTraders(book, otterKey, orders);
 
+        assertEq(IERC20Minimal(Currency.unwrap(currency0)).balanceOf(dom), 0, "dominant sold its whole budget");
         assertEq(
-            IERC20Minimal(Currency.unwrap(currency0)).balanceOf(dom), 0, "dominant sold its whole budget"
-        );
-        assertEq(
-            IERC20Minimal(Currency.unwrap(currency1)).balanceOf(dom) - domOutBefore,
-            o.x[0],
-            "dominant paid exactly x*"
+            IERC20Minimal(Currency.unwrap(currency1)).balanceOf(dom) - domOutBefore, o.x[0], "dominant paid exactly x*"
         );
         assertEq(
             IERC20Minimal(Currency.unwrap(currency0)).balanceOf(min) - minOutBefore,
@@ -322,6 +311,7 @@ contract OtterSettlementTest is Deployers {
         OtterSettlement.Outcome memory o = _outcome(c, 0);
 
         settlement.settle(otterKey, batchId, orders, o);
+        _claimAllTraders(book, otterKey, orders);
         console2.log("burn at exact ceiling", settlement.pendingSurplus(otterId, currency1));
     }
 
@@ -337,6 +327,7 @@ contract OtterSettlementTest is Deployers {
 
         vm.expectRevert(abi.encodeWithSelector(OtterSettlement.MinorityFillWrong.selector, 1));
         settlement.settle(otterKey, batchId, orders, o);
+        _claimAllTraders(book, otterKey, orders);
     }
 
     function test_rejectsOverpaymentToDominant() public {
@@ -347,6 +338,7 @@ contract OtterSettlementTest is Deployers {
 
         vm.expectRevert();
         settlement.settle(otterKey, batchId, orders, o);
+        _claimAllTraders(book, otterKey, orders);
     }
 
     function test_cannotSettleTwice() public {
@@ -355,8 +347,10 @@ contract OtterSettlementTest is Deployers {
         OtterSettlement.Outcome memory o = _outcome(c, 1e15);
 
         settlement.settle(otterKey, batchId, orders, o);
+        _claimAllTraders(book, otterKey, orders);
         vm.expectRevert(OtterOrderBook.AlreadySettled.selector);
         settlement.settle(otterKey, batchId, orders, o);
+        _claimAllTraders(book, otterKey, orders);
     }
 
     function test_cannotSettleWhileWindowOpen() public {
@@ -369,6 +363,7 @@ contract OtterSettlementTest is Deployers {
         OtterMath.Curve memory c = _curve();
         vm.expectRevert(OtterOrderBook.WindowStillOpen.selector);
         settlement.settle(otterKey, batchId, orders, _outcome(c, 1e15));
+        _claimAllTraders(book, otterKey, orders);
     }
 
     /// The inclusion guarantee, end to end: a solver cannot drop an order it
@@ -389,5 +384,6 @@ contract OtterSettlementTest is Deployers {
         settlement.settle(
             otterKey, batchId, trimmed, OtterSettlement.Outcome({dominantSellsCurrency0: true, y: y1, x: x1})
         );
+        _claimAllTraders(book, otterKey, orders);
     }
 }

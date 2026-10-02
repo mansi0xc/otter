@@ -3,7 +3,7 @@
 Prepared 2 October 2026. Baseline: user-created commit `63ec94e`.
 Sources: [grant readiness review](./GRANT_READINESS_REVIEW_2026-10-02.md), [remediation plan](./REMEDIATION_PLAN.md), the pinned v4 core, and [the paper](https://arxiv.org/html/2609.03474v1).
 
-**Status: implementation contract for the remediation; no production fixes have landed at this checkpoint.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
+**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling in the local checkout; the remaining v2 state machine and mechanism are still pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
 
 The user has selected **native ETH and concentrated liquidity support now**. These belong to this remediation, including contracts, the integer solver, recovery, deployment, and wallet flows. Supporting WETH alone or removing the full-range check alone does not meet this scope.
 
@@ -25,7 +25,7 @@ Deploy v2 with a new order-signature domain/version and an explicit manifest. Ex
 ### Assets and custody
 
 - Register sorted, distinct currencies. At most currency0 can be native ETH. Nonzero currencies must contain contract code and meet the declared ERC20 support policy.
-- Support standard balance-conserving ERC20s with either a true return value or no return data. Compare the custodian's balance before and after every escrow deposit; credit exactly the signed budget only if the increase matches it.
+- Support standard balance-conserving ERC20s with either a true return value or no return data. Compare both sender debit and custodian receipt before and after every escrow deposit; credit exactly the signed budget only if both match it. Also check ERC20 debits/receipts at custodian withdrawals and PoolManager payments/takes. Native receivers may spend ETH within their receive function, so successful value delivery is the native withdrawal condition.
 - Exclude transfer-tax, rebasing, and arbitrary callback accounting semantics. A registration check cannot prove immutable behavior. If an otherwise supported token later blocks a recipient, their delivery may fail, but finalization and unrelated claims must remain possible. A token blocking Otter or PoolManager can still prevent delivery of that currency; do not claim otherwise.
 - For a payable submission, `msg.value` must equal the sum of native budgets in that call. Reject excess or missing value. A relayer can fund a trader's signed native order; the claim belongs to the signed trader, not the payer. ETH orders have no ERC20 approval step.
 - Forced ETH or unsolicited ERC20 transfers create no order, ownership, or claim. They cannot be swept from amounts reserved for escrow or claims.
@@ -210,6 +210,15 @@ Contract invariants must cover many users, pools sharing currencies, failed clai
 
 ## 9. Checkpoint and next implementation
 
-Checkpoint 1 delivers this specification and the expanded remediation plan. Verification at this checkpoint is source/dependency inspection and documentation/traceability checks; contract tests have not been rerun because production source is unchanged. All findings remain open until their regression and implementation acceptance evidence pass.
+The user committed the specification as `a7637a9` and authenticated LP custody
+as `bc79d64`. Checkpoint 2B supplies direct native/ERC20 trader escrow, backed
+pull claims, exact transfer checks, and explicit zero-fee/complete-input policy.
+See its report for verification and the pending user-created commit. The legacy
+order signature, unbounded digest replay, payment discretion, and delayed
+surplus donations remain in that checkpoint; it is not the complete v2 system.
 
-After the user's checkpoint 1 commit, begin step 2 with the authenticated range-position vault, hook authorization, native/optional-return escrow semantics, and deployment integration. Preserve existing user changes. Split that work into smaller user-created commit checkpoints if necessary. Do not start settlement payment changes by patching a clamp before G1–G3 are resolved.
+After the 2B commit, step 3 implements bounded admission, epoch/execution-bound
+signatures, stored independent recovery, constant-work expiry, and queued LP
+exits. Preserve the custody/claim accounting and avoid recipient calls during
+finalization. Canonical settlement and concentrated execution still require
+sections 5–7; a correct claim ledger does not resolve G1–G3.

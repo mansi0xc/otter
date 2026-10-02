@@ -82,6 +82,10 @@ contract OtterHookTest is OtterHookFixture {
         vm.expectRevert(OtterLiquidityVault.ActiveBatch.selector);
         vault.removeLiquidity(1, 1e18, 0, 0);
         vm.prank(address(settlement));
+        book.releaseFilled(PoolId.unwrap(otterId), submittedOrders, new uint256[](submittedOrders.length));
+        vm.prank(address(settlement));
+        book.creditPayouts(PoolId.unwrap(otterId), submittedOrders, new uint256[](submittedOrders.length));
+        vm.prank(address(settlement));
         book.completeExecution(PoolId.unwrap(otterId));
         vault.removeLiquidity(1, 1e18, 0, 0);
     }

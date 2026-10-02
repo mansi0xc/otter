@@ -2,6 +2,8 @@
 pragma solidity 0.8.26;
 
 import {IOtterLiquidityGuard} from "./interfaces/IOtterLiquidityGuard.sol";
+import {ERC20} from "solmate/src/tokens/ERC20.sol";
+import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 
 /// @title OtterOrderBook
 /// @notice Collects signed orders into per-pool batch windows and escrows the
@@ -37,7 +39,9 @@ import {IOtterLiquidityGuard} from "./interfaces/IOtterLiquidityGuard.sol";
 ///    only point of failure to the individual `submit` call the trader's own
 ///    order is in: a bad pull reverts that call, not batches it never touched.
 ///    Settlement releases exactly the filled amount to itself and this contract
-///    refunds the rest directly — see `releaseFilled`.
+///    credits the rest to the signed trader's withdrawable claim. Settlement
+///    outputs and timeout refunds use the same claim ledger; no trader recipient
+///    is called while processing a batch.
 ///
 ///    A pool must be registered (`registerPoolCurrencies`) before any order
 ///    against it can be escrowed; this contract otherwise has no way to know
@@ -50,17 +54,11 @@ import {IOtterLiquidityGuard} from "./interfaces/IOtterLiquidityGuard.sol";
 /// Known limitation: signatures are ECDSA only. Contract wallets (EIP-1271) cannot
 /// currently trade. Noted in the README rather than silently unsupported.
 ///
-/// Known limitation: no order cancellation. A trader who wants out before
-/// settlement cannot withdraw an escrowed order early; they can only let it be
-/// filled or (if ineligible) unfilled. The paper's ex-post individual
-/// rationality means withdrawal would never have been strategically useful
-/// (§1.1), so this is a UX gap, not a game-theoretic one — but it is a real gap,
-/// and it is not fixed here.
-interface IERC20Escrow {
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    function transfer(address to, uint256 amount) external returns (bool);
-}
-
+/// Known limitations: the legacy signature is not bound to an epoch or maximum
+/// execution time, admission is unbounded, and timeout recovery still needs the
+/// full committed order array. Pull claims remove recipient vetoes after that
+/// replay; they do not resolve the batch/data-availability liveness problem.
+/// Stored per-order recovery and bounded expiry are the next checkpoint.
 contract OtterOrderBook {
     // ------------------------------------------------------------------
     // Types
@@ -133,12 +131,21 @@ contract OtterOrderBook {
     mapping(bytes32 poolId => mapping(uint256 batchId => Batch)) public batches;
     mapping(bytes32 poolId => mapping(uint256 batchId => bytes32)) public batchDigest;
 
-    /// @notice The two tokens a pool trades, so `submit` knows what to escrow.
-    ///         Zero until `registerPoolCurrencies` is called for that pool.
+    /// @notice Zero currency0 denotes native ETH, so registration uses an
+    /// explicit flag instead of an address sentinel.
+    mapping(bytes32 poolId => bool) public registered;
     mapping(bytes32 poolId => address) public currency0Of;
     mapping(bytes32 poolId => address) public currency1Of;
     mapping(bytes32 poolId => address) public liquidityGuardOf;
     mapping(bytes32 poolId => bool) public executionInProgress;
+    mapping(bytes32 poolId => mapping(uint256 batchId => bool)) public escrowReleased;
+    mapping(bytes32 poolId => mapping(uint256 batchId => bool)) public payoutsCredited;
+
+    /// @notice Shared-currency liabilities across all pools. Unsolicited funds
+    /// never grant a claim. Supported ERC20s must have stable, exact transfers.
+    mapping(address currency => uint256) public totalEscrow;
+    mapping(address trader => mapping(address currency => uint256)) public claimable;
+    mapping(address currency => uint256) public totalClaimable;
 
     /// Permit2-style unordered nonces: 256 nonces share one slot, so a trader
     /// submitting repeatedly pays one cold SSTORE per 256 orders rather than each.
@@ -154,9 +161,7 @@ contract OtterOrderBook {
     // Events / errors
     // ------------------------------------------------------------------
 
-    event OrderSubmitted(
-        bytes32 indexed poolId, uint256 indexed batchId, address indexed trader, bytes32 orderHash
-    );
+    event OrderSubmitted(bytes32 indexed poolId, uint256 indexed batchId, address indexed trader, bytes32 orderHash);
     event BatchSettled(bytes32 indexed poolId, uint256 indexed batchId, uint32 count);
     event BatchRefunded(bytes32 indexed poolId, uint256 indexed batchId, uint32 count);
     event SettlementSet(address settlement);
@@ -180,10 +185,22 @@ contract OtterOrderBook {
     error PoolNotRegistered();
     error PoolAlreadyRegistered();
     error ZeroCurrency();
-    error TransferFailed();
     error ReentrantCall();
     error InvalidLiquidityGuard();
     error NotExecuting();
+    error InvalidCurrencies();
+    error InvalidTrader(uint256 i);
+    error NativeValueMismatch(uint256 supplied, uint256 required);
+    error InexactTransfer(address currency, uint256 expected);
+    error Insolvent(address currency);
+    error AlreadyReleased();
+    error AlreadyCredited();
+    error BudgetExceeded(uint256 i);
+    error InvalidClaim();
+    error NativeTransferFailed();
+
+    event ClaimCredited(address indexed trader, address indexed currency, uint256 amount);
+    event Claimed(address indexed trader, address indexed currency, address indexed recipient, uint256 amount);
 
     event PoolRegistered(bytes32 indexed poolId, address currency0, address currency1);
 
@@ -216,11 +233,18 @@ contract OtterOrderBook {
     /// @notice Register the two tokens a pool trades, so `submit` can escrow
     ///         against it. Callable once per pool, only by `settlement` (which
     ///         holds the v4 `PoolKey` this `poolId` was derived from).
-    function registerPoolCurrencies(bytes32 poolId, address currency0, address currency1, address liquidityGuard) external {
+    function registerPoolCurrencies(bytes32 poolId, address currency0, address currency1, address liquidityGuard)
+        external
+    {
         if (msg.sender != settlement) revert NotSettlement();
-        if (currency0Of[poolId] != address(0)) revert PoolAlreadyRegistered();
-        if (currency0 == address(0) || currency1 == address(0)) revert ZeroCurrency();
+        if (registered[poolId]) revert PoolAlreadyRegistered();
+        if (currency1 == address(0)) revert ZeroCurrency();
+        if (
+            currency0 >= currency1 || currency1.code.length == 0
+                || (currency0 != address(0) && currency0.code.length == 0)
+        ) revert InvalidCurrencies();
         if (liquidityGuard.code.length == 0) revert InvalidLiquidityGuard();
+        registered[poolId] = true;
         currency0Of[poolId] = currency0;
         currency1Of[poolId] = currency1;
         liquidityGuardOf[poolId] = liquidityGuard;
@@ -268,12 +292,14 @@ contract OtterOrderBook {
     }
 
     /// @notice Submit signed orders into the open batch. Anyone may relay, but
-    ///         each order's `budget` is pulled from its own trader — a relayer
-    ///         cannot fund someone else's order.
+    ///         ERC20 budgets are pulled from each signed trader. Native budgets
+    ///         are funded by the caller's exact msg.value; refunds always belong
+    ///         to the signed trader, including when a relayer supplies ETH.
     /// @dev Every order must target the same pool, which is what lets one
     ///      rollover check and one currency lookup cover the whole array.
     function submit(Order[] calldata orders, bytes[] calldata signatures)
         external
+        payable
         nonReentrant
         returns (uint256 batchId)
     {
@@ -283,8 +309,10 @@ contract OtterOrderBook {
         bytes32 poolId = orders[0].poolId;
         address c0 = currency0Of[poolId];
         address c1 = currency1Of[poolId];
-        if (c0 == address(0)) revert PoolNotRegistered();
+        if (!registered[poolId]) revert PoolNotRegistered();
         IOtterLiquidityGuard(liquidityGuardOf[poolId]).assertBatchSupported(poolId);
+        _assertSolvent(c0);
+        _assertSolvent(c1);
 
         batchId = _rollover(poolId);
 
@@ -292,12 +320,14 @@ contract OtterOrderBook {
         if (block.timestamp >= b.closesAt) revert WindowClosed();
 
         bytes32 acc = batchDigest[poolId][batchId];
+        uint256 nativeRequired;
 
         for (uint256 i; i < n; ++i) {
             Order calldata o = orders[i];
             if (o.poolId != poolId) revert WrongPool(i);
             if (block.timestamp > o.deadline) revert OrderExpired(i);
             if (o.budget == 0) revert ZeroBudget(i);
+            if (o.trader == address(0)) revert InvalidTrader(i);
 
             _useNonce(o.trader, o.nonce, i);
 
@@ -308,12 +338,17 @@ contract OtterOrderBook {
             // Escrow now, while the trader's approval and balance are known
             // good, rather than trusting they will still hold at settlement.
             address sold = o.sellingCurrency0 ? c0 : c1;
-            if (!IERC20Escrow(sold).transferFrom(o.trader, address(this), o.budget)) revert TransferFailed();
+            if (sold == address(0)) nativeRequired += o.budget;
+            else _pullExact(sold, o.trader, o.budget);
+            totalEscrow[sold] += o.budget;
 
             acc = keccak256(abi.encode(acc, h));
             emit OrderSubmitted(poolId, batchId, o.trader, h);
         }
 
+        if (msg.value != nativeRequired) revert NativeValueMismatch(msg.value, nativeRequired);
+        _assertSolvent(c0);
+        _assertSolvent(c1);
         batchDigest[poolId][batchId] = acc;
         b.count += uint32(n);
     }
@@ -369,7 +404,7 @@ contract OtterOrderBook {
 
     /// @notice Called by OtterSettlement once the window has closed. Validates the
     ///         supplied orders against the commitment and marks the batch spent.
-    function consume(bytes32 poolId, uint256 batchId, Order[] calldata orders) external {
+    function consume(bytes32 poolId, uint256 batchId, Order[] calldata orders) external nonReentrant {
         if (msg.sender != settlement) revert NotSettlement();
 
         Batch storage b = batches[poolId][batchId];
@@ -386,16 +421,16 @@ contract OtterOrderBook {
     /// @dev Keep LP custody frozen through all settlement token callbacks, even
     /// after consume has marked the batch spent. Completion itself transfers no
     /// tokens and is called only after the complete settlement succeeds.
-    function completeExecution(bytes32 poolId) external {
+    function completeExecution(bytes32 poolId) external nonReentrant {
         if (msg.sender != settlement) revert NotSettlement();
         if (!executionInProgress[poolId]) revert NotExecuting();
+        if (!payoutsCredited[poolId][currentBatchId[poolId]]) revert NotExecuting();
         executionInProgress[poolId] = false;
     }
 
     function isBatchActive(bytes32 poolId) external view returns (bool) {
         Batch memory b = batches[poolId][currentBatchId[poolId]];
-        return _reentrancyLock != 1 || executionInProgress[poolId]
-            || (b.closesAt != 0 && b.count != 0 && !b.settled);
+        return _reentrancyLock != 1 || executionInProgress[poolId] || (b.closesAt != 0 && b.count != 0 && !b.settled);
     }
 
     /// @notice Refund every order in a committed batch that was not settled in
@@ -415,41 +450,142 @@ contract OtterOrderBook {
 
         address c0 = currency0Of[poolId];
         address c1 = currency1Of[poolId];
+        _assertSolvent(c0);
+        _assertSolvent(c1);
         for (uint256 i; i < orders.length; ++i) {
             address sold = orders[i].sellingCurrency0 ? c0 : c1;
-            if (!IERC20Escrow(sold).transfer(orders[i].trader, orders[i].budget)) revert TransferFailed();
+            totalEscrow[sold] -= orders[i].budget;
+            _credit(orders[i].trader, sold, orders[i].budget);
         }
-
         emit BatchRefunded(poolId, batchId, b.count);
     }
 
-    /// @notice Move each order's filled amount from escrow to `settlement`, and
-    ///         refund the unfilled remainder straight to the trader.
-    /// @dev Only callable as part of the same `settle` that already ran
-    ///      `consume` on this exact batch, so `filled[i] <= orders[i].budget` has
-    ///      already been checked by OtterMath (`BudgetExceeded`) before any
-    ///      token here moves. This contract does not re-check it — it trusts
-    ///      settlement the same way `consume` already does.
-    function releaseFilled(bytes32 poolId, Order[] calldata orders, uint256[] calldata filled)
-        external
-        nonReentrant
-    {
+    /// @notice Release filled input exactly once for the currently executing
+    /// committed batch. Unfilled input becomes a claim; no trader is called.
+    function releaseFilled(bytes32 poolId, Order[] calldata orders, uint256[] calldata filled) external nonReentrant {
         if (msg.sender != settlement) revert NotSettlement();
+        uint256 batchId = _executingBatch(poolId, orders);
+        if (escrowReleased[poolId][batchId]) revert AlreadyReleased();
         if (filled.length != orders.length) revert LengthMismatch();
+        escrowReleased[poolId][batchId] = true;
 
         address c0 = currency0Of[poolId];
         address c1 = currency1Of[poolId];
-
+        _assertSolvent(c0);
+        _assertSolvent(c1);
+        uint256 amount0;
+        uint256 amount1;
         for (uint256 i; i < orders.length; ++i) {
+            if (filled[i] > orders[i].budget) revert BudgetExceeded(i);
             address sold = orders[i].sellingCurrency0 ? c0 : c1;
-            uint256 refund = orders[i].budget - filled[i];
+            totalEscrow[sold] -= orders[i].budget;
+            _credit(orders[i].trader, sold, orders[i].budget - filled[i]);
+            if (orders[i].sellingCurrency0) amount0 += filled[i];
+            else amount1 += filled[i];
+        }
+        _sendExact(c0, settlement, amount0);
+        _sendExact(c1, settlement, amount1);
+        _assertSolvent(c0);
+        _assertSolvent(c1);
+    }
 
-            if (filled[i] > 0) {
-                if (!IERC20Escrow(sold).transfer(msg.sender, filled[i])) revert TransferFailed();
-            }
-            if (refund > 0) {
-                if (!IERC20Escrow(sold).transfer(orders[i].trader, refund)) revert TransferFailed();
-            }
+    /// @notice Fund outputs exactly once and credit the committed traders.
+    /// ERC20 funds are pulled from settlement; native outputs need exact value.
+    function creditPayouts(bytes32 poolId, Order[] calldata orders, uint256[] calldata outputs)
+        external
+        payable
+        nonReentrant
+    {
+        if (msg.sender != settlement) revert NotSettlement();
+        uint256 batchId = _executingBatch(poolId, orders);
+        if (!escrowReleased[poolId][batchId]) revert NotExecuting();
+        if (payoutsCredited[poolId][batchId]) revert AlreadyCredited();
+        if (outputs.length != orders.length) revert LengthMismatch();
+        payoutsCredited[poolId][batchId] = true;
+
+        address c0 = currency0Of[poolId];
+        address c1 = currency1Of[poolId];
+        _assertSolvent(c0);
+        _assertSolvent(c1);
+        uint256 amount0;
+        uint256 amount1;
+        for (uint256 i; i < orders.length; ++i) {
+            address received = orders[i].sellingCurrency0 ? c1 : c0;
+            _credit(orders[i].trader, received, outputs[i]);
+            if (orders[i].sellingCurrency0) amount1 += outputs[i];
+            else amount0 += outputs[i];
+        }
+        uint256 nativeRequired = c0 == address(0) ? amount0 : 0;
+        if (msg.value != nativeRequired) revert NativeValueMismatch(msg.value, nativeRequired);
+        if (c0 != address(0)) _pullExact(c0, settlement, amount0);
+        _pullExact(c1, settlement, amount1);
+        _assertSolvent(c0);
+        _assertSolvent(c1);
+    }
+
+    /// @notice Withdraw your own credit, in whole or part, to a chosen receiver.
+    /// A failed token transfer or rejecting ETH receiver rolls back only this
+    /// call. It cannot veto settlement, expiry, or another owner's claim.
+    function claim(address currency, uint256 amount, address recipient) external nonReentrant {
+        if (
+            amount == 0 || amount > claimable[msg.sender][currency] || recipient == address(0)
+                || recipient == address(this)
+        ) revert InvalidClaim();
+        _assertSolvent(currency);
+        claimable[msg.sender][currency] -= amount;
+        totalClaimable[currency] -= amount;
+        _sendExact(currency, recipient, amount);
+        _assertSolvent(currency);
+        emit Claimed(msg.sender, currency, recipient, amount);
+    }
+
+    function _executingBatch(bytes32 poolId, Order[] calldata orders) private view returns (uint256 batchId) {
+        if (!executionInProgress[poolId]) revert NotExecuting();
+        batchId = currentBatchId[poolId];
+        replay(poolId, batchId, orders);
+    }
+
+    function _credit(address trader, address currency, uint256 amount) private {
+        if (amount == 0) return;
+        claimable[trader][currency] += amount;
+        totalClaimable[currency] += amount;
+        emit ClaimCredited(trader, currency, amount);
+    }
+
+    function _balance(address currency, address account) private view returns (uint256) {
+        return currency == address(0) ? account.balance : ERC20(currency).balanceOf(account);
+    }
+
+    function _assertSolvent(address currency) private view {
+        if (_balance(currency, address(this)) < totalEscrow[currency] + totalClaimable[currency]) {
+            revert Insolvent(currency);
+        }
+    }
+
+    function _pullExact(address currency, address from, uint256 amount) private {
+        if (amount == 0) return;
+        uint256 beforeBalance = _balance(currency, address(this));
+        uint256 senderBefore = _balance(currency, from);
+        SafeTransferLib.safeTransferFrom(ERC20(currency), from, address(this), amount);
+        if (
+            _balance(currency, address(this)) != beforeBalance + amount
+                || _balance(currency, from) + amount != senderBefore
+        ) revert InexactTransfer(currency, amount);
+    }
+
+    function _sendExact(address currency, address recipient, uint256 amount) private {
+        if (amount == 0) return;
+        if (currency == address(0)) {
+            (bool success,) = recipient.call{value: amount}("");
+            if (!success) revert NativeTransferFailed();
+        } else {
+            uint256 beforeBalance = _balance(currency, address(this));
+            uint256 recipientBefore = _balance(currency, recipient);
+            SafeTransferLib.safeTransfer(ERC20(currency), recipient, amount);
+            if (
+                _balance(currency, address(this)) + amount != beforeBalance
+                    || _balance(currency, recipient) != recipientBefore + amount
+            ) revert InexactTransfer(currency, amount);
         }
     }
 

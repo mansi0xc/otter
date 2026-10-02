@@ -79,12 +79,7 @@ contract OtterSettlementSellXTest is Deployers {
         settlement.registerPool(otterKey);
         _modifyLiquidity(
             otterKey,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: LO,
-                tickUpper: HI,
-                liquidityDelta: 1e21,
-                salt: 0
-            }),
+            IPoolManager.ModifyLiquidityParams({tickLower: LO, tickUpper: HI, liquidityDelta: 1e21, salt: 0}),
             ZERO_BYTES
         );
 
@@ -122,17 +117,11 @@ contract OtterSettlementSellXTest is Deployers {
 
     /// @dev OtterMath's x0 is the reserve of the token the dominant side RECEIVES,
     ///      y0 the reserve of the token it SUPPLIES. Mirrors OtterSettlement._curveFor.
-    function _curve(bool dominantSellsC0, uint256 minorityBudget)
-        internal
-        view
-        returns (OtterMath.Curve memory c)
-    {
+    function _curve(bool dominantSellsC0, uint256 minorityBudget) internal view returns (OtterMath.Curve memory c) {
         (uint160 p,,,) = manager.getSlot0(otterId);
         uint128 liq = manager.getLiquidity(otterId);
         (uint256 r0, uint256 r1) = OtterPoolMath.virtualReserves(p, liq);
-        c = dominantSellsC0
-            ? OtterMath.Curve({x0: r1, y0: r0, M: 0})
-            : OtterMath.Curve({x0: r0, y0: r1, M: 0});
+        c = dominantSellsC0 ? OtterMath.Curve({x0: r1, y0: r0, M: 0}) : OtterMath.Curve({x0: r0, y0: r1, M: 0});
         c.M = (c.y0 * minorityBudget) / c.x0;
     }
 
@@ -168,11 +157,9 @@ contract OtterSettlementSellXTest is Deployers {
         x[1] = (c.y0 * MIN_BUDGET) / c.x0;
 
         settlement.settle(
-            otterKey,
-            batchId,
-            orders,
-            OtterSettlement.Outcome({dominantSellsCurrency0: dominantSellsC0, y: y, x: x})
+            otterKey, batchId, orders, OtterSettlement.Outcome({dominantSellsCurrency0: dominantSellsC0, y: y, x: x})
         );
+        _claimAllTraders(book, otterKey, orders);
 
         domReceived = IERC20X(Currency.unwrap(domOut)).balanceOf(dom);
         minReceived = IERC20X(Currency.unwrap(domIn)).balanceOf(min);
@@ -242,6 +229,7 @@ contract OtterSettlementSellXTest is Deployers {
         settlement.settle(
             otterKey, batchId, orders, OtterSettlement.Outcome({dominantSellsCurrency0: false, y: y, x: x})
         );
+        _claimAllTraders(book, otterKey, orders);
     }
 
     /// The sell-X twin of OtterMargin: full ceiling, zero headroom, across price.
@@ -275,5 +263,6 @@ contract OtterSettlementSellXTest is Deployers {
         settlement.settle(
             otterKey, batchId, orders, OtterSettlement.Outcome({dominantSellsCurrency0: false, y: y, x: x})
         );
+        _claimAllTraders(book, otterKey, orders);
     }
 }

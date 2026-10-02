@@ -5,6 +5,7 @@ import {Deployers} from "@uniswap/v4-core/test/utils/Deployers.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {OtterOrderBook} from "../../src/OtterOrderBook.sol";
 import {OtterHook} from "../../src/OtterHook.sol";
 import {OtterLiquidityVault} from "../../src/OtterLiquidityVault.sol";
 
@@ -50,5 +51,22 @@ abstract contract OtterTestDeployers is Deployers {
         uint256 c1 = vault.claims(address(this), poolKey.currency1);
         if (c0 != 0) vault.claim(poolKey.currency0, c0, address(this));
         if (c1 != 0) vault.claim(poolKey.currency1, c1, address(this));
+    }
+
+    /// @dev Wallet-balance integration assertions explicitly withdraw new
+    /// trader claims after settlement. Production callers choose their receiver.
+    function _claimAllTraders(OtterOrderBook book, PoolKey memory key, OtterOrderBook.Order[] memory orders) internal {
+        address c0 = Currency.unwrap(key.currency0);
+        address c1 = Currency.unwrap(key.currency1);
+        for (uint256 i; i < orders.length; ++i) {
+            address trader = orders[i].trader;
+            for (uint256 j; j < 2; ++j) {
+                address currency = j == 0 ? c0 : c1;
+                uint256 amount = book.claimable(trader, currency);
+                if (amount == 0) continue;
+                vm.prank(trader);
+                book.claim(currency, amount, trader);
+            }
+        }
     }
 }

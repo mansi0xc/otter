@@ -79,10 +79,7 @@ contract SolverEndToEndTest is Deployers {
         _modifyLiquidity(
             otterKey,
             IPoolManager.ModifyLiquidityParams({
-                tickLower: -887272,
-                tickUpper: 887272,
-                liquidityDelta: int256(json.readUint(".liquidity")),
-                salt: 0
+                tickLower: -887272, tickUpper: 887272, liquidityDelta: int256(json.readUint(".liquidity")), salt: 0
             }),
             ZERO_BYTES
         );
@@ -142,11 +139,9 @@ contract SolverEndToEndTest is Deployers {
         vm.warp(block.timestamp + WINDOW);
 
         settlement.settle(
-            otterKey,
-            batchId,
-            orders,
-            OtterSettlement.Outcome({dominantSellsCurrency0: domSellsC0, y: y, x: x})
+            otterKey, batchId, orders, OtterSettlement.Outcome({dominantSellsCurrency0: domSellsC0, y: y, x: x})
         );
+        _claimAllTraders(book, otterKey, orders);
 
         // every trader received exactly what the solver said they would
         for (uint256 i; i < n; ++i) {

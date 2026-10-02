@@ -31,6 +31,7 @@ contract OtterOrderBookTest is Test {
         address liquidityGuard = address(new MockLiquidityGuard());
         currency0 = new MockERC20("TEST0", "T0", 18);
         currency1 = new MockERC20("TEST1", "T1", 18);
+        if (address(currency0) > address(currency1)) (currency0, currency1) = (currency1, currency0);
         vm.prank(settlement);
         book.registerPoolCurrencies(POOL, address(currency0), address(currency1), liquidityGuard);
         vm.prank(settlement);
@@ -267,6 +268,10 @@ contract OtterOrderBookTest is Test {
         vm.prank(settlement);
         book.consume(POOL, first, os);
         vm.prank(settlement);
+        book.releaseFilled(POOL, os, new uint256[](os.length));
+        vm.prank(settlement);
+        book.creditPayouts(POOL, os, new uint256[](os.length));
+        vm.prank(settlement);
         book.completeExecution(POOL);
         uint256 second = book.submit(os2, sigs2);
 
@@ -317,6 +322,11 @@ contract OtterOrderBookTest is Test {
         vm.warp(block.timestamp + 1);
         book.refundExpired(POOL, batchId, os);
 
+        vm.prank(alice);
+        book.claim(address(currency0), os[0].budget, alice);
+        vm.prank(bob);
+        book.claim(address(currency1), os[1].budget, bob);
+
         assertEq(currency0.balanceOf(alice), aliceBefore + os[0].budget, "seller 0 fully refunded");
         assertEq(currency1.balanceOf(bob), bobBefore + os[1].budget, "seller 1 fully refunded");
 
@@ -363,6 +373,10 @@ contract OtterOrderBookTest is Test {
             vm.warp(block.timestamp + WINDOW); // fresh batch each round
             vm.prank(settlement);
             book.consume(POOL, s, os);
+            vm.prank(settlement);
+            book.releaseFilled(POOL, os, new uint256[](os.length));
+            vm.prank(settlement);
+            book.creditPayouts(POOL, os, new uint256[](os.length));
             vm.prank(settlement);
             book.completeExecution(POOL);
         }

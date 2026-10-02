@@ -139,10 +139,7 @@ contract SandwichHarness is Deployers {
         _modifyLiquidity(
             k,
             IPoolManager.ModifyLiquidityParams({
-                tickLower: LO,
-                tickUpper: HI,
-                liquidityDelta: int256(uint256(LIQUIDITY)),
-                salt: 0
+                tickLower: LO, tickUpper: HI, liquidityDelta: int256(uint256(LIQUIDITY)), salt: 0
             }),
             ZERO_BYTES
         );
@@ -249,14 +246,8 @@ contract SandwichHarness is Deployers {
         // which no real wallet defaults to and no careful trader would set.
         // It is included as the theoretical ceiling, not as what a sandwich
         // actually nets against a protected trade — see 2b for that.
-        uint256[6] memory candidates = [
-            VICTIM_SIZE,
-            VICTIM_SIZE * 4,
-            VICTIM_SIZE * 8,
-            VICTIM_SIZE * 20,
-            VICTIM_SIZE * 50,
-            VICTIM_SIZE * 100
-        ];
+        uint256[6] memory candidates =
+            [VICTIM_SIZE, VICTIM_SIZE * 4, VICTIM_SIZE * 8, VICTIM_SIZE * 20, VICTIM_SIZE * 50, VICTIM_SIZE * 100];
 
         int256 ceilingProfit = type(int256).min;
         uint256 ceilingFront;
@@ -404,10 +395,14 @@ contract SandwichHarness is Deployers {
             realisticJson = string.concat(
                 realisticJson,
                 i == 0 ? "" : ",",
-                '\n    { "bps": ', vm.toString(uint256(TOLERANCE_BPS[i])),
-                ', "searcherCapital": ', vm.toString(tolFront[i]),
-                ', "searcherProfit": ', vm.toString(uint256(tolProfit[i] > 0 ? tolProfit[i] : int256(0))),
-                ', "victimOut": ', vm.toString(tolVictimOut[i]),
+                '\n    { "bps": ',
+                vm.toString(uint256(TOLERANCE_BPS[i])),
+                ', "searcherCapital": ',
+                vm.toString(tolFront[i]),
+                ', "searcherProfit": ',
+                vm.toString(uint256(tolProfit[i] > 0 ? tolProfit[i] : int256(0))),
+                ', "victimOut": ',
+                vm.toString(tolVictimOut[i]),
                 " }"
             );
         }
@@ -416,16 +411,25 @@ contract SandwichHarness is Deployers {
         vm.writeFile(
             "../harness/results/sandwich.json",
             string.concat(
-                '{\n  "victimSize": ', vm.toString(VICTIM_SIZE),
-                ',\n  "fairOut": ', vm.toString(fairOut),
-                ',\n  "sandwichedOut": ', vm.toString(ceilingVictimOut),
-                ',\n  "otterOut": ', vm.toString(otterOut),
-                ',\n  "searcherCapital": ', vm.toString(ceilingFront),
-                ',\n  "searcherProfit": ', vm.toString(uint256(ceilingProfit)),
-                ',\n  "victimLoss": ', vm.toString(ceilingLoss),
-                ',\n  "spotClearedM": ', vm.toString(m),
-                ',\n  "realistic": ', realisticJson,
-                '\n}\n'
+                '{\n  "victimSize": ',
+                vm.toString(VICTIM_SIZE),
+                ',\n  "fairOut": ',
+                vm.toString(fairOut),
+                ',\n  "sandwichedOut": ',
+                vm.toString(ceilingVictimOut),
+                ',\n  "otterOut": ',
+                vm.toString(otterOut),
+                ',\n  "searcherCapital": ',
+                vm.toString(ceilingFront),
+                ',\n  "searcherProfit": ',
+                vm.toString(uint256(ceilingProfit)),
+                ',\n  "victimLoss": ',
+                vm.toString(ceilingLoss),
+                ',\n  "spotClearedM": ',
+                vm.toString(m),
+                ',\n  "realistic": ',
+                realisticJson,
+                "\n}\n"
             )
         );
     }
@@ -469,6 +473,7 @@ contract SandwichHarness is Deployers {
         settlement.settle(
             otterKey, batchId, orders, OtterSettlement.Outcome({dominantSellsCurrency0: true, y: y, x: x})
         );
+        _claimAllTraders(book, otterKey, orders);
 
         victimOut = IERC20H(Currency.unwrap(currency1)).balanceOf(victim);
 
@@ -552,6 +557,7 @@ contract SandwichHarness is Deployers {
         settlement.settle(
             otterKey, batchId, orders, OtterSettlement.Outcome({dominantSellsCurrency0: true, y: y, x: x})
         );
+        _claimAllTraders(book, otterKey, orders);
 
         uint256 burn = settlement.pendingSurplus(otterId, currency1);
 

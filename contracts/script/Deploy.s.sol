@@ -7,6 +7,8 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {SqrtPriceMath} from "@uniswap/v4-core/src/libraries/SqrtPriceMath.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
@@ -33,7 +35,11 @@ import {HookMiner} from "../test/utils/HookMiner.sol";
 ///   TOKEN0, TOKEN1        existing ERC20s. If unset, two MockERC20s are deployed
 ///                         and minted to the deployer.
 ///   WINDOW                batch window in seconds. Default 60.
-///   LIQUIDITY             full-range liquidity to seed. Default 1e21.
+///   NATIVE_ETH            true for native ETH/currency1. TOKEN0 must be unset.
+///   SQRT_PRICE_X96        initial raw-unit price, Q64.96. Default 1:1.
+///   LIQUIDITY             full-range seed. Default ERC20 1e21 / native 1e18.
+///   SEED_AMOUNT0_MAX, SEED_AMOUNT1_MAX optional principal limits; defaults
+///                         to the exact required amounts at SQRT_PRICE_X96.
 ///   SOLVER                the address with exclusive settlement rights for
 ///                         EXCLUSIVITY_WINDOW seconds after each batch's window
 ///                         closes. Defaults to the deployer. See OtterSettlement's
@@ -59,8 +65,8 @@ contract Deploy is Script {
 
     uint160 constant SQRT_PRICE_1_1 = 79228162514264337593543950336; // 1 << 96
 
-    /// Full range at tickSpacing 1. Otter requires a single full-range position so
-    /// liquidity is constant across any batch — see OtterPoolMath.
+    /// Full range at tickSpacing 1. The legacy auction only admits full-range
+    /// liquidity until the tick-aware execution step is implemented.
     int24 constant TICK_LOWER = -887272;
     int24 constant TICK_UPPER = 887272;
 
@@ -79,7 +85,19 @@ contract Deploy is Script {
         IPoolManager manager = IPoolManager(pmAddress);
 
         uint64 window = uint64(vm.envOr("WINDOW", uint256(60)));
-        uint256 liquidity = vm.envOr("LIQUIDITY", uint256(1e21));
+        bool nativePair = vm.envOr("NATIVE_ETH", false);
+        uint256 liquidity = vm.envOr("LIQUIDITY", nativePair ? uint256(1e18) : uint256(1e21));
+        require(liquidity > 0 && liquidity <= (uint256(1) << 88) - 1, "unsupported liquidity");
+        uint256 rawPrice = vm.envOr("SQRT_PRICE_X96", uint256(SQRT_PRICE_1_1));
+        require(rawPrice >= uint256(1) << 64 && rawPrice < uint256(1) << 128, "unsupported price");
+        uint160 sqrtPrice = uint160(rawPrice);
+        uint256 amount0 =
+            SqrtPriceMath.getAmount0Delta(sqrtPrice, TickMath.getSqrtPriceAtTick(TICK_UPPER), uint128(liquidity), true);
+        uint256 amount1 =
+            SqrtPriceMath.getAmount1Delta(TickMath.getSqrtPriceAtTick(TICK_LOWER), sqrtPrice, uint128(liquidity), true);
+        uint256 amount0Max = vm.envOr("SEED_AMOUNT0_MAX", amount0);
+        uint256 amount1Max = vm.envOr("SEED_AMOUNT1_MAX", amount1);
+        require(amount0 <= amount0Max && amount1 <= amount1Max, "seed exceeds principal limit");
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(privateKey);
         address solver = vm.envOr("SOLVER", deployer);
@@ -89,7 +107,8 @@ contract Deploy is Script {
         vm.startBroadcast(privateKey);
 
         // --- tokens ---------------------------------------------------
-        (Currency currency0, Currency currency1) = _resolveTokens(deployer, liquidity);
+        (Currency currency0, Currency currency1) =
+            _resolveTokens(deployer, nativePair, amount0 > amount1 ? amount0 : amount1);
 
         // --- core -----------------------------------------------------
         OtterOrderBook book = new OtterOrderBook(window, refundDelay);
@@ -98,9 +117,8 @@ contract Deploy is Script {
 
         // --- hook: mine a salt carrying swap + add/remove-liquidity permissions ---
         bytes memory args = abi.encode(manager, address(settlement));
-        uint160 hookFlags = uint160(
-            Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
-        );
+        uint160 hookFlags =
+            uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG);
         (address predicted, bytes32 salt) =
             HookMiner.find(CREATE2_DEPLOYER, hookFlags, type(OtterHook).creationCode, args);
 
@@ -119,7 +137,7 @@ contract Deploy is Script {
             tickSpacing: TICK_SPACING,
             hooks: IHooks(address(hook))
         });
-        manager.initialize(key, SQRT_PRICE_1_1);
+        manager.initialize(key, sqrtPrice);
 
         // Escrow needs to know which two tokens this poolId trades before any
         // order can be submitted against it — see OtterOrderBook's ESCROW note.
@@ -128,37 +146,53 @@ contract Deploy is Script {
         // --- liquidity ------------------------------------------------
         OtterLiquidityVault vault = hook.liquidityVault();
         require(liquidity > 0 && liquidity <= vault.MAX_POOL_LIQUIDITY(), "unsupported liquidity");
-        SafeTransferLib.safeApprove(ERC20(Currency.unwrap(currency0)), address(vault), liquidity);
-        SafeTransferLib.safeApprove(ERC20(Currency.unwrap(currency1)), address(vault), liquidity);
-        uint256 positionId = vault.createPosition(key, TICK_LOWER, TICK_UPPER, uint128(liquidity), liquidity, liquidity);
+        if (!nativePair) SafeTransferLib.safeApprove(ERC20(Currency.unwrap(currency0)), address(vault), amount0);
+        SafeTransferLib.safeApprove(ERC20(Currency.unwrap(currency1)), address(vault), amount1);
+        uint256 positionId = vault.createPosition{value: nativePair ? amount0 : 0}(
+            key, TICK_LOWER, TICK_UPPER, uint128(liquidity), amount0Max, amount1Max
+        );
 
         vm.stopBroadcast();
 
         _report(key, book, settlement, hook, vault, window, refundDelay, liquidity, solver, exclusivityWindow);
+        console2.log("sqrtPriceX96   ", rawPrice);
+        console2.log("seed amount0   ", amount0);
+        console2.log("seed amount1   ", amount1);
         console2.log("LP position ID ", positionId);
         console2.log("LP owner       ", deployer);
     }
 
-    function _resolveTokens(address deployer, uint256 liquidity)
+    function _resolveTokens(address deployer, bool nativePair, uint256 seedAmount)
         private
         returns (Currency currency0, Currency currency1)
     {
         address t0 = vm.envOr("TOKEN0", address(0));
         address t1 = vm.envOr("TOKEN1", address(0));
 
-        if (t0 == address(0) || t1 == address(0)) {
+        if (nativePair) {
+            require(t0 == address(0), "NATIVE_ETH requires TOKEN0 unset/zero");
+            if (t1 == address(0)) {
+                MockERC20 token = new MockERC20("Otter Test Token", "OTT", 18);
+                token.mint(deployer, seedAmount * 1000);
+                t1 = address(token);
+            }
+            require(t1.code.length > 0, "TOKEN1 has no code");
+            return (Currency.wrap(address(0)), Currency.wrap(t1));
+        }
+        require((t0 == address(0)) == (t1 == address(0)), "set both ERC20 tokens or neither");
+        if (t0 == address(0)) {
             MockERC20 a = new MockERC20("Otter Test A", "OTA", 18);
             MockERC20 b = new MockERC20("Otter Test B", "OTB", 18);
             // mint generously: the deployer seeds liquidity and the demo traders
-            a.mint(deployer, liquidity * 1000);
-            b.mint(deployer, liquidity * 1000);
+            a.mint(deployer, seedAmount * 1000);
+            b.mint(deployer, seedAmount * 1000);
             (t0, t1) = (address(a), address(b));
         }
 
+        require(t0 != t1 && t0.code.length > 0 && t1.code.length > 0, "invalid ERC20 pair");
         // v4 requires currency0 < currency1 by address
-        (currency0, currency1) = t0 < t1
-            ? (Currency.wrap(t0), Currency.wrap(t1))
-            : (Currency.wrap(t1), Currency.wrap(t0));
+        (currency0, currency1) =
+            t0 < t1 ? (Currency.wrap(t0), Currency.wrap(t1)) : (Currency.wrap(t1), Currency.wrap(t0));
     }
 
     function _report(

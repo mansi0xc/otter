@@ -9,6 +9,8 @@ import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {ERC20} from "solmate/src/tokens/ERC20.sol";
+import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/src/utils/FixedPointMathLib.sol";
 
 import {OtterMath} from "./OtterMath.sol";
@@ -25,9 +27,9 @@ import {OtterOrderBook} from "./OtterOrderBook.sol";
 /// divert the residual to LPs it controls. Exclusivity selects a caller; it does
 /// not resolve that economic discretion. See the review and specification gates.
 ///
-/// SCOPE: ERC20 batch settlement with zero-fee, full-range liquidity. The vault
-/// supports native/range custody, but native trader escrow is a later checkpoint
-/// and concentrated admission/swaps remain blocked until tick-aware settlement.
+/// SCOPE: native ETH/ERC20 settlement with zero LP/protocol fees and full-range
+/// liquidity. Concentrated admission/swaps remain blocked until tick-aware
+/// settlement. Outputs and refunds are withdrawable claims in the order book.
 /// Traders approve the order book for escrow, not this contract.
 contract OtterSettlement is IUnlockCallback {
     using PoolIdLibrary for PoolKey;
@@ -38,6 +40,8 @@ contract OtterSettlement is IUnlockCallback {
     OtterOrderBook public immutable orderBook;
     address public immutable owner;
     uint256 private _reentrancyLock = 1;
+    bytes32 private _callbackHash;
+    bool private _callbackPending;
 
     /// @notice The sole hook implementation whose pools may be registered. It is
     ///         set once after deployment because the hook constructor itself
@@ -67,6 +71,7 @@ contract OtterSettlement is IUnlockCallback {
     /// principal/fee claims do not supply historical batch reward eligibility;
     /// R7 remains open until the snapshot reward ledger replaces this policy.
     mapping(PoolId poolId => mapping(Currency currency => uint256)) public pendingSurplus;
+    mapping(Currency currency => uint256) public totalPendingSurplus;
 
     /// @param dominantSellsCurrency0 which side of the book is the dominant side
     /// @param y per-order amount sold, in that order's input token
@@ -102,7 +107,14 @@ contract OtterSettlement is IUnlockCallback {
     error HookAlreadySet();
     error InvalidHook(address supplied);
     error NonZeroFee(uint24 fee);
-    error NativeCurrencyUnsupported();
+    error UnsupportedProtocolFee(uint24 fee);
+    error UnsupportedPrice(uint160 sqrtPriceX96);
+    error InvalidCallback();
+    error InvalidSwapDelta();
+    error UnexpectedInputConsumption(uint256 requested, uint256 consumed);
+    error InexactTransfer(Currency currency, uint256 expected);
+    error Insolvent(Currency currency);
+    error NativeSenderUnauthorized();
     error ReentrantCall();
 
     modifier nonReentrant() {
@@ -160,9 +172,13 @@ contract OtterSettlement is IUnlockCallback {
     function registerPool(PoolKey calldata key) external {
         if (address(key.hooks) != approvedHook) revert InvalidHook(address(key.hooks));
         if (key.fee != 0) revert NonZeroFee(key.fee);
-        if (key.currency0.isAddressZero() || key.currency1.isAddressZero()) revert NativeCurrencyUnsupported();
+        (,, uint24 protocolFee, uint24 lpFee) = poolManager.getSlot0(key.toId());
+        if (protocolFee != 0) revert UnsupportedProtocolFee(protocolFee);
+        if (lpFee != 0) revert NonZeroFee(lpFee);
         orderBook.registerPoolCurrencies(
-            PoolId.unwrap(key.toId()), Currency.unwrap(key.currency0), Currency.unwrap(key.currency1),
+            PoolId.unwrap(key.toId()),
+            Currency.unwrap(key.currency0),
+            Currency.unwrap(key.currency1),
             address(OtterHook(address(key.hooks)).liquidityVault())
         );
     }
@@ -203,8 +219,7 @@ contract OtterSettlement is IUnlockCallback {
         OtterMath.Curve memory curve = _curveFor(key, outcome.dominantSellsCurrency0);
 
         // (3) Classify, price the minority side, and size the dominant side.
-        (OtterMath.Fill[] memory fills, uint256 dMinority, uint256 minorityPaid) =
-            _classify(curve, orders, outcome);
+        (OtterMath.Fill[] memory fills, uint256 dMinority, uint256 minorityPaid) = _classify(curve, orders, outcome);
 
         curve.M = FixedPointMathLib.mulDivDown(curve.y0, dMinority, curve.x0); // rho0 * D_X
 
@@ -213,19 +228,19 @@ contract OtterSettlement is IUnlockCallback {
 
         // (5) Move tokens. Pulls first so the contract is never paying out funds
         // it has not yet received.
-        _collectAndPayMinority(key, orders, outcome);
+        orderBook.releaseFilled(poolId, orders, outcome.y);
 
         // (6) Residual through the pool, then distribute. The authoritative burn is
         // measured here, not modelled: it is what v4 actually paid minus what the
         // outcome owes, so it absorbs any unused discretisation allowance.
-        uint256 realisedBurn =
-            _executeAndDistribute(key, orders, outcome, totalIn, minorityPaid, dMinority, totalPaid);
+        uint256 realisedBurn = _executeAndDistribute(key, outcome, totalIn, minorityPaid, dMinority, totalPaid);
 
+        _fundPayouts(key, orders, outcome);
+        _assertSurplusBacked(key.currency0);
+        _assertSurplusBacked(key.currency1);
         orderBook.completeExecution(poolId);
 
-        emit Settled(
-            key.toId(), batchId, outcome.dominantSellsCurrency0, totalIn, totalPaid, realisedBurn
-        );
+        emit Settled(key.toId(), batchId, outcome.dominantSellsCurrency0, totalIn, totalPaid, realisedBurn);
         emit BurnBreakdown(key.toId(), batchId, modelBurn, realisedBurn);
     }
 
@@ -238,24 +253,28 @@ contract OtterSettlement is IUnlockCallback {
         returns (OtterMath.Curve memory curve)
     {
         PoolId id = key.toId();
-        (uint160 sqrtPriceX96,,,) = poolManager.getSlot0(id);
+        (uint160 sqrtPriceX96,, uint24 protocolFee, uint24 lpFee) = poolManager.getSlot0(id);
+        if (key.fee != 0 || lpFee != 0) revert NonZeroFee(lpFee == 0 ? key.fee : lpFee);
+        if (protocolFee != 0) revert UnsupportedProtocolFee(protocolFee);
         uint128 liquidity = poolManager.getLiquidity(id);
         if (liquidity == 0 || sqrtPriceX96 == 0) revert NoLiquidity();
 
+        if (sqrtPriceX96 < uint160(1) << 64 || sqrtPriceX96 >= uint160(1) << 128) {
+            revert UnsupportedPrice(sqrtPriceX96);
+        }
         (uint256 r0, uint256 r1) = OtterPoolMath.virtualReserves(sqrtPriceX96, liquidity);
-        curve = dominantSellsCurrency0
-            ? OtterMath.Curve({x0: r1, y0: r0, M: 0})
-            : OtterMath.Curve({x0: r0, y0: r1, M: 0});
+        curve =
+            dominantSellsCurrency0 ? OtterMath.Curve({x0: r1, y0: r0, M: 0}) : OtterMath.Curve({x0: r0, y0: r1, M: 0});
     }
 
     /// @dev Splits the book, enforces the minority rule (§3.4: every eligible
     ///      minority order fills IN FULL at the initial spot price, no auction),
     ///      and returns the dominant side shaped for OtterMath.
-    function _classify(
-        OtterMath.Curve memory curve,
-        OtterOrderBook.Order[] calldata orders,
-        Outcome calldata outcome
-    ) private pure returns (OtterMath.Fill[] memory fills, uint256 dMinority, uint256 minorityPaid) {
+    function _classify(OtterMath.Curve memory curve, OtterOrderBook.Order[] calldata orders, Outcome calldata outcome)
+        private
+        pure
+        returns (OtterMath.Fill[] memory fills, uint256 dMinority, uint256 minorityPaid)
+    {
         uint256 n = orders.length;
         fills = new OtterMath.Fill[](n);
 
@@ -265,12 +284,8 @@ contract OtterSettlement is IUnlockCallback {
             if (isDominant) {
                 // Ineligible dominant orders are handled by OtterMath: their ask
                 // exceeds sigma0, so any positive payment trips the spot bound.
-                fills[i] = OtterMath.Fill({
-                    ask: orders[i].ask,
-                    budget: orders[i].budget,
-                    y: outcome.y[i],
-                    x: outcome.x[i]
-                });
+                fills[i] =
+                    OtterMath.Fill({ask: orders[i].ask, budget: orders[i].budget, y: outcome.y[i], x: outcome.x[i]});
                 continue;
             }
 
@@ -292,32 +307,30 @@ contract OtterSettlement is IUnlockCallback {
         }
     }
 
-    /// Release every seller's contribution from escrow, then pay the minority
-    /// side immediately — it is priced at spot and does not depend on the pool
-    /// swap.
-    /// @dev Funds were pulled into `orderBook` at `submit` time, not here — see
-    ///      OtterOrderBook's ESCROW note. `releaseFilled` moves exactly
-    ///      `outcome.y[i]` to this contract per order and refunds
-    ///      `budget[i] - y[i]` to the trader directly, in the same call.
-    function _collectAndPayMinority(
-        PoolKey calldata key,
-        OtterOrderBook.Order[] calldata orders,
-        Outcome calldata outcome
-    ) private {
-        Currency dominantIn = outcome.dominantSellsCurrency0 ? key.currency0 : key.currency1;
-
-        orderBook.releaseFilled(PoolId.unwrap(key.toId()), orders, outcome.y);
-
+    /// @dev Fund the entire output ledger after the swap has succeeded. Minority
+    /// funds stay reserved here until this call; no trader receiver is invoked.
+    function _fundPayouts(PoolKey calldata key, OtterOrderBook.Order[] calldata orders, Outcome calldata outcome)
+        private
+    {
+        uint256 amount0;
+        uint256 amount1;
         for (uint256 i; i < orders.length; ++i) {
-            bool isDominant = orders[i].sellingCurrency0 == outcome.dominantSellsCurrency0;
-            if (isDominant || outcome.x[i] == 0) continue;
-            dominantIn.transfer(orders[i].trader, outcome.x[i]);
+            if (orders[i].sellingCurrency0) amount1 += outcome.x[i];
+            else amount0 += outcome.x[i];
         }
+        if (!key.currency0.isAddressZero() && amount0 != 0) {
+            SafeTransferLib.safeApprove(ERC20(Currency.unwrap(key.currency0)), address(orderBook), amount0);
+        }
+        if (amount1 != 0) {
+            SafeTransferLib.safeApprove(ERC20(Currency.unwrap(key.currency1)), address(orderBook), amount1);
+        }
+        orderBook.creditPayouts{value: key.currency0.isAddressZero() ? amount0 : 0}(
+            PoolId.unwrap(key.toId()), orders, outcome.x
+        );
     }
 
     function _executeAndDistribute(
         PoolKey calldata key,
-        OtterOrderBook.Order[] calldata orders,
         Outcome calldata outcome,
         uint256 totalIn,
         uint256 minorityPaid,
@@ -327,7 +340,7 @@ contract OtterSettlement is IUnlockCallback {
         Currency dominantOut = outcome.dominantSellsCurrency0 ? key.currency1 : key.currency0;
 
         // Only the imbalance beyond M touches the pool. The first M units of
-        // dominant input were paid straight to the minority side at spot.
+        // dominant input are reserved for minority claims at spot.
         uint256 netIn = totalIn - minorityPaid;
 
         // Take the lagged pot BEFORE this batch's surplus is computed, so that
@@ -335,12 +348,14 @@ contract OtterSettlement is IUnlockCallback {
         PoolId id = key.toId();
         uint256 donate0 = pendingSurplus[id][key.currency0];
         uint256 donate1 = pendingSurplus[id][key.currency1];
-        if (donate0 > 0) pendingSurplus[id][key.currency0] = 0;
-        if (donate1 > 0) pendingSurplus[id][key.currency1] = 0;
+        pendingSurplus[id][key.currency0] = 0;
+        pendingSurplus[id][key.currency1] = 0;
+        totalPendingSurplus[key.currency0] -= donate0;
+        totalPendingSurplus[key.currency1] -= donate1;
 
         uint256 received;
         if (netIn > 0 || donate0 > 0 || donate1 > 0) {
-            bytes memory result = poolManager.unlock(
+            bytes memory result = _unlock(
                 abi.encode(
                     CallbackArgs({
                         key: key,
@@ -362,16 +377,13 @@ contract OtterSettlement is IUnlockCallback {
         uint256 available = dMinority + received;
         if (available < totalPaid) revert PoolOutputShortfall(available, totalPaid);
 
-        for (uint256 i; i < orders.length; ++i) {
-            bool isDominant = orders[i].sellingCurrency0 == outcome.dominantSellsCurrency0;
-            if (!isDominant || outcome.x[i] == 0) continue;
-            dominantOut.transfer(orders[i].trader, outcome.x[i]);
-        }
-
         // The surplus stays in this contract and joins the pot. The next
         // settlement on this pool hands it to the LPs.
         burn = available - totalPaid;
-        if (burn > 0) pendingSurplus[id][dominantOut] += burn;
+        if (burn > 0) {
+            pendingSurplus[id][dominantOut] += burn;
+            totalPendingSurplus[dominantOut] += burn;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -403,11 +415,14 @@ contract OtterSettlement is IUnlockCallback {
         pendingSurplus[id][key.currency0] = 0;
         pendingSurplus[id][key.currency1] = 0;
 
-        poolManager.unlock(
-            abi.encode(
-                CallbackArgs({key: key, zeroForOne: false, amountIn: 0, donate0: donate0, donate1: donate1})
-            )
+        totalPendingSurplus[key.currency0] -= donate0;
+        totalPendingSurplus[key.currency1] -= donate1;
+
+        _unlock(
+            abi.encode(CallbackArgs({key: key, zeroForOne: false, amountIn: 0, donate0: donate0, donate1: donate1}))
         );
+        _assertSurplusBacked(key.currency0);
+        _assertSurplusBacked(key.currency1);
         emit SurplusDonated(id, donate0, donate1);
     }
 
@@ -417,6 +432,8 @@ contract OtterSettlement is IUnlockCallback {
 
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
         if (msg.sender != address(poolManager)) revert NotPoolManager();
+        if (_reentrancyLock != 2 || !_callbackPending || keccak256(data) != _callbackHash) revert InvalidCallback();
+        _callbackPending = false;
         CallbackArgs memory a = abi.decode(data, (CallbackArgs));
 
         // Both the swap and the donation create deltas against this contract.
@@ -430,6 +447,13 @@ contract OtterSettlement is IUnlockCallback {
         uint256 received;
 
         if (a.amountIn > 0) {
+            // Escrow release can invoke ERC20 callbacks after _curveFor. Read
+            // fees again at the swap boundary so a controller callback cannot
+            // make execution use a fee-bearing curve after verification.
+            (,, uint24 protocolFee, uint24 lpFee) = poolManager.getSlot0(a.key.toId());
+            if (protocolFee != 0) revert UnsupportedProtocolFee(protocolFee);
+            if (lpFee != 0 || a.key.fee != 0) revert NonZeroFee(lpFee == 0 ? a.key.fee : lpFee);
+            if (a.amountIn > uint256(uint128(type(int128).max))) revert InvalidSwapDelta();
             BalanceDelta delta = poolManager.swap(
                 a.key,
                 IPoolManager.SwapParams({
@@ -441,6 +465,10 @@ contract OtterSettlement is IUnlockCallback {
             );
 
             int128 outDelta = a.zeroForOne ? delta.amount1() : delta.amount0();
+            int128 inDelta = a.zeroForOne ? delta.amount0() : delta.amount1();
+            if (inDelta > 0 || outDelta < 0) revert InvalidSwapDelta();
+            uint256 consumed = uint256(-int256(inDelta));
+            if (consumed != a.amountIn) revert UnexpectedInputConsumption(a.amountIn, consumed);
             received = uint256(uint128(outDelta));
 
             if (a.zeroForOne) {
@@ -470,13 +498,44 @@ contract OtterSettlement is IUnlockCallback {
     ///      if we owe, take it if we are owed, do nothing if they cancel.
     function _settleNet(Currency c, uint256 owed, uint256 credit) private {
         if (owed > credit) {
+            uint256 amount = owed - credit;
             poolManager.sync(c);
-            c.transfer(address(poolManager), owed - credit);
-            poolManager.settle();
+            uint256 paid;
+            if (c.isAddressZero()) {
+                paid = poolManager.settle{value: amount}();
+            } else {
+                uint256 senderBefore = c.balanceOfSelf();
+                c.transfer(address(poolManager), amount);
+                if (c.balanceOfSelf() + amount != senderBefore) revert InexactTransfer(c, amount);
+                paid = poolManager.settle();
+            }
+            if (paid != amount) revert InexactTransfer(c, amount);
         } else if (credit > owed) {
-            poolManager.take(c, address(this), credit - owed);
+            uint256 amount = credit - owed;
+            uint256 beforeBalance = c.balanceOfSelf();
+            uint256 managerBefore = c.isAddressZero() ? 0 : c.balanceOf(address(poolManager));
+            poolManager.take(c, address(this), amount);
+            if (c.balanceOfSelf() != beforeBalance + amount) revert InexactTransfer(c, amount);
+            if (!c.isAddressZero() && c.balanceOf(address(poolManager)) + amount != managerBefore) {
+                revert InexactTransfer(c, amount);
+            }
         }
     }
 
-    // ------------------------------------------------------------------
+    function _unlock(bytes memory data) private returns (bytes memory result) {
+        if (_callbackPending) revert InvalidCallback();
+        _callbackHash = keccak256(data);
+        _callbackPending = true;
+        result = poolManager.unlock(data);
+        if (_callbackPending) revert InvalidCallback();
+        delete _callbackHash;
+    }
+
+    function _assertSurplusBacked(Currency c) private view {
+        if (c.balanceOfSelf() < totalPendingSurplus[c]) revert Insolvent(c);
+    }
+
+    receive() external payable {
+        if (msg.sender != address(orderBook) && msg.sender != address(poolManager)) revert NativeSenderUnauthorized();
+    }
 }

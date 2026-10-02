@@ -81,6 +81,7 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
     error SlippageExceeded();
     error NativeValueMismatch(uint256 supplied, uint256 required);
     error EscrowMismatch(uint256 received, uint256 required);
+    error InexactTransfer(Currency currency, uint256 amount);
     error AmountOutOfRange();
     error InvalidDelta();
     error InvalidClaim();
@@ -283,7 +284,20 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
         CallbackArgs memory a = abi.decode(data, (CallbackArgs));
         if (a.operation == Operation.Claim) {
             poolManager.burn(address(this), a.claimCurrency.toId(), a.claimAmount);
+            uint256 managerBefore;
+            uint256 recipientBefore;
+            if (!a.claimCurrency.isAddressZero()) {
+                managerBefore = a.claimCurrency.balanceOf(address(poolManager));
+                recipientBefore = a.claimCurrency.balanceOf(a.recipient);
+            }
             poolManager.take(a.claimCurrency, a.recipient, a.claimAmount);
+            if (
+                !a.claimCurrency.isAddressZero()
+                    && (a.claimCurrency.balanceOf(address(poolManager)) + a.claimAmount != managerBefore
+                        || a.claimCurrency.balanceOf(a.recipient) != recipientBefore + a.claimAmount)
+            ) {
+                revert InexactTransfer(a.claimCurrency, a.claimAmount);
+            }
             return "";
         }
 
@@ -328,7 +342,9 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
         if (currency.isAddressZero()) {
             paid = poolManager.settle{value: amount}();
         } else {
+            uint256 payerBefore = currency.balanceOf(payer);
             SafeTransferLib.safeTransferFrom(ERC20(Currency.unwrap(currency)), payer, address(poolManager), amount);
+            if (currency.balanceOf(payer) + amount != payerBefore) revert InexactTransfer(currency, amount);
             paid = poolManager.settle();
         }
         if (paid != amount) revert EscrowMismatch(paid, amount);

@@ -31,6 +31,7 @@ contract OtterOrderBookViewTest is Test {
         address liquidityGuard = address(new MockLiquidityGuard());
         currency0 = new MockERC20("TEST0", "T0", 18);
         currency1 = new MockERC20("TEST1", "T1", 18);
+        if (address(currency0) > address(currency1)) (currency0, currency1) = (currency1, currency0);
         vm.prank(address(0x5E77));
         book.registerPoolCurrencies(POOL, address(currency0), address(currency1), liquidityGuard);
 
@@ -61,6 +62,10 @@ contract OtterOrderBookViewTest is Test {
         vm.prank(address(0x5E77));
         book.consume(POOL, batchId, os);
         vm.prank(address(0x5E77));
+        book.releaseFilled(POOL, os, new uint256[](os.length));
+        vm.prank(address(0x5E77));
+        book.creditPayouts(POOL, os, new uint256[](os.length));
+        vm.prank(address(0x5E77));
         book.completeExecution(POOL);
     }
 
@@ -70,7 +75,9 @@ contract OtterOrderBookViewTest is Test {
         returns (OtterOrderBook.Order[] memory all)
     {
         all = new OtterOrderBook.Order[](existing.length + 1);
-        for (uint256 i; i < existing.length; ++i) all[i] = existing[i];
+        for (uint256 i; i < existing.length; ++i) {
+            all[i] = existing[i];
+        }
         all[existing.length] = one[0];
     }
 

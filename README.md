@@ -1,24 +1,33 @@
 # Otter
 
-**The MEV-resilient AMM — optimal truthful trading with excess redistribution**
+**A research prototype for batch trading and surplus redistribution on Uniswap v4**
 
 An implementation of [*Otter: A Provably MEV-Resilient Automated Market Maker via
 Surplus Redistribution*](https://eprint.iacr.org/2026/1877) (Shi, Zhang, Chung, Li — IACR ePrint 2026/1877, posted
 3 September 2026) as a Uniswap v4 hook with an off-chain VCG solver.
 
-No public implementation of this mechanism was found as of 9 September 2026.
+The local remediation now has authenticated LP custody, native ETH/ERC20
+trader escrow, and separate trader/LP asset claims. See
+[checkpoint 2B](./reviews/CHECKPOINT_2B.md) for the contract API and tests. These
+changes have not been deployed, and the existing wallet dashboard and published
+Sepolia addresses still target the earlier prototype.
+
+The current settlement verifier accepts feasible allocations without enforcing
+the paper's canonical allocation/payments. Integer incentive guarantees,
+historical LP rewards, bounded expiry, and independent stored-order recovery
+remain unfinished. Concentrated positions can be custodied, but concentrated
+batch execution is blocked pending the exact tick-aware model and mechanism
+gates. This checkout does not establish optimal trading or truthfulness.
 
 ---
 
 ## What is Otter?
 
-Otter is a batch automated market maker that clears trades in a way that's
-**dominant-strategy truthful** — not just for ordinary users, but for a builder
-acting as a user too. Where existing batch AMMs (CoW Protocol, Angstrom, SPEEDEX,
-am-AMM, Penumbra) clear at a uniform price without incentive compatibility, Otter
-achieves truthfulness by redistributing the mechanism's surplus back to
-participants, as described in [the paper](https://eprint.iacr.org/2026/1877).
-This is its first implementation.
+Otter explores the batch AMM and surplus redistribution mechanism described
+in [the paper](https://eprint.iacr.org/2026/1877). The paper's continuous-model
+results are the research target; the current integer implementation and security
+remediation require additional mechanism and execution work before those
+properties can be claimed for this code.
 
 See [`CORRECTIONS.md`](./CORRECTIONS.md) for the places where this repo's
 understanding of the paper diverges from the notes it was originally planned
@@ -48,44 +57,31 @@ Stated up front rather than buried:
 
 ## Inside the hook
 
-Otter's guarantees hold for a whole batch settled as an order-independent set.
-The `OtterHook` exists to make that assumption true on-chain rather than just
-in the solver:
+The current hook enforces the following integration rules:
 
-- **Batch-only swaps.** `beforeSwap` rejects any caller other than
-  `OtterSettlement`. Without this, anyone could slip an ordinary sequential
-  swap into the same block, move the pool state the batch was solved against,
-  and break order-independence.
-- **Full-range liquidity gate.** The paper models the AMM as a constant-product
-  curve `F(y) = x0 - k/(y0 + y)`. A v4 pool is concentrated liquidity, not
-  constant product — but on the virtual reserves, v3/v4 math *is* constant
-  product as long as in-range liquidity `L` doesn't change mid-swap. `beforeAddLiquidity`
-  enforces this by requiring every position to span the pool's full range at
-  its tick spacing, so a batch can never cross a tick boundary and shift `L`
-  underneath the settled curve. Gating adds is sufficient — a position can
-  only exist if it was admitted through this same check, so there's nothing
-  narrower to remove.
-- **Batch-active guards.** `beforeAddLiquidity` and `beforeRemoveLiquidity`
-  both revert while a batch is open for the pool, so liquidity is frozen from
-  the first accepted order until the batch settles or is refunded. A solver
-  prices against one curve; this keeps a different curve from appearing by
-  the time it executes.
-- **No silent permissions.** Every hook callback the contract doesn't use
-  (`beforeInitialize`, `afterSwap`, `beforeDonate`, etc.) explicitly reverts
-  rather than returning success, and the hook's address is mined so its low
-  bits only carry the three flags it actually implements.
-- **Zero LP fee.** A non-zero fee would make the realized swap diverge from
-  `F`, breaking curve conservation. LPs are compensated out of the
-  redistributed surplus instead — a burn destination the paper explicitly
-  permits (§3.6).
+- **Batch-only swaps.** Only the configured settlement contract can swap.
+- **Authenticated LP custody.** Only the hook's dedicated vault can add, remove,
+  or collect liquidity. Its position ledger authenticates each beneficial owner.
+- **Concentrated execution gate.** Range positions are supported for custody.
+  Order admission and swaps reject pools containing funded concentrated
+  positions while the legacy auction still uses constant-product reserves.
+- **Batch-active guards.** LP changes and fee collection are frozen from the
+  first accepted order through complete settlement or timeout finalization.
+  Callback guards preserve that freeze during asset transfers. Queued exits
+  and protection against repeated-batch exit starvation remain planned.
+- **Explicit permissions.** The hook address carries only before-swap,
+  before-add-liquidity, and before-remove-liquidity flags.
+- **Zero swap fees.** Registration and settlement reject nonzero LP or protocol
+  fees. A later protocol-fee change leaves escrow available for timeout refunds.
+  The current delayed donation policy remains vulnerable to historical LP
+  reward capture and will be replaced by snapshot-based claims.
 
 ## Prior art
 
-Batch AMMs exist and are implemented — CoW Protocol, Angstrom, SPEEDEX, am-AMM,
-Penumbra — so this is not the first batch AMM or the first anti-MEV hook.
-Existing batch AMMs clear at a uniform price and are not incentive compatible.
-Otter is the first design achieving dominant-strategy truthfulness for users
-*and* for a builder-as-user, via surplus redistribution.
+Batch trading and MEV mitigation have existing implementations. The project's
+research focus is the paper's allocation/payment mechanism and its suitability
+for v4. Comparative economic evidence and claims of novelty belong in the
+remaining grant-readiness work, with explicit assumptions and source support.
 
 ## Getting started
 
@@ -94,7 +90,7 @@ Otter is the first design achieving dominant-strategy truthfulness for users
 cd solver && npm test
 
 # Contracts: Foundry test suite
-cd contracts && forge test
+cd contracts && forge test --offline --no-match-contract 'GasCurveTest|SandwichHarness'
 
 # Web dashboard
 cd web && yarn && yarn dev
