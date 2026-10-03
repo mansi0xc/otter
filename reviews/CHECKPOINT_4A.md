@@ -1,7 +1,7 @@
 # Checkpoint 4A — bounded exact core execution quote
 
 Prepared 3 October 2026. Starting revision: user-created commit `eee2aeb`.
-Status: implemented and validated locally, pending the user-created commit.
+Status: committed by the user as `051c11f`; clean tree inspected before checkpoint 4B.
 The user creates every commit. No deployment or live transaction is included.
 
 ## What was achieved

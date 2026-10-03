@@ -3,7 +3,7 @@
 Prepared 2 October 2026. Baseline: user-created commit `63ec94e`.
 Sources: [grant readiness review](./GRANT_READINESS_REVIEW_2026-10-02.md), [remediation plan](./REMEDIATION_PLAN.md), the pinned v4 core, and [the paper](https://arxiv.org/html/2609.03474v1).
 
-**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. [3B](./CHECKPOINT_3B.md) implements queued exit priority and bounded donation accrual. [4A](./CHECKPOINT_4A.md) adds a bounded read-only exact execution quote. Pool/reward snapshots, the matched BigInt reference, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
+**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. [3B](./CHECKPOINT_3B.md) implements queued exit priority and bounded donation accrual. [4A](./CHECKPOINT_4A.md) adds a bounded read-only exact execution quote; [4B](./CHECKPOINT_4B.md) adds an independent BigInt execution reference with matched domains and real-core comparisons. Pool/reward snapshots, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
 
 The user has selected **native ETH and concentrated liquidity support now**. These belong to this remediation, including contracts, the integer solver, recovery, deployment, and wallet flows. Supporting WETH alone or removing the full-range check alone does not meet this scope.
 
@@ -167,6 +167,26 @@ must bind and revalidate the opening snapshot, enforce the configured hook,
 accept only supported statuses, skip zero swaps, and reconcile actual signed
 manager deltas. Read-only quoting does not implement those settlement changes.
 
+Checkpoint 4B implements the independent execution reference in
+`solver/src/execution.ts`. It uses exact BigInt amount fractions and a
+binary-search inverse of the protocol's quantized tick prices. It models the
+same fee policy, uint96 input, uint120 output, uint88 liquidity, price interval,
+16 words, 64 crossings, 80 steps, check order, statuses, and diagnostic prefixes.
+Raw amounts/prices never pass through floating point. Metadata integers are
+checked for their ABI widths; negative or too-wide amounts are malformed
+off-chain inputs, distinct from ABI-representable requests that return an
+unsupported economic-domain status.
+
+An offline snapshot must explicitly supply every visited bitmap word, including
+zero words, and every reached initialized tick. Missing data fails explicitly;
+it must not be interpreted as absent liquidity. Snapshot tick is preserved,
+including core's downward predecrement; replacing it with inverse(price) can
+choose the wrong liquidity side. The reference neither mutates nor authenticates
+its supplied maps. Test snapshots come from actual PoolManager reads, but a
+production RPC reader, block-pinned snapshot/configuration commitment, ownership
+version, and execution-time revalidation remain to implement. The local ABI/FFI
+bridge is test-only and is not an on-chain witness or verification mechanism.
+
 ### Execution and accounting
 
 Verify the complete stored batch, canonical direction/allocation/payments, snapshot, capacity, and claim amounts before executing. No keeper-controlled payment interval or alternative feasible vector is accepted. Re-read execution-critical pool state and fee fields before the actual swap. A mismatch produces no economic completion and retains timeout recovery.
@@ -213,6 +233,15 @@ Three gates remain. These are technical acceptance gates, not requests for anoth
 
 **G2 — Establish the concentrated-liquidity mechanism's domain.** The paper assumes an increasing concave continuous curve with an unbounded nonnegative input domain and stated inverse/differentiability behavior. A real tick-aware integer pool has finite usable capacity, zero-liquidity gaps, staircase output, and price limits. Document which assumptions hold on each supported domain and prove or qualify the extended rule. Matching v4's execution is necessary but insufficient. Do not carry over a full-range theorem merely because a within-tick segment is constant-product.
 
+Checkpoint 4B reproduces a concrete integer concavity failure: at 1:1 raw price
+with full-range liquidity 1,000, inputs `0, 1, 2` produce outputs `0, 0, 1`.
+The second marginal increment exceeds the first; no concave real curve can
+match all three points literally. BigInt, the on-chain quote, and a real core
+swap for input 2 agree. This falsifies literal substitution of integer output
+into the continuous assumption, not the existence of an adapted truthful rule.
+G1/G2 must select and evaluate that adaptation, including finite capacity,
+integer payments, unspent input, both-side IR, and dust.
+
 **G3 — Choose enforceable verification within measured resources.** Begin by benchmarking direct recomputation on bounded batches and traces, including counterfactuals. If it cannot fit, lower measured limits or specify a complete authenticated witness/proof design. The witness must bind G1's full computation and G2's real curve, not just feasibility or welfare. Do not introduce a TEE, bond, or optimistic dispute period and call it equivalent to immediate trustless verification. Any changed trust/delivery model requires a revised specification and disclosed funding scope.
 
 Custody, independent recovery, and the exact quote can proceed while these gates are researched. During their implementation, concentrated positions may be custodied, but admission and swaps must reject concentrated pools before escrow until their execution model is supported. Step 5 cannot be considered complete until G1–G3 have an implementation-ready rule and acceptance evidence. If the extension fails a claimed incentive property, report that result and adjust the claim; do not hide it with more randomized passing tests.
@@ -254,10 +283,13 @@ still the earlier prototype.
 Checkpoint 3A was committed as `3518355`. Checkpoint 3B was committed as `eee2aeb` and implements queued LP
 exits, priority before the next epoch, bounded uncollected donations, and full
 core-representable withdrawal credits. Its report records validation and the
-user-created commit. Checkpoint 4A implements authenticated bounded read-only
-quotes and differential execution evidence; its report records the pending
-user-created commit. The next slice supplies the independent BigInt execution
-reference, matched integer domains, opening snapshot work, and discrete research
-evidence. Canonical results and historical rewards remain separate work. Canonical
+user-created commit. Checkpoint 4A was committed as `051c11f` and implements
+authenticated bounded read-only quotes and differential execution evidence.
+Checkpoint 4B supplies the independent BigInt execution reference, matched
+execution domains, and further real-core comparisons; its report records the
+pending user-created commit. The next slice supplies opening snapshot work and
+small-domain discrete mechanism research. The legacy auction reference remains
+separate and retains its known boundary/payment failures. Canonical results and
+historical rewards remain separate work. Canonical
 settlement and concentrated execution still require sections 5–7; a correct
 claim ledger and exit barrier do not resolve G1–G3.

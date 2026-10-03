@@ -185,7 +185,7 @@ execution, wallet migration, and independent reviews remain.
 
 See [the oracle checkpoint report](./CHECKPOINT_4A.md) for the read-only API,
 supported statuses/domain, real-core differential tests, cold gas measurements,
-limitations, and the pending user-created commit. This slice authenticates live
+limitations, and the user-created commit. This slice authenticates live
 PoolManager state and models zero-fee exact-input execution through initialized
 ticks, empty bitmap boundaries, zero-liquidity gaps, and finite price limits.
 It reports actual consumption, output, final state, and bounded traversal usage.
@@ -196,9 +196,31 @@ Zero input is a model no-op and requires skipping the public manager swap.
 The oracle neither reserves a snapshot nor changes settlement or admission.
 Concentrated custody remains available and concentrated batches remain gated.
 
-Step 4 is not complete. After the user's 4A commit, continue with an independent
-BigInt execution reference and matched domains, explicit opening snapshots,
-and small-domain discrete mechanism/capacity research under G1–G3. One bounded
-quote's cost is not a bound for an auction with counterfactual quotes. Do not
-integrate the new oracle by merely replacing the old constant-product formula
-or lifting the concentrated execution gate.
+**4A was committed by the user as `051c11f`; clean tree inspected before 4B.**
+One bounded quote's cost is not a bound for an auction with counterfactual
+quotes. Do not integrate the oracle by merely replacing the old constant-product
+formula or lifting the concentrated execution gate.
+
+## Checkpoint 4B: independent execution reference and matched domains
+
+See [the reference checkpoint report](./CHECKPOINT_4B.md) for exact BigInt
+fraction math, binary-search tick inversion, snapshot completeness rules,
+domain/status correspondence, the local ABI test bridge, and validation.
+The new model agrees with the Solidity oracle and actual PoolManager execution
+in deterministic cases and 512 randomized comparisons. Unsupported results
+also agree field-for-field, including diagnostic prefixes and traversal usage.
+It is an offline reference, not an authenticated live-state reader or a solver.
+
+A real-core-backed reproduction with liquidity 1,000 and price 1:1 gives raw
+outputs `0, 0, 1` for inputs `0, 1, 2`. The increasing marginal increment shows
+why the exact integer quote cannot be substituted literally for the continuous
+concave curve in the proof. This is not an impossibility result for an adapted
+mechanism. The existing dust IR, arrival-tie, and allocation/reward failures
+remain visible and unresolved.
+
+**4B is pending the user's commit.** Step 4 remains incomplete. After confirmation,
+continue with the explicit opening pool/ownership snapshot and independent
+small-domain discrete allocation/payment/capacity research under G1–G3. The
+reference supplies executable curve evidence for that research; it supplies no
+canonical auction rule. Canonical verification, partial-settlement accounting,
+historical rewards, and concentrated execution require their remaining gates.
