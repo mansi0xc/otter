@@ -16,6 +16,7 @@ import {FixedPointMathLib} from "solmate/src/utils/FixedPointMathLib.sol";
 import {OtterMath} from "./OtterMath.sol";
 import {OtterHook, OtterPoolMath} from "./OtterHook.sol";
 import {OtterOrderBook} from "./OtterOrderBook.sol";
+import {IOtterLiquidityGuard} from "./interfaces/IOtterLiquidityGuard.sol";
 
 /// @title OtterSettlement
 /// @notice Settles one Otter batch: validates the solver's proposed outcome, runs
@@ -113,6 +114,7 @@ contract OtterSettlement is IUnlockCallback {
     error InvalidCallback();
     error InvalidSwapDelta();
     error UnexpectedInputConsumption(uint256 requested, uint256 consumed);
+    error SnapshotMismatch();
     error InexactTransfer(Currency currency, uint256 expected);
     error Insolvent(Currency currency);
     error NativeSenderUnauthorized();
@@ -215,10 +217,9 @@ contract OtterSettlement is IUnlockCallback {
         // the window has closed, and the batch has not already been settled.
         orderBook.consume(poolId, batchId, orders);
 
-        // (2) The curve, read from the pool at execution time rather than trusted
-        // from the solver. If liquidity moved since the batch was solved, the
-        // shortfall check in (6) is what catches it.
-        OtterMath.Curve memory curve = _curveFor(key, outcome.dominantSellsCurrency0);
+        // (2) Use the recorded opening state after checking live pricing and
+        // funded ownership. This remains the legacy full-range auction.
+        OtterMath.Curve memory curve = _curveFor(key, batchId, outcome.dominantSellsCurrency0);
 
         // (3) Classify, price the minority side, and size the dominant side.
         (OtterMath.Fill[] memory fills, uint256 dMinority, uint256 minorityPaid) = _classify(curve, orders, outcome);
@@ -249,7 +250,7 @@ contract OtterSettlement is IUnlockCallback {
     /// @dev OtterMath's `x0` is the reserve of the token the dominant side
     ///      RECEIVES and `y0` the reserve of the token it SUPPLIES, so the two
     ///      swap according to which side is dominant.
-    function _curveFor(PoolKey calldata key, bool dominantSellsCurrency0)
+    function _curveFor(PoolKey calldata key, uint256 batchId, bool dominantSellsCurrency0)
         private
         view
         returns (OtterMath.Curve memory curve)
@@ -258,7 +259,14 @@ contract OtterSettlement is IUnlockCallback {
         (uint160 sqrtPriceX96,, uint24 protocolFee, uint24 lpFee) = poolManager.getSlot0(id);
         if (key.fee != 0 || lpFee != 0) revert NonZeroFee(lpFee == 0 ? key.fee : lpFee);
         if (protocolFee != 0) revert UnsupportedProtocolFee(protocolFee);
-        uint128 liquidity = poolManager.getLiquidity(id);
+        bytes32 poolId = PoolId.unwrap(id);
+        IOtterLiquidityGuard.PoolSnapshot memory snapshot = orderBook.openingSnapshot(poolId, batchId);
+        if (snapshot.manager != address(poolManager) || PoolId.unwrap(snapshot.key.toId()) != poolId) {
+            revert SnapshotMismatch();
+        }
+        orderBook.assertSnapshot(poolId, batchId);
+        sqrtPriceX96 = snapshot.sqrtPriceX96;
+        uint128 liquidity = snapshot.activeLiquidity;
         if (liquidity == 0 || sqrtPriceX96 == 0) revert NoLiquidity();
 
         if (sqrtPriceX96 < uint160(1) << 64 || sqrtPriceX96 >= uint160(1) << 128) {
@@ -339,6 +347,13 @@ contract OtterSettlement is IUnlockCallback {
         uint256 dMinority,
         uint256 totalPaid
     ) private returns (uint256 burn) {
+        // Escrow transfers ran after the first validation. Covers zero-residual
+        // batches too; drift cannot be accepted as economic completion.
+        bytes32 poolId = PoolId.unwrap(key.toId());
+        (,, uint24 protocolFee, uint24 lpFee) = poolManager.getSlot0(key.toId());
+        if (protocolFee != 0) revert UnsupportedProtocolFee(protocolFee);
+        if (lpFee != 0 || key.fee != 0) revert NonZeroFee(lpFee == 0 ? key.fee : lpFee);
+        orderBook.assertSnapshot(poolId, orderBook.currentBatchId(poolId));
         Currency dominantOut = outcome.dominantSellsCurrency0 ? key.currency1 : key.currency0;
 
         // Only the imbalance beyond M touches the pool. The first M units of
@@ -455,6 +470,8 @@ contract OtterSettlement is IUnlockCallback {
             (,, uint24 protocolFee, uint24 lpFee) = poolManager.getSlot0(a.key.toId());
             if (protocolFee != 0) revert UnsupportedProtocolFee(protocolFee);
             if (lpFee != 0 || a.key.fee != 0) revert NonZeroFee(lpFee == 0 ? a.key.fee : lpFee);
+            bytes32 poolId = PoolId.unwrap(a.key.toId());
+            orderBook.assertSnapshot(poolId, orderBook.currentBatchId(poolId));
             if (a.amountIn > uint256(uint128(type(int128).max))) revert InvalidSwapDelta();
             BalanceDelta delta = poolManager.swap(
                 a.key,

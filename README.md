@@ -9,7 +9,9 @@ Surplus Redistribution*](https://eprint.iacr.org/2026/1877) (Shi, Zhang, Chung, 
 The local remediation now has authenticated LP custody, native ETH/ERC20
 trader escrow, bounded v2 signed epochs, independent stored-order recovery,
 queued LP exits that precede the next epoch, and a bounded read-only execution
-oracle with an independent BigInt execution reference. See
+oracle with an independent BigInt execution reference. Epochs now retain their
+opening pool state and authenticated LP roster, with validation before execution.
+See [checkpoint 4C](./reviews/CHECKPOINT_4C.md) for snapshot scope and limitations,
 [checkpoint 4B](./reviews/CHECKPOINT_4B.md) for reference/domain comparisons and
 [checkpoint 4A](./reviews/CHECKPOINT_4A.md) for authenticated exact quotes,
 [checkpoint 3B](./reviews/CHECKPOINT_3B.md)
@@ -22,7 +24,7 @@ The current settlement verifier accepts feasible allocations without enforcing
 the paper's canonical allocation/payments. Integer incentive guarantees
 and historical LP rewards remain unfinished. Concentrated positions can be
 custodied, but concentrated
-batch execution is blocked pending opening snapshots, integration, and mechanism
+batch execution is blocked pending concentrated snapshot/execution integration and mechanism
 gates. The quote/reference alone do not implement canonical payments or
 enable concentrated auctions. This checkout does not establish optimal trading
 or truthfulness.
@@ -71,6 +73,11 @@ The current hook enforces the following integration rules:
 - **Batch-only swaps.** Only the configured settlement contract can swap.
 - **Authenticated LP custody.** Only the hook's dedicated vault can add, remove,
   or collect liquidity. Its position ledger authenticates each beneficial owner.
+- **Opening epoch records.** The first accepted order stores the pool key,
+  manager, price/tick/liquidity, fee fields and up to 32 authenticated LP records.
+  Later admission and settlement check the opening state; donations and exit
+  reservations leave it intact. Historical records survive exits and new epochs.
+  This does not yet allocate historical rewards or supply a production RPC reader.
 - **Concentrated execution gate.** Range positions are supported for custody.
   Order admission and swaps reject pools containing funded concentrated
   positions while the legacy auction still uses constant-product reserves.

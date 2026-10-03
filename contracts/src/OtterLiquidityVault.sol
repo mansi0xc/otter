@@ -9,6 +9,7 @@ import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {Position as CorePosition} from "@uniswap/v4-core/src/libraries/Position.sol";
 import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {IOtterBatchStatus, IOtterLiquidityGuard} from "./interfaces/IOtterLiquidityGuard.sol";
@@ -62,6 +63,9 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
     mapping(bytes32 => uint256[]) private _openPositions;
     mapping(uint256 => uint256) private _positionIndex;
     mapping(bytes32 => uint128) public totalLiquidity;
+    /// @notice Changes only with funded membership or liquidity, not fees,
+    /// claims or exit reservations.
+    mapping(bytes32 => uint256) public ownershipVersion;
     mapping(bytes32 => uint256) public concentratedPositions;
     mapping(address => mapping(Currency => uint256)) public claims;
     mapping(Currency => uint256) public totalClaims;
@@ -96,6 +100,7 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
     error ReentrantCall();
     error InFlightLiquidity();
     error UnsupportedPoolState();
+    error SnapshotMismatch();
     error PendingExits();
     error ExitAlreadyQueued();
     error ExitNotQueued();
@@ -182,6 +187,76 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
         return protocolFee != 0 || lpFee != 0;
     }
 
+    /// @notice Authenticated, bounded roster for the admitted full-range model.
+    /// Core position amounts are checked; fee growth and future reward weights
+    /// are not part of this record. The book retains it after owners exit.
+    function openingSnapshot(bytes32 poolId)
+        external
+        view
+        returns (PoolSnapshot memory pool, PositionSnapshot[] memory roster)
+    {
+        _assertBatchSupported(poolId);
+        _requireNoExits(poolId);
+        pool.key = _keys[poolId];
+        pool.manager = address(poolManager);
+        PoolId id = PoolId.wrap(poolId);
+        (pool.sqrtPriceX96, pool.tick, pool.protocolFee, pool.lpFee) = poolManager.getSlot0(id);
+        pool.activeLiquidity = poolManager.getLiquidity(id);
+        pool.totalLiquidity = totalLiquidity[poolId];
+        pool.ownershipVersion = ownershipVersion[poolId];
+        uint256[] storage ids = _openPositions[poolId];
+        if (ids.length == 0 || ids.length > MAX_POSITIONS || pool.activeLiquidity != pool.totalLiquidity) {
+            revert SnapshotMismatch();
+        }
+        roster = new PositionSnapshot[](ids.length);
+        uint256 sum;
+        for (uint256 i; i < ids.length; ++i) {
+            uint256 positionId = ids[i];
+            Position storage p = positions[positionId];
+            bytes32 coreId =
+                CorePosition.calculatePositionKey(address(this), p.tickLower, p.tickUpper, bytes32(positionId));
+            if (
+                p.poolId != poolId || p.owner == address(0) || p.liquidity == 0
+                    || !_isFullRange(pool.key, p.tickLower, p.tickUpper)
+                    || poolManager.getPositionLiquidity(id, coreId) != p.liquidity
+            ) revert SnapshotMismatch();
+            roster[i] = PositionSnapshot(positionId, p.owner, p.tickLower, p.tickUpper, p.liquidity);
+            sum += p.liquidity;
+        }
+        if (sum != pool.totalLiquidity) revert SnapshotMismatch();
+        // The hook authorizes only this vault. In the admitted model, all
+        // funded positions share these endpoints and every mutation versions it.
+        _authenticateEndpoint(id, pool.key.tickSpacing, roster[0].tickLower, pool.totalLiquidity, false);
+        _authenticateEndpoint(id, pool.key.tickSpacing, roster[0].tickUpper, pool.totalLiquidity, true);
+        pool.positionsHash = keccak256(abi.encode(roster));
+    }
+
+    function _authenticateEndpoint(PoolId id, int24 spacing, int24 tick, uint128 total, bool upper) private view {
+        (uint128 gross, int128 net) = poolManager.getTickLiquidity(id, tick);
+        int128 expected = int128(total);
+        int24 compressed = tick / spacing; // endpoints are aligned
+        uint256 bitmap = poolManager.getTickBitmap(id, int16(compressed >> 8));
+        if (
+            gross != total || net != (upper ? -expected : expected)
+                || bitmap & (uint256(1) << uint8(uint24(compressed))) == 0
+        ) revert SnapshotMismatch();
+    }
+
+    /// @notice Constant-work pre-execution check while LP mutations are locked.
+    /// Reservations and fee growth are excluded; pricing and ownership must match.
+    function assertSnapshot(bytes32 poolId, PoolSnapshot calldata pool) external view {
+        if (_lock != 1) revert InFlightLiquidity();
+        (uint160 price, int24 tick, uint24 protocolFee, uint24 lpFee) = poolManager.getSlot0(PoolId.wrap(poolId));
+        if (
+            pool.manager != address(poolManager) || PoolId.unwrap(pool.key.toId()) != poolId
+                || pool.sqrtPriceX96 != price || pool.tick != tick || pool.protocolFee != protocolFee
+                || pool.lpFee != lpFee || pool.activeLiquidity != poolManager.getLiquidity(PoolId.wrap(poolId))
+                || pool.totalLiquidity != totalLiquidity[poolId] || pool.ownershipVersion != ownershipVersion[poolId]
+        ) {
+            revert SnapshotMismatch();
+        }
+    }
+
     function createPosition(
         PoolKey calldata key,
         int24 lower,
@@ -207,6 +282,7 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
         _openPositions[poolId].push(id);
         _positionIndex[id] = _openPositions[poolId].length;
         totalLiquidity[poolId] += liquidity;
+        ownershipVersion[poolId]++;
         if (!_isFullRange(key, lower, upper)) concentratedPositions[poolId]++;
 
         _modify(id, int256(uint256(liquidity)), amount0Max, amount1Max, msg.value);
@@ -232,6 +308,7 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
         }
         p.liquidity += liquidity;
         totalLiquidity[p.poolId] += liquidity;
+        ownershipVersion[p.poolId]++;
         _modify(id, int256(uint256(liquidity)), amount0Max, amount1Max, msg.value);
         emit LiquidityChanged(id, p.liquidity);
     }
@@ -281,6 +358,7 @@ contract OtterLiquidityVault is IUnlockCallback, IOtterLiquidityGuard {
         Position storage p = positions[id];
         p.liquidity -= liquidity;
         totalLiquidity[p.poolId] -= liquidity;
+        ownershipVersion[p.poolId]++;
         if (p.liquidity == 0) {
             _removeOpenPosition(id, p.poolId);
             if (!_isFullRange(_keys[p.poolId], p.tickLower, p.tickUpper)) concentratedPositions[p.poolId]--;

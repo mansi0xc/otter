@@ -118,6 +118,11 @@ contract OtterOrderBook {
     mapping(bytes32 poolId => mapping(uint256 batchId => mapping(uint256 index => StoredOrder))) private _orders;
     mapping(bytes32 poolId => uint256) public configVersionOf;
     mapping(bytes32 poolId => mapping(uint256 batchId => bytes32)) public batchDigest;
+    mapping(bytes32 => mapping(uint256 => IOtterLiquidityGuard.PoolSnapshot)) private _openingSnapshots;
+    mapping(bytes32 => mapping(uint256 => IOtterLiquidityGuard.PositionSnapshot[])) private _openingPositions;
+    mapping(bytes32 => mapping(uint256 => bytes32)) public snapshotHash;
+    mapping(bytes32 => mapping(uint256 => uint256)) public openingBlock;
+    bytes32 public constant SNAPSHOT_TYPEHASH = keccak256("OtterOpeningSnapshot/v1");
 
     /// @notice Zero currency0 denotes native ETH, so registration uses an
     /// explicit flag instead of an address sentinel.
@@ -158,6 +163,7 @@ contract OtterOrderBook {
         Order order
     );
     event EpochExpired(bytes32 indexed poolId, uint256 indexed batchId);
+    event EpochOpened(bytes32 indexed poolId, uint256 indexed epoch, bytes32 snapshotHash, uint256 openingBlock);
     event OrderRecovered(bytes32 indexed poolId, uint256 indexed batchId, uint256 indexed index, address trader);
     event NoncesInvalidated(address indexed trader, uint256 word, uint256 mask);
     event BatchSettled(bytes32 indexed poolId, uint256 indexed batchId, uint32 count);
@@ -206,6 +212,8 @@ contract OtterOrderBook {
     error AlreadyRecovered();
     error NotRefundable();
     error FeesStillSupported();
+    error SnapshotMissing();
+    error InvalidSnapshot();
     error InvalidClock();
     error AdmissionPaused();
     event AdmissionPauseSet(bool paused);
@@ -332,6 +340,31 @@ contract OtterOrderBook {
         return _batches[poolId][epoch].executeUntil;
     }
 
+    function openingSnapshot(bytes32 poolId, uint256 epoch)
+        external
+        view
+        returns (IOtterLiquidityGuard.PoolSnapshot memory)
+    {
+        if (snapshotHash[poolId][epoch] == bytes32(0)) revert SnapshotMissing();
+        return _openingSnapshots[poolId][epoch];
+    }
+
+    function openingPositions(bytes32 poolId, uint256 epoch)
+        external
+        view
+        returns (IOtterLiquidityGuard.PositionSnapshot[] memory)
+    {
+        if (snapshotHash[poolId][epoch] == bytes32(0)) revert SnapshotMissing();
+        return _openingPositions[poolId][epoch];
+    }
+
+    /// @notice Checks the recorded pre-swap state, not a historical state after
+    /// a successful swap. Recovery never depends on this external check.
+    function assertSnapshot(bytes32 poolId, uint256 epoch) public view {
+        if (snapshotHash[poolId][epoch] == bytes32(0)) revert SnapshotMissing();
+        IOtterLiquidityGuard(liquidityGuardOf[poolId]).assertSnapshot(poolId, _openingSnapshots[poolId][epoch]);
+    }
+
     function nextEpochId(bytes32 poolId) public view returns (uint256 id) {
         id = currentBatchId[poolId];
         if (_terminal(_batches[poolId][id].state)) ++id;
@@ -432,8 +465,12 @@ contract OtterOrderBook {
         // current collection window or veto its swaps by blocking later orders.
         State currentState = _batches[poolId][currentBatchId[poolId]].state;
         IOtterLiquidityGuard guard = IOtterLiquidityGuard(liquidityGuardOf[poolId]);
-        if (currentState == State.None || _terminal(currentState)) guard.assertAdmissionSupported(poolId);
-        else guard.assertBatchSupported(poolId);
+        if (currentState == State.None || _terminal(currentState)) {
+            guard.assertAdmissionSupported(poolId);
+        } else {
+            guard.assertBatchSupported(poolId);
+            assertSnapshot(poolId, currentBatchId[poolId]);
+        }
         _assertSolvent(c0);
         _assertSolvent(c1);
 
@@ -497,6 +534,8 @@ contract OtterOrderBook {
         _assertSolvent(c0);
         _assertSolvent(c1);
         batchDigest[poolId][batchId] = acc;
+        // Token callbacks cannot silently change opening state during escrow.
+        assertSnapshot(poolId, batchId);
     }
 
     function _rollover(bytes32 poolId) private returns (uint256 id) {
@@ -513,6 +552,38 @@ contract OtterOrderBook {
         Batch storage next = _batches[poolId][id];
         (next.closesAt, next.executeUntil) = _clock();
         next.state = State.Collecting;
+        _captureSnapshot(poolId, id, next);
+    }
+
+    function _captureSnapshot(bytes32 poolId, uint256 epoch, Batch storage batch) private {
+        address guard = liquidityGuardOf[poolId];
+        (IOtterLiquidityGuard.PoolSnapshot memory pool, IOtterLiquidityGuard.PositionSnapshot[] memory roster) =
+            IOtterLiquidityGuard(guard).openingSnapshot(poolId);
+        if (roster.length == 0 || roster.length > 32 || pool.positionsHash != keccak256(abi.encode(roster))) {
+            revert InvalidSnapshot();
+        }
+        _openingSnapshots[poolId][epoch] = pool;
+        for (uint256 i; i < roster.length; ++i) {
+            _openingPositions[poolId][epoch].push(roster[i]);
+        }
+        openingBlock[poolId][epoch] = block.number;
+        bytes32 commitment = keccak256(
+            abi.encode(
+                SNAPSHOT_TYPEHASH,
+                block.chainid,
+                address(this),
+                poolId,
+                epoch,
+                configVersionOf[poolId],
+                batch.closesAt,
+                batch.executeUntil,
+                block.number,
+                guard,
+                pool
+            )
+        );
+        snapshotHash[poolId][epoch] = commitment;
+        emit EpochOpened(poolId, epoch, commitment, block.number);
     }
 
     function _useNonce(address trader, uint256 nonce, uint256 i) private {

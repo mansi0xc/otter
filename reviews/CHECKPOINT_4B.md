@@ -1,7 +1,7 @@
 # Checkpoint 4B — independent BigInt execution reference
 
 Prepared 3 October 2026. Starting revision: user-created commit `051c11f`.
-Status: implemented and validated locally, pending the user-created commit.
+Status: committed by the user as `49586b3`; clean tree verified before 4C.
 The user creates every commit. No deployment or live transaction is included.
 
 ## What was achieved
@@ -196,4 +196,5 @@ Suggested explanation:
 
 > Add exact BigInt execution math with matching numerical limits, statuses, and explicit snapshot completeness. Compare every quote field with Solidity and real v4 swaps, including 512 randomized cases. Preserve the concentrated auction gate and document the integer concavity counterexample and remaining mechanism work.
 
-Create the commit and confirm completion before the next implementation slice.
+The user created commit `49586b3`; the original handoff and validation above
+are retained. The next implemented slice is [checkpoint 4C](./CHECKPOINT_4C.md).

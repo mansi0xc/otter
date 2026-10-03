@@ -3,7 +3,7 @@
 Prepared 2 October 2026. Baseline: user-created commit `63ec94e`.
 Sources: [grant readiness review](./GRANT_READINESS_REVIEW_2026-10-02.md), [remediation plan](./REMEDIATION_PLAN.md), the pinned v4 core, and [the paper](https://arxiv.org/html/2609.03474v1).
 
-**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. [3B](./CHECKPOINT_3B.md) implements queued exit priority and bounded donation accrual. [4A](./CHECKPOINT_4A.md) adds a bounded read-only exact execution quote; [4B](./CHECKPOINT_4B.md) adds an independent BigInt execution reference with matched domains and real-core comparisons. Pool/reward snapshots, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
+**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. [3B](./CHECKPOINT_3B.md) implements queued exit priority and bounded donation accrual. [4A](./CHECKPOINT_4A.md) adds a bounded read-only exact execution quote; [4B](./CHECKPOINT_4B.md) adds an independent BigInt execution reference with matched domains and real-core comparisons. [4C](./CHECKPOINT_4C.md) records and revalidates opening pool state and LP ownership for the admitted full-range model. Concentrated snapshot integration, reward weights/claims, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
 
 The user has selected **native ETH and concentrated liquidity support now**. These belong to this remediation, including contracts, the integer solver, recovery, deployment, and wallet flows. Supporting WETH alone or removing the full-range check alone does not meet this scope.
 
@@ -183,9 +183,46 @@ it must not be interpreted as absent liquidity. Snapshot tick is preserved,
 including core's downward predecrement; replacing it with inverse(price) can
 choose the wrong liquidity side. The reference neither mutates nor authenticates
 its supplied maps. Test snapshots come from actual PoolManager reads, but a
-production RPC reader, block-pinned snapshot/configuration commitment, ownership
-version, and execution-time revalidation remain to implement. The local ABI/FFI
+production RPC reader and concentrated snapshot integration remain to implement.
+Checkpoint 4C records the opening configuration and ownership version and
+revalidates the admitted full-range epoch before execution. The local ABI/FFI
 bridge is test-only and is not an on-chain witness or verification mechanism.
+
+Checkpoint 4C stores `PoolSnapshot` and `PositionSnapshot[]` in the order book
+once on first successful admission. The pool record includes its full key,
+manager, opening price/tick, active/aggregate liquidity, zero fees, ownership
+version and roster hash. The vault checks every funded position's core
+liquidity, the roster sum, active liquidity, and both full-range endpoints'
+gross/net liquidity and initialized bitmap bits. At most 32 records are read.
+The roster order is the vault's current array order, retained exactly, not an
+economic ranking. Changes to funded membership or liquidity increment a
+pool-specific version; exit reservations, donations, fee collection and claims
+do not. Fee growth and already accrued fee claims are excluded from the record.
+
+`snapshotHash` commits to a v1 domain tag, chain ID, order-book address, pool,
+epoch, configuration, fixed clocks, opening block number, guard and complete
+pool record (which includes the roster hash). `EpochOpened` exposes that
+commitment. This is not an EIP-712 order field: existing v2 signatures authorize
+their epoch/ask/budget/time bounds, and its first admission selects the actual
+opening state. The block number identifies the opening transaction's block,
+not a block hash, finality proof or an RPC authentication mechanism.
+
+The hook's exclusive vault custody and epoch lock preserve the full-range tick
+schedule; cheap revalidation checks live slot0/active liquidity and funded
+version/total. It does not recopy all bitmap words or authenticate arbitrary
+keeper-supplied maps. Concentrated endpoint/tick commitments must be designed
+and tested before that gate is removed. Admission validates again after escrow
+callbacks; settlement prices from the stored opening state, validates after
+escrow release even for zero residual input, and checks again at the swap
+boundary. Failure rolls back economic execution. Expiry and individual recovery
+remain independent of pool reads and roster scans. Snapshots remain available
+after settlement, exits and later epochs; a pre-swap check is not expected to
+match the changed price after a successful swap.
+
+4C stores ownership and principal liquidity only. It neither computes the
+capital weights in section 6, enforces positive reward weight at opening, nor
+distributes batch rewards; raw liquidity is not a substitute for those weights.
+The legacy donation policy and R7 remain open until the reward ledger replaces it.
 
 ### Execution and accounting
 
@@ -285,10 +322,12 @@ exits, priority before the next epoch, bounded uncollected donations, and full
 core-representable withdrawal credits. Its report records validation and the
 user-created commit. Checkpoint 4A was committed as `051c11f` and implements
 authenticated bounded read-only quotes and differential execution evidence.
-Checkpoint 4B supplies the independent BigInt execution reference, matched
-execution domains, and further real-core comparisons; its report records the
-pending user-created commit. The next slice supplies opening snapshot work and
-small-domain discrete mechanism research. The legacy auction reference remains
+Checkpoint 4B was committed as `49586b3` and supplies the independent BigInt
+execution reference, matched execution domains, and further real-core comparisons.
+Checkpoint 4C supplies opening full-range pool/ownership records and execution
+revalidation; its report records the pending user-created commit. Step 4 remains
+incomplete. The next slice addresses small-domain discrete allocation/payment/
+capacity research under G1–G3. The legacy auction reference remains
 separate and retains its known boundary/payment failures. Canonical results and
 historical rewards remain separate work. Canonical
 settlement and concentrated execution still require sections 5–7; a correct

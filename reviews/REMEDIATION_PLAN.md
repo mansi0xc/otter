@@ -218,9 +218,33 @@ concave curve in the proof. This is not an impossibility result for an adapted
 mechanism. The existing dust IR, arrival-tie, and allocation/reward failures
 remain visible and unresolved.
 
-**4B is pending the user's commit.** Step 4 remains incomplete. After confirmation,
-continue with the explicit opening pool/ownership snapshot and independent
-small-domain discrete allocation/payment/capacity research under G1–G3. The
+**4B was committed by the user as `49586b3`; clean tree inspected before 4C.**
+Step 4 remains incomplete. Continue with the explicit opening pool/ownership
+snapshot and independent small-domain allocation/payment/capacity research
+under G1–G3. The
 reference supplies executable curve evidence for that research; it supplies no
 canonical auction rule. Canonical verification, partial-settlement accounting,
 historical rewards, and concentrated execution require their remaining gates.
+
+## Checkpoint 4C: opening pool state and LP ownership records
+
+See [the snapshot checkpoint report](./CHECKPOINT_4C.md) for immutable epoch
+history, authenticated bounded LP/core reads, the configuration commitment,
+callback and execution revalidation, resource evidence, and remaining limits.
+Failed first admission leaves no snapshot, clock, nonce or escrow. Later orders
+cannot overwrite the opening record; exits/new deposits cannot overwrite older
+ownership history. Queued exits and donations remain compatible with the
+current epoch, and timeout recovery does not read the pool or scan the roster.
+
+This slice binds the currently admitted full-range state only. It does not
+authenticate arbitrary off-chain maps, enable concentrated auctions, implement
+capital weights or reward claims, remove legacy solver discretion, or resolve
+integer IR. Those remain explicit deliverables, not implied by storing a roster.
+
+**4C is pending the user's commit.** After confirmation, continue G1/G2
+small-domain mechanism research using the exact execution reference, including
+finite capacity, dust, both-side IR, ties and counterfactual semantics. Measure
+the complete candidate computation for G3 before committing to canonical
+settlement. Concentrated snapshot integration and historical rewards still
+require their implementation and validation; do not lift the auction gate
+merely because the full-range snapshot tests pass.
