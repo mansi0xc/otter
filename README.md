@@ -117,6 +117,13 @@ The current hook enforces the following integration rules:
   allocation outcomes rule out every whole payment satisfying both IR and
   truthfulness under their stated assumptions. This is scoped research, not an
   impossibility theorem for every redesigned mechanism or an implemented asset.
+- **Integer cost-grid research.** `solver/src/cost-grid-research.ts` computes
+  exact per-lot integer pivots and independent finite welfare. A scoped one-sided
+  argument supports funding/IR and same-direction false-name resistance for
+  true integer costs; it does not prove the two-sided rule. Rounding original
+  valuations into that grid fails in published cases. Larger value-preserving
+  lots also lose next-batch admissibility after a real v4 swap. The production
+  order domain and minimum-output contract are unchanged.
 - **Batch-active guards.** LP changes and fee collection are frozen from the
   first accepted order through complete settlement or explicit expiry.
   Anyone can expire an epoch at its fixed execution deadline without token

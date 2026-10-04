@@ -72,3 +72,17 @@ regenerate this artifact. `npm run test:representation` checks its bytes,
 independent two-report allocations, seeded backing transitions and ordinary-price
 adapter arithmetic. Every BigInt is a decimal string. Existing fixtures remain
 unchanged.
+
+`research/cost-grid-research.json` records exact integer-per-lot payments,
+independent one-sided welfare, out-of-grid valuation-rounding failures and
+WAD-preserving exchange lots that become inadmissible after a real-core-matched
+swap. See [checkpoint 4G](../reviews/CHECKPOINT_4G.md) for the scoped analytical
+argument and its exclusions. This is a research artifact, not a new order ABI,
+production minimum-trade policy or full two-sided theorem.
+
+Reproduce to stdout from `solver/` with
+`node --experimental-strip-types research/cost-grid-cli.ts`; append
+`> ../fixtures/research/cost-grid-research.json` only for deliberate regeneration.
+`npm run test:cost-grid` compares its bytes, allocations/counterfactuals,
+breakpoint integration and bounded net-flow strategies. BigInts are decimal
+strings. The tests do not regenerate previous fixtures or economic results.

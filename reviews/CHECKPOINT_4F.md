@@ -1,7 +1,7 @@
 # Checkpoint 4F — compensation representation and actual-input gaps
 
 Prepared 5 October 2026. Starting revision: user-created commit `5d6415e`.
-Status: implemented and validated locally, pending the user-created commit.
+Status: implemented and validated locally; committed by the user as `d37d48b`.
 The user creates every commit. No deployment or live transaction is included.
 
 ## Outcome
@@ -253,4 +253,5 @@ Suggested explanation:
 
 > Add exact rational spot/input diagnostics, a fractional-credit backing and redemption model, and real-v4 comparisons. Establish a scoped whole-payment IR/truthfulness conflict and retain the original guarantee target.
 
-Create the commit and confirm completion before the next implementation slice.
+The user committed this checkpoint as `d37d48b`. The clean tree was verified
+before [checkpoint 4G](./CHECKPOINT_4G.md). The handoff above is historical.

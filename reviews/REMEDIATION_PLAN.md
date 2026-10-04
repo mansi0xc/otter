@@ -318,9 +318,33 @@ deficits, while floor swaps require explicit output, reserve and liability rules
 The ledger retains all dust and rejects spending other claims/escrow as surplus.
 It is offline arithmetic, not an implemented fractional asset or selected rule.
 
-**4F is pending the user's commit.** The next design work must address the
+**4F was committed by the user as `d37d48b`; clean tree inspected before 4G.** The next design work must address the
 allocation outcomes or a complete asset/curve adapter with analytical incentive,
 backing and redemption arguments. More passing nominal grids alone cannot close
 the demonstrated gaps. Retain the user's original guarantee and minimum-output
 priority; do not advance to canonical settlement or concentrated execution before
 G1–G3 and independent mechanism review are resolved.
+
+## Checkpoint 4G: integer cost grids and repeat-batch lot limits
+
+See [the cost-grid checkpoint report](./CHECKPOINT_4G.md) for exact integer pivots,
+independent layer-cake calculations and a finite one-sided analytical argument
+under explicit assumptions. It supports funded reported IR and feasible
+same-direction value/budget/false-name resistance for true integer per-lot costs.
+Two-sided grid tests do not establish the full theorem. Automatically ceiling
+original costs permits a profitable misreport; flooring can violate original IR.
+No valuation restriction or rounding policy is selected for production.
+
+The smallest exact exchange lots preserving every original WAD ask in both
+directions are primitive lots multiplied by WAD. A real v4 swap from special
+spot 9/4 moves to a price where even the primitive lots exceed uint96. Thus the
+candidate can lose next-batch admissibility immediately after a valid trade.
+Larger value-preserving lots cannot repair generic or repeat-batch price support.
+
+**4G is pending the user's commit.** Continue a broader-domain redesign that
+addresses original WAD valuations, whole-token IR, finite capacity and changing
+v4 prices together. Require explicit efficiency and analytical incentive/backing
+arguments for changed allocations or a report-independent curve/asset adapter.
+Do not substitute the restricted grid for the user's original guarantee target.
+G1/G2 and independent review remain open; G3 must measure the selected full
+authenticated algorithm before canonical settlement or concentrated admission.
