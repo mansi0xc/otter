@@ -294,10 +294,33 @@ solution. Rounded spot ratios or changed input/payment assets require explicit
 new execution, backing and incentive analysis. No weaker production mechanism,
 fractional token, deployment or concentrated-gate change is selected.
 
-**4E is pending the user's commit.** After confirmation, investigate a
+**4E was committed by the user as `5d6415e`; clean tree inspected before 4F.** Investigate a
 proof-compatible compensation/asset representation that fits ordinary quantized
 prices. Define the complete redemption/backing/dust/actual-input rules and
 evaluate whole-token IR and full net-flow incentives before any product-contract
 revision. Retain the user's original guarantee priority. G1/G2 and independent
 mechanism review remain open; G3 must measure the selected full computation
 before canonical settlement and concentrated auctions can proceed.
+
+## Checkpoint 4F: compensation representation and actual input
+
+See [the representation checkpoint report](./CHECKPOINT_4F.md) for exact rational
+spot diagnostics, retained fractional debt, immutable backing/redemption models
+and real-core neighboring swaps. For the two published allocation outcomes,
+every whole payment satisfying the winning type's IR creates a profitable
+misreport by the losing type. This is a scoped unchanged-allocation conflict,
+not a universal impossibility theorem for revised mechanisms.
+
+Output credits alone neither meet immediate underlying-token IR nor make a
+fractional residual input executable in v4. Increasing decimal precision cannot
+express every reciprocal spot payment; ceil residual swaps expose input-backing
+deficits, while floor swaps require explicit output, reserve and liability rules.
+The ledger retains all dust and rejects spending other claims/escrow as surplus.
+It is offline arithmetic, not an implemented fractional asset or selected rule.
+
+**4F is pending the user's commit.** The next design work must address the
+allocation outcomes or a complete asset/curve adapter with analytical incentive,
+backing and redemption arguments. More passing nominal grids alone cannot close
+the demonstrated gaps. Retain the user's original guarantee and minimum-output
+priority; do not advance to canonical settlement or concentrated execution before
+G1–G3 and independent mechanism review are resolved.

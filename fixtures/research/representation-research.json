@@ -1,0 +1,539 @@
+{
+  "schema": "otter/representation-research/v1",
+  "qualification": "Offline arithmetic and ledger diagnostics, not a production claim asset, auction, adapter, or full incentive proof.",
+  "fixedAllocationPaymentConflict": {
+    "honest": [
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "ask": "187500000000000000",
+        "budget": "4",
+        "sellingCurrency0": true
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+        "ask": "125000000000000000",
+        "budget": "4",
+        "sellingCurrency0": true
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000003",
+        "ask": "125000000000000000",
+        "budget": "4",
+        "sellingCurrency0": true
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000004",
+        "ask": "400000000000000000",
+        "budget": "9",
+        "sellingCurrency0": false
+      }
+    ],
+    "lowerReport": [
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "ask": "62500000000000000",
+        "budget": "4",
+        "sellingCurrency0": true
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+        "ask": "125000000000000000",
+        "budget": "4",
+        "sellingCurrency0": true
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000003",
+        "ask": "125000000000000000",
+        "budget": "4",
+        "sellingCurrency0": true
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000004",
+        "ask": "400000000000000000",
+        "budget": "9",
+        "sellingCurrency0": false
+      }
+    ],
+    "truthfulFill": "0",
+    "lowerReportFill": "4",
+    "truthfulCompensation": "0",
+    "lowerReportNominalCompensation": "500000000000000000",
+    "zeroLosingCompensationAssumed": true,
+    "witness": {
+      "minimumWholePayment": "1",
+      "maximumTruthfulPaymentNumerator": "750000000000000000",
+      "deviationGainLowerBoundNumerator": "250000000000000000",
+      "impossible": true
+    }
+  },
+  "creditRedemption": {
+    "individualWholeRedemption": [
+      "0",
+      "0"
+    ],
+    "promisedMinimumWhole": [
+      "1",
+      "1"
+    ],
+    "initial": {
+      "scale": "1000000000000000000",
+      "cash": "17",
+      "escrow": [],
+      "claims": [
+        [
+          "trader-b",
+          "750000000000000000"
+        ],
+        [
+          "trader-c",
+          "750000000000000000"
+        ]
+      ],
+      "community": "15500000000000000000",
+      "accounting": {
+        "cash": "17",
+        "escrow": "0",
+        "claims": "1500000000000000000",
+        "community": "15500000000000000000",
+        "unassigned": "0",
+        "backed": true
+      }
+    },
+    "afterCommunity": {
+      "scale": "1000000000000000000",
+      "cash": "2",
+      "escrow": [],
+      "claims": [
+        [
+          "trader-b",
+          "750000000000000000"
+        ],
+        [
+          "trader-c",
+          "750000000000000000"
+        ]
+      ],
+      "community": "500000000000000000",
+      "accounting": {
+        "cash": "2",
+        "escrow": "0",
+        "claims": "1500000000000000000",
+        "community": "500000000000000000",
+        "unassigned": "0",
+        "backed": true
+      }
+    },
+    "afterVoluntaryAggregation": {
+      "scale": "1000000000000000000",
+      "cash": "2",
+      "escrow": [],
+      "claims": [
+        [
+          "trader-c",
+          "1500000000000000000"
+        ]
+      ],
+      "community": "500000000000000000",
+      "accounting": {
+        "cash": "2",
+        "escrow": "0",
+        "claims": "1500000000000000000",
+        "community": "500000000000000000",
+        "unassigned": "0",
+        "backed": true
+      }
+    },
+    "afterTraderRedemption": {
+      "scale": "1000000000000000000",
+      "cash": "1",
+      "escrow": [],
+      "claims": [
+        [
+          "trader-c",
+          "500000000000000000"
+        ]
+      ],
+      "community": "500000000000000000",
+      "accounting": {
+        "cash": "1",
+        "escrow": "0",
+        "claims": "500000000000000000",
+        "community": "500000000000000000",
+        "unassigned": "0",
+        "backed": true
+      }
+    },
+    "naiveSweep": {
+      "withdrawal": "17",
+      "remainingCash": "0",
+      "stillOwedTraderCredits": "1500000000000000000"
+    },
+    "scope": "Voluntary credit transfer can aggregate dust. It does not guarantee each original order immediate underlying-token IR or a market price."
+  },
+  "spotPrecision": [
+    {
+      "price": "118842243771396506390315925504",
+      "sellingCurrency0": true,
+      "exactSpotPayment": {
+        "numerator": "9",
+        "denominator": "4"
+      },
+      "wad": {
+        "exact": true,
+        "floorCredits": "2250000000000000000",
+        "lostValue": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "decimal36": {
+        "exact": true,
+        "floorCredits": "2250000000000000000000000000000000000",
+        "lostValue": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "binary192": {
+        "exact": true,
+        "floorCredits": "14123478904620031718630526202217249436230299750044077654016",
+        "lostValue": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "price": "118842243771396506390315925504",
+      "sellingCurrency0": false,
+      "exactSpotPayment": {
+        "numerator": "4",
+        "denominator": "9"
+      },
+      "wad": {
+        "exact": false,
+        "floorCredits": "444444444444444444",
+        "lostValue": {
+          "numerator": "1",
+          "denominator": "2250000000000000000"
+        }
+      },
+      "decimal36": {
+        "exact": false,
+        "floorCredits": "444444444444444444444444444444444444",
+        "lostValue": {
+          "numerator": "1",
+          "denominator": "2250000000000000000000000000000000000"
+        }
+      },
+      "binary192": {
+        "exact": false,
+        "floorCredits": "2789822993505191450593684188092296184934380197539570894620",
+        "lostValue": {
+          "numerator": "1",
+          "denominator": "14123478904620031718630526202217249436230299750044077654016"
+        }
+      }
+    },
+    {
+      "price": "79232123823359799118286999568",
+      "sellingCurrency0": true,
+      "exactSpotPayment": {
+        "numerator": "24522380646719607155906925790044402809511515354687625729",
+        "denominator": "24519928653854221733733552434404946937899825954937634816"
+      },
+      "wad": {
+        "exact": false,
+        "floorCredits": "1000100000000000000",
+        "lostValue": {
+          "numerator": "247509610573687135721560718449",
+          "denominator": "15324955408658888583583470271503091836187391221836021760000"
+        }
+      },
+      "decimal36": {
+        "exact": false,
+        "floorCredits": "1000100000000000000000000000016150755",
+        "lostValue": {
+          "numerator": "48347341584208454322275566319056029013763069",
+          "denominator": "71362384635297994052914298472474756819137331200000000000000000000000000000000000"
+        }
+      },
+      "binary192": {
+        "exact": true,
+        "floorCredits": "6277729445560219431912173002251367119234947930800032186624",
+        "lostValue": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "price": "79232123823359799118286999568",
+      "sellingCurrency0": false,
+      "exactSpotPayment": {
+        "numerator": "24519928653854221733733552434404946937899825954937634816",
+        "denominator": "24522380646719607155906925790044402809511515354687625729"
+      },
+      "wad": {
+        "exact": false,
+        "floorCredits": "999900009999000099",
+        "lostValue": {
+          "numerator": "24277181359785089159229624845083957676411310221654052829",
+          "denominator": "24522380646719607155906925790044402809511515354687625729000000000000000000"
+        }
+      },
+      "decimal36": {
+        "exact": false,
+        "floorCredits": "999900009999000099990000999883862472",
+        "lostValue": {
+          "numerator": "3032458611279043726240913057691358868811466883044407239",
+          "denominator": "3065297580839950894488365723755550351188939419335953216125000000000000000000000000000000000"
+        }
+      },
+      "binary192": {
+        "exact": false,
+        "floorCredits": "6276474087977882975538235599546341982393084988288422078772",
+        "lostValue": {
+          "numerator": "1478472169132154727709117154773296060235890609399665587",
+          "denominator": "38482369528334100254101824223427734708731624427705372707627581369952135313024071350713894145028228937848817975296"
+        }
+      }
+    }
+  ],
+  "residualAdapters": [
+    {
+      "label": "spot 9/4; dominant sells currency0; Q=1, minority=1",
+      "price": "118842243771396506390315925504",
+      "floor": {
+        "minorityCompensation": {
+          "numerator": "4",
+          "denominator": "9"
+        },
+        "residualInput": {
+          "numerator": "5",
+          "denominator": "9"
+        },
+        "integerResidual": false,
+        "requestedInput": "0",
+        "actual": {
+          "status": 10,
+          "requestedInput": "0",
+          "consumedInput": "0",
+          "output": "0",
+          "sqrtPriceX96": "118842243771396506390315925504",
+          "tick": 8109,
+          "liquidity": "1000",
+          "bitmapWords": 0,
+          "initializedTicksCrossed": 0,
+          "steps": 0
+        },
+        "complete": true,
+        "inputRemainder": {
+          "numerator": "5",
+          "denominator": "9"
+        },
+        "interpolatedOutput": {
+          "numerator": "10",
+          "denominator": "9"
+        },
+        "interpolationShortfall": {
+          "numerator": "10",
+          "denominator": "9"
+        }
+      },
+      "ceil": {
+        "minorityCompensation": {
+          "numerator": "4",
+          "denominator": "9"
+        },
+        "residualInput": {
+          "numerator": "5",
+          "denominator": "9"
+        },
+        "integerResidual": false,
+        "requestedInput": "1",
+        "actual": {
+          "status": 10,
+          "requestedInput": "1",
+          "consumedInput": "1",
+          "output": "2",
+          "sqrtPriceX96": "118664247400296062296870619575",
+          "tick": 8079,
+          "liquidity": "1000",
+          "bitmapWords": 1,
+          "initializedTicksCrossed": 0,
+          "steps": 1
+        },
+        "complete": true,
+        "inputRemainder": {
+          "numerator": "-4",
+          "denominator": "9"
+        },
+        "interpolatedOutput": {
+          "numerator": "10",
+          "denominator": "9"
+        },
+        "interpolationShortfall": {
+          "numerator": "-8",
+          "denominator": "9"
+        }
+      }
+    },
+    {
+      "label": "spot 9/4; dominant sells currency1; Q=3, minority=1",
+      "price": "118842243771396506390315925504",
+      "floor": {
+        "minorityCompensation": {
+          "numerator": "9",
+          "denominator": "4"
+        },
+        "residualInput": {
+          "numerator": "3",
+          "denominator": "4"
+        },
+        "integerResidual": false,
+        "requestedInput": "0",
+        "actual": {
+          "status": 10,
+          "requestedInput": "0",
+          "consumedInput": "0",
+          "output": "0",
+          "sqrtPriceX96": "118842243771396506390315925504",
+          "tick": 8109,
+          "liquidity": "1000",
+          "bitmapWords": 0,
+          "initializedTicksCrossed": 0,
+          "steps": 0
+        },
+        "complete": true,
+        "inputRemainder": {
+          "numerator": "3",
+          "denominator": "4"
+        },
+        "interpolatedOutput": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "interpolationShortfall": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "ceil": {
+        "minorityCompensation": {
+          "numerator": "9",
+          "denominator": "4"
+        },
+        "residualInput": {
+          "numerator": "3",
+          "denominator": "4"
+        },
+        "integerResidual": false,
+        "requestedInput": "1",
+        "actual": {
+          "status": 10,
+          "requestedInput": "1",
+          "consumedInput": "1",
+          "output": "0",
+          "sqrtPriceX96": "118921471933910770727909469454",
+          "tick": 8123,
+          "liquidity": "1000",
+          "bitmapWords": 1,
+          "initializedTicksCrossed": 0,
+          "steps": 1
+        },
+        "complete": true,
+        "inputRemainder": {
+          "numerator": "-1",
+          "denominator": "4"
+        },
+        "interpolatedOutput": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "interpolationShortfall": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "label": "ordinary tick 1; dominant sells currency0; Q=10, minority=1",
+      "price": "79232123823359799118286999568",
+      "floor": {
+        "minorityCompensation": {
+          "numerator": "24519928653854221733733552434404946937899825954937634816",
+          "denominator": "24522380646719607155906925790044402809511515354687625729"
+        },
+        "residualInput": {
+          "numerator": "220703877813341849825335705466039081157215327591938622474",
+          "denominator": "24522380646719607155906925790044402809511515354687625729"
+        },
+        "integerResidual": false,
+        "requestedInput": "9",
+        "actual": {
+          "status": 10,
+          "requestedInput": "9",
+          "consumedInput": "9",
+          "output": "7",
+          "sqrtPriceX96": "78599367573674938088833284064",
+          "tick": -160,
+          "liquidity": "1000",
+          "bitmapWords": 2,
+          "initializedTicksCrossed": 0,
+          "steps": 2
+        },
+        "complete": true,
+        "inputRemainder": {
+          "numerator": "2451992865385422173373355639455871611689399749990913",
+          "denominator": "24522380646719607155906925790044402809511515354687625729"
+        },
+        "interpolatedOutput": {
+          "numerator": "171659116519902635513521853885950275538192296882563371016",
+          "denominator": "24522380646719607155906925790044402809511515354687625729"
+        },
+        "interpolationShortfall": {
+          "numerator": "2451992865385422173373355639455871611689399749990913",
+          "denominator": "24522380646719607155906925790044402809511515354687625729"
+        }
+      },
+      "ceil": {
+        "minorityCompensation": {
+          "numerator": "24519928653854221733733552434404946937899825954937634816",
+          "denominator": "24522380646719607155906925790044402809511515354687625729"
+        },
+        "residualInput": {
+          "numerator": "220703877813341849825335705466039081157215327591938622474",
+          "denominator": "24522380646719607155906925790044402809511515354687625729"
+        },
+        "integerResidual": false,
+        "requestedInput": "10",
+        "actual": {
+          "status": 10,
+          "requestedInput": "10",
+          "consumedInput": "10",
+          "output": "8",
+          "sqrtPriceX96": "78521469290648501083789841761",
+          "tick": -180,
+          "liquidity": "1000",
+          "bitmapWords": 2,
+          "initializedTicksCrossed": 0,
+          "steps": 2
+        },
+        "complete": true,
+        "inputRemainder": {
+          "numerator": "-24519928653854221733733552434404946937899825954937634816",
+          "denominator": "24522380646719607155906925790044402809511515354687625729"
+        },
+        "interpolatedOutput": {
+          "numerator": "171659116519902635513521853885950275538192296882563371016",
+          "denominator": "24522380646719607155906925790044402809511515354687625729"
+        },
+        "interpolationShortfall": {
+          "numerator": "-24519928653854221733733552434404946937899825954937634816",
+          "denominator": "24522380646719607155906925790044402809511515354687625729"
+        }
+      }
+    }
+  ]
+}

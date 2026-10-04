@@ -1,7 +1,7 @@
 # Checkpoint 4E — two-sided exact exchange lot candidate
 
 Prepared 4 October 2026. Starting revision: user-created commit `e156b91`.
-Status: implemented and validated locally, pending the user-created commit.
+Status: implemented and validated locally; committed by the user as `5d6415e`.
 The user creates every commit. No deployment or live transaction is included.
 
 ## Outcome and user-selected priority
@@ -281,4 +281,5 @@ Suggested explanation:
 
 > Add two-sided candidate calculations, net-flow deviation checks and real-v4 capacity evidence. Document oversized exact lots, fractional redemption IR and rounding profits while preserving the paper's incentive guarantees as the research target.
 
-Create the commit and confirm completion before the next implementation slice.
+The user committed this checkpoint as `5d6415e`. The clean tree was verified
+before [checkpoint 4F](./CHECKPOINT_4F.md). The handoff above is historical.

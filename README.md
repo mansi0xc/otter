@@ -110,6 +110,13 @@ The current hook enforces the following integration rules:
   bound at most sampled tick prices. Fractional claims are not implemented and
   do not establish immediate underlying-token IR; ceil rounding still rewards
   some deviations. No candidate is selected or integrated into settlement.
+- **Representation research.** `solver/src/representation-research.ts` checks
+  exact rational spot payments, fractional debt/redemption and actual residual
+  input. Fixed decimal credits cannot represent every spot payment; output
+  claims do not guarantee whole-token IR or fractional v4 input. Two unchanged
+  allocation outcomes rule out every whole payment satisfying both IR and
+  truthfulness under their stated assumptions. This is scoped research, not an
+  impossibility theorem for every redesigned mechanism or an implemented asset.
 - **Batch-active guards.** LP changes and fee collection are frozen from the
   first accepted order through complete settlement or explicit expiry.
   Anyone can expire an epoch at its fixed execution deadline without token
