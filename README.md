@@ -13,7 +13,10 @@ oracle with an independent BigInt execution reference. Epochs now retain their
 opening pool state and authenticated LP roster, with validation before execution.
 Small-domain discrete research now exposes funding and rounding incentive failures
 in candidate integer adaptations; no production mechanism is selected.
-See [checkpoint 4D](./reviews/CHECKPOINT_4D.md) for those counterexamples and limits,
+The two-sided exact-lot candidate has further price-support and fractional
+redemption limits. The paper's incentive guarantees remain the research target.
+See [checkpoint 4E](./reviews/CHECKPOINT_4E.md) for that candidate and its net-flow
+tests, [checkpoint 4D](./reviews/CHECKPOINT_4D.md) for the original discrete counterexamples,
 [checkpoint 4C](./reviews/CHECKPOINT_4C.md) for snapshot scope and limitations,
 [checkpoint 4B](./reviews/CHECKPOINT_4B.md) for reference/domain comparisons and
 [checkpoint 4A](./reviews/CHECKPOINT_4A.md) for authenticated exact quotes,
@@ -101,6 +104,12 @@ The current hook enforces the following integration rules:
   and exposes deficits without clamping. Candidate ceil/refund policies have
   funding or incentive counterexamples; these tests do not enforce canonical
   settlement or establish integer truthfulness or sybil resistance.
+- **Two-sided candidate research.** `solver/src/lot-candidate.ts` tests exact
+  reciprocal exchange lots, minority funding, residual swaps and raw dominant
+  pivots against full net-flow utility. Exact lots exceed the accepted input
+  bound at most sampled tick prices. Fractional claims are not implemented and
+  do not establish immediate underlying-token IR; ceil rounding still rewards
+  some deviations. No candidate is selected or integrated into settlement.
 - **Batch-active guards.** LP changes and fee collection are frozen from the
   first accepted order through complete settlement or explicit expiry.
   Anyone can expire an epoch at its fixed execution deadline without token

@@ -1,7 +1,7 @@
 # Checkpoint 4D — discrete allocation and payment research
 
 Prepared 4 October 2026. Starting revision: user-created commit `caca1bd`.
-Status: implemented and validated locally, pending the user-created commit.
+Status: committed by the user as `e156b91`; clean tree inspected before 4E.
 The user creates every commit. No deployment or live transaction is included.
 
 ## Result and scope
@@ -277,4 +277,6 @@ Suggested explanation:
 
 > Add bounded exact welfare/pivot research, independent exhaustive checks and real-v4 counterexamples. Preserve unsupported capacity and document funding, IR, rounding and false-name failures without enabling canonical or concentrated settlement.
 
-Create the commit and confirm completion before the next implementation slice.
+This handoff was completed by the user as `e156b91`. It remains above as the
+historical checkpoint scope; [checkpoint 4E](./CHECKPOINT_4E.md) records the
+subsequent two-sided candidate research and its separate commit handoff.

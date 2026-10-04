@@ -7,6 +7,11 @@ The review supplies the findings and reproductions needed to begin. This plan su
 
 User-selected scope: **expand asset and liquidity support now**, including direct native ETH and concentrated liquidity. These are part of the remediation rather than deferred follow-ups. [The v2 implementation specification](./IMPLEMENTATION_SPEC.md) records the selected custody, recovery, liquidity, and execution rules, together with the numerical research gates.
 
+User-selected mechanism priority on 4 October: **preserve the paper's guarantees;
+keep testing before selecting a rule**. Do not substitute a funded prototype with
+weaker incentives. Payment/asset and trade-size changes remain research candidates
+until their complete rules, practical support and guarantees are established.
+
 ## Commit protocol
 
 The user creates every commit. The assistant must not create or amend a commit.
@@ -264,10 +269,35 @@ bound have explicit assumptions and exclusions; neither establishes the full
 incentive theorem or complete two-sided settlement. G1/G2 remain open. No
 production contract, legacy solver, deployment or concentrated gate changes.
 
-**4D is pending the user's commit.** After confirmation, develop and compare
+**4D was committed by the user as `e156b91`; clean tree inspected before 4E.**
+Develop and compare
 complete candidate adaptations with explicit allocation/payment/lot/dust and
 identity tradeoffs, including both sides' IR and finite capacity. Then measure
 the selected full algorithm and authenticated counterfactual verification for
 G3. Do not advance to step 5 merely because the research optimizer and its
 negative controls pass. Historical LP rewards and concentrated integration
 remain separate implementation work.
+
+## Checkpoint 4E: two-sided exact exchange lot candidate
+
+See [the candidate checkpoint report](./CHECKPOINT_4E.md) for minority/AMM funding,
+dominant pivot counterfactuals, signed residuals, the local concavity certificate,
+full net-flow utility and independent enumeration. The candidate's nominal
+fractional claims show no profitable deviation in the declared 30,940-feasible
+strategy grid. That is not a complete UIC proof or an implemented claim asset.
+Ceil rounding still gives profitable ask/split deviations. Immediate floor
+redemption fails the existing whole-token IR postcondition in published cases.
+
+Minimum exact reciprocal spot lots exceed the uint96 input bound at 2,000 of
+2,001 sampled tick prices. The candidate is therefore not a general price-support
+solution. Rounded spot ratios or changed input/payment assets require explicit
+new execution, backing and incentive analysis. No weaker production mechanism,
+fractional token, deployment or concentrated-gate change is selected.
+
+**4E is pending the user's commit.** After confirmation, investigate a
+proof-compatible compensation/asset representation that fits ordinary quantized
+prices. Define the complete redemption/backing/dust/actual-input rules and
+evaluate whole-token IR and full net-flow incentives before any product-contract
+revision. Retain the user's original guarantee priority. G1/G2 and independent
+mechanism review remain open; G3 must measure the selected full computation
+before canonical settlement and concentrated auctions can proceed.
