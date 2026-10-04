@@ -241,10 +241,33 @@ authenticate arbitrary off-chain maps, enable concentrated auctions, implement
 capital weights or reward claims, remove legacy solver discretion, or resolve
 integer IR. Those remain explicit deliverables, not implied by storing a roster.
 
-**4C is pending the user's commit.** After confirmation, continue G1/G2
-small-domain mechanism research using the exact execution reference, including
+**4C was committed by the user as `caca1bd`; clean tree inspected before 4D.**
+Continue G1/G2 small-domain research using the exact execution reference, including
 finite capacity, dust, both-side IR, ties and counterfactual semantics. Measure
 the complete candidate computation for G3 before committing to canonical
 settlement. Concentrated snapshot integration and historical rewards still
 require their implementation and validation; do not lift the auction gate
 merely because the full-range snapshot tests pass.
+
+## Checkpoint 4D: discrete allocation/payment counterexamples
+
+See [the research checkpoint report](./CHECKPOINT_4D.md) for the bounded exact
+quantity scan, independent Cartesian optimizer, fixed counterfactual domain,
+finite capacity/lot behavior and real-core-backed tables. Published negative
+controls expose raw pivot deficits, a whole-unit IR/funding conflict at specific
+welfare-optimal fills, rounding-only deficits, a profitable refund-fallback
+misreport, funded ceil-payment manipulation and false-name rounding profit.
+Minority floor payments fail integer IR in both price orientations.
+
+The local concavity certificate and limited single-identity sub-unit rounding
+bound have explicit assumptions and exclusions; neither establishes the full
+incentive theorem or complete two-sided settlement. G1/G2 remain open. No
+production contract, legacy solver, deployment or concentrated gate changes.
+
+**4D is pending the user's commit.** After confirmation, develop and compare
+complete candidate adaptations with explicit allocation/payment/lot/dust and
+identity tradeoffs, including both sides' IR and finite capacity. Then measure
+the selected full algorithm and authenticated counterfactual verification for
+G3. Do not advance to step 5 merely because the research optimizer and its
+negative controls pass. Historical LP rewards and concentrated integration
+remain separate implementation work.

@@ -3,8 +3,10 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node --experimental-strip-types test/properties.ts && node --experimental-strip-types test/execution.ts",
+    "test": "node --experimental-strip-types test/properties.ts && node --experimental-strip-types test/execution.ts && node --experimental-strip-types test/discrete-research.ts",
     "test:execution": "node --experimental-strip-types test/execution.ts",
+    "test:discrete": "node --experimental-strip-types test/discrete-research.ts",
+    "research:discrete": "node --experimental-strip-types research/discrete-cli.ts",
     "mutation": "node --experimental-strip-types test/mutation.ts",
     "bench": "node --experimental-strip-types test/bench.ts",
     "vectors": "node --experimental-strip-types src/cli.ts ../fixtures/vectors",

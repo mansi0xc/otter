@@ -1,7 +1,7 @@
 # Checkpoint 4C — opening pool state and LP ownership records
 
 Prepared 3 October 2026. Starting revision: user-created commit `49586b3`.
-Status: implemented and validated locally, pending the user-created commit.
+Status: committed by the user as `caca1bd`; clean tree inspected before 4D.
 The user creates every commit. No deployment or live transaction is included.
 
 ## What changed
@@ -234,4 +234,6 @@ Suggested explanation:
 
 > Store authenticated opening pool and LP records, bind them to the epoch configuration and clock, and validate state through admission and settlement callbacks. Preserve history across exits and new epochs while keeping recovery independent of pool reads. Keep concentrated auctions and historical reward distribution gated behind their remaining work.
 
-Create the commit and confirm completion before the next implementation slice.
+This handoff was completed by the user as `caca1bd`. It remains above as the
+historical checkpoint scope; [checkpoint 4D](./CHECKPOINT_4D.md) records the
+subsequent discrete mechanism research and its separate commit handoff.

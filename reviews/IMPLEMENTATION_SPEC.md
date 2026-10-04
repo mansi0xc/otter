@@ -3,7 +3,7 @@
 Prepared 2 October 2026. Baseline: user-created commit `63ec94e`.
 Sources: [grant readiness review](./GRANT_READINESS_REVIEW_2026-10-02.md), [remediation plan](./REMEDIATION_PLAN.md), the pinned v4 core, and [the paper](https://arxiv.org/html/2609.03474v1).
 
-**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. [3B](./CHECKPOINT_3B.md) implements queued exit priority and bounded donation accrual. [4A](./CHECKPOINT_4A.md) adds a bounded read-only exact execution quote; [4B](./CHECKPOINT_4B.md) adds an independent BigInt execution reference with matched domains and real-core comparisons. [4C](./CHECKPOINT_4C.md) records and revalidates opening pool state and LP ownership for the admitted full-range model. Concentrated snapshot integration, reward weights/claims, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
+**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. [3B](./CHECKPOINT_3B.md) implements queued exit priority and bounded donation accrual. [4A](./CHECKPOINT_4A.md) adds a bounded read-only exact execution quote; [4B](./CHECKPOINT_4B.md) adds an independent BigInt execution reference with matched domains and real-core comparisons. [4C](./CHECKPOINT_4C.md) records and revalidates opening pool state and LP ownership for the admitted full-range model. [4D](./CHECKPOINT_4D.md) adds bounded one-sided discrete allocation/payment research and counterexamples, without selecting a production mechanism. Concentrated snapshot integration, reward weights/claims, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
 
 The user has selected **native ETH and concentrated liquidity support now**. These belong to this remediation, including contracts, the integer solver, recovery, deployment, and wallet flows. Supporting WETH alone or removing the full-range check alone does not meet this scope.
 
@@ -266,7 +266,7 @@ Minimum enforceable postconditions are:
 
 Three gates remain. These are technical acceptance gates, not requests for another user permission.
 
-**G1 — Complete the discrete allocation/payment definition.** Derive a rule with a nonempty integer payment interval, both-side IR, deterministic side selection/ties, and an explicit treatment of dust and finite capacity. State the objective in common units and define leave-one-out outcomes, rounding order, and zero allocation. Use independent exhaustive rational/integer optimization on small domains to find counterexamples before selecting the scalable implementation. Define any deviation from continuous pivot payments and quantify an incentive error only if supported. Postconditions alone are not an algorithm or a truthfulness proof.
+**G1 — Complete the discrete allocation/payment definition.** Derive a rule with a nonempty integer payment interval, both-side IR, deterministic side selection/ties, and an explicit treatment of dust and finite capacity. State the objective and its units for each side; if introducing a cross-side welfare comparison, define and justify its common units rather than attributing that additional rule to the paper. Define leave-one-out outcomes, rounding order, and zero allocation. Use independent exhaustive rational/integer optimization on small domains to find counterexamples before selecting the scalable implementation. Define any deviation from continuous pivot payments and quantify an incentive error only if supported. Postconditions alone are not an algorithm or a truthfulness proof.
 
 **G2 — Establish the concentrated-liquidity mechanism's domain.** The paper assumes an increasing concave continuous curve with an unbounded nonnegative input domain and stated inverse/differentiability behavior. A real tick-aware integer pool has finite usable capacity, zero-liquidity gaps, staircase output, and price limits. Document which assumptions hold on each supported domain and prove or qualify the extended rule. Matching v4's execution is necessary but insufficient. Do not carry over a full-range theorem merely because a within-tick segment is constant-product.
 
@@ -278,6 +278,27 @@ swap for input 2 agree. This falsifies literal substitution of integer output
 into the continuous assumption, not the existence of an adapted truthful rule.
 G1/G2 must select and evaluate that adaptation, including finite capacity,
 integer payments, unspent input, both-side IR, and dust.
+
+Checkpoint 4D supplies a one-sided finite-domain exact welfare/pivot laboratory
+and independent exhaustive comparison. It shows a raw pivot funding deficit
+on that same v4 staircase, as well as particular optimal fills for which both
+whole-unit IR payments cannot fit the available output. Ceil/floor rounding
+introduces further funding or IR failures, and refunding every insolvent batch
+creates a profitable ask misreport in the tested candidate policy. Even on
+funded finite concave tables, ceil payments can reward an ask misreport or
+identity splitting. These are open candidate failures, not deployed policies,
+proof counterexamples under the paper's assumptions, or an impossibility result
+for all adapted mechanisms.
+
+The report proves funding/IR for ceil pivots only on a fixed one-sided finite
+integer-concave prefix, and a less-than-one-raw-output-unit incentive error
+only for a single identity's feasible ask/budget deviation under fixed direction,
+domain, linear utility and other reports. The latter excludes false names,
+LP rewards, two-sided selection and the refund fallback; for unfunded outcomes
+it is only algebraic. No complete adaptation is selected. A coarse lot or
+fractional claim would change the mechanism contract and needs its own analysis.
+G1/G2 remain open; preserve whole-unit per-order IR until an explicit revised
+policy is selected and its tradeoffs are recorded.
 
 **G3 — Choose enforceable verification within measured resources.** Begin by benchmarking direct recomputation on bounded batches and traces, including counterfactuals. If it cannot fit, lower measured limits or specify a complete authenticated witness/proof design. The witness must bind G1's full computation and G2's real curve, not just feasibility or welfare. Do not introduce a TEE, bond, or optimistic dispute period and call it equivalent to immediate trustless verification. Any changed trust/delivery model requires a revised specification and disclosed funding scope.
 
@@ -324,10 +345,13 @@ user-created commit. Checkpoint 4A was committed as `051c11f` and implements
 authenticated bounded read-only quotes and differential execution evidence.
 Checkpoint 4B was committed as `49586b3` and supplies the independent BigInt
 execution reference, matched execution domains, and further real-core comparisons.
-Checkpoint 4C supplies opening full-range pool/ownership records and execution
-revalidation; its report records the pending user-created commit. Step 4 remains
-incomplete. The next slice addresses small-domain discrete allocation/payment/
-capacity research under G1–G3. The legacy auction reference remains
+Checkpoint 4C was committed as `caca1bd` and supplies opening full-range
+pool/ownership records and execution revalidation. Checkpoint 4D supplies bounded
+discrete allocation/payment/capacity research; its report records the pending
+user-created commit and the candidate funding/incentive failures. Step 4 remains
+incomplete. The next slice compares complete adaptations and their tradeoffs
+under G1/G2 before measuring the selected full algorithm for G3. The legacy
+auction reference remains
 separate and retains its known boundary/payment failures. Canonical results and
 historical rewards remain separate work. Canonical
 settlement and concentrated execution still require sections 5–7; a correct

@@ -1,0 +1,602 @@
+{
+  "schema": "otter/discrete-research/v1",
+  "qualification": "Offline negative controls; no production solver, authenticated snapshot, or accepted mechanism.",
+  "pivotFunding": {
+    "curve": [
+      "0",
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "4",
+      null,
+      null
+    ],
+    "bids": [
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "ask": "0",
+        "budget": "1"
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+        "ask": "0",
+        "budget": "1"
+      }
+    ],
+    "result": {
+      "fill": [
+        "1",
+        "1"
+      ],
+      "totalInput": "2",
+      "output": "1",
+      "welfareNumerator": "1000000000000000000",
+      "costNumerator": "0",
+      "evaluated": 3,
+      "withoutWelfareNumerator": [
+        "0",
+        "0"
+      ],
+      "paymentNumerator": [
+        "1000000000000000000",
+        "1000000000000000000"
+      ],
+      "floorPayment": [
+        "1",
+        "1"
+      ],
+      "ceilPayment": [
+        "1",
+        "1"
+      ],
+      "minimumPayment": [
+        "0",
+        "0"
+      ],
+      "unspent": [
+        "0",
+        "0"
+      ],
+      "rawDeficitNumerator": "1000000000000000000",
+      "ceilDeficit": "1",
+      "ceilResidual": "-1",
+      "floorIRFailures": [],
+      "quantityEvaluations": 7
+    }
+  },
+  "noIntegerIRPaymentVector": {
+    "curve": [
+      "0",
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "4",
+      null,
+      null
+    ],
+    "bids": [
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "ask": "100000000000000000",
+        "budget": "1"
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+        "ask": "100000000000000000",
+        "budget": "1"
+      }
+    ],
+    "result": {
+      "fill": [
+        "1",
+        "1"
+      ],
+      "totalInput": "2",
+      "output": "1",
+      "welfareNumerator": "800000000000000000",
+      "costNumerator": "200000000000000000",
+      "evaluated": 3,
+      "withoutWelfareNumerator": [
+        "0",
+        "0"
+      ],
+      "paymentNumerator": [
+        "900000000000000000",
+        "900000000000000000"
+      ],
+      "floorPayment": [
+        "0",
+        "0"
+      ],
+      "ceilPayment": [
+        "1",
+        "1"
+      ],
+      "minimumPayment": [
+        "1",
+        "1"
+      ],
+      "unspent": [
+        "0",
+        "0"
+      ],
+      "rawDeficitNumerator": "800000000000000000",
+      "ceilDeficit": "1",
+      "ceilResidual": "-1",
+      "floorIRFailures": [
+        0,
+        1
+      ],
+      "quantityEvaluations": 7
+    },
+    "minimumTotal": "2"
+  },
+  "roundingOnlyDeficit": {
+    "bids": [
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "ask": "500000000000000000",
+        "budget": "1"
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+        "ask": "500000000000000000",
+        "budget": "1"
+      }
+    ],
+    "result": {
+      "fill": [
+        "1",
+        "1"
+      ],
+      "totalInput": "2",
+      "output": "1",
+      "welfareNumerator": "0",
+      "costNumerator": "1000000000000000000",
+      "evaluated": 3,
+      "withoutWelfareNumerator": [
+        "0",
+        "0"
+      ],
+      "paymentNumerator": [
+        "500000000000000000",
+        "500000000000000000"
+      ],
+      "floorPayment": [
+        "0",
+        "0"
+      ],
+      "ceilPayment": [
+        "1",
+        "1"
+      ],
+      "minimumPayment": [
+        "1",
+        "1"
+      ],
+      "unspent": [
+        "0",
+        "0"
+      ],
+      "rawDeficitNumerator": "0",
+      "ceilDeficit": "1",
+      "ceilResidual": "-1",
+      "floorIRFailures": [
+        0,
+        1
+      ],
+      "quantityEvaluations": 7
+    }
+  },
+  "refundOnDeficitDeviation": {
+    "honestBids": [
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "ask": "0",
+        "budget": "2"
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+        "ask": "0",
+        "budget": "1"
+      }
+    ],
+    "dishonestBids": [
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "ask": "1000000000000000000",
+        "budget": "2"
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+        "ask": "0",
+        "budget": "1"
+      }
+    ],
+    "honest": {
+      "fill": [
+        "2",
+        "1"
+      ],
+      "totalInput": "3",
+      "output": "2",
+      "welfareNumerator": "2000000000000000000",
+      "costNumerator": "0",
+      "evaluated": 4,
+      "withoutWelfareNumerator": [
+        "0",
+        "1000000000000000000"
+      ],
+      "paymentNumerator": [
+        "2000000000000000000",
+        "1000000000000000000"
+      ],
+      "floorPayment": [
+        "2",
+        "1"
+      ],
+      "ceilPayment": [
+        "2",
+        "1"
+      ],
+      "minimumPayment": [
+        "0",
+        "0"
+      ],
+      "unspent": [
+        "0",
+        "0"
+      ],
+      "rawDeficitNumerator": "1000000000000000000",
+      "ceilDeficit": "1",
+      "ceilResidual": "-1",
+      "floorIRFailures": [],
+      "quantityEvaluations": 9
+    },
+    "dishonest": {
+      "fill": [
+        "2",
+        "1"
+      ],
+      "totalInput": "3",
+      "output": "2",
+      "welfareNumerator": "0",
+      "costNumerator": "2000000000000000000",
+      "evaluated": 4,
+      "withoutWelfareNumerator": [
+        "0",
+        "0"
+      ],
+      "paymentNumerator": [
+        "2000000000000000000",
+        "0"
+      ],
+      "floorPayment": [
+        "2",
+        "0"
+      ],
+      "ceilPayment": [
+        "2",
+        "0"
+      ],
+      "minimumPayment": [
+        "2",
+        "0"
+      ],
+      "unspent": [
+        "0",
+        "0"
+      ],
+      "rawDeficitNumerator": "0",
+      "ceilDeficit": "0",
+      "ceilResidual": "0",
+      "floorIRFailures": [],
+      "quantityEvaluations": 9
+    },
+    "truthful": {
+      "fill": [
+        "0",
+        "0"
+      ],
+      "payment": [
+        "0",
+        "0"
+      ]
+    },
+    "deviating": {
+      "fill": [
+        "2",
+        "1"
+      ],
+      "payment": [
+        "2",
+        "0"
+      ]
+    },
+    "gainNumerator": "2000000000000000000"
+  },
+  "ceilPaymentAskDeviation": {
+    "snapshotPrice": "118842243771396506390315925504",
+    "limit": "118664247400296062296870619575",
+    "curve": [
+      "0",
+      "2",
+      null,
+      null
+    ],
+    "certificate": {
+      "contiguous": true,
+      "concave": true,
+      "supportedLots": 1,
+      "violationAt": null
+    },
+    "partialRequest": {
+      "status": 11,
+      "requestedInput": "2",
+      "consumedInput": "1",
+      "output": "2",
+      "sqrtPriceX96": "118664247400296062296870619575",
+      "tick": 8079,
+      "liquidity": "1000",
+      "bitmapWords": 1,
+      "initializedTicksCrossed": 0,
+      "steps": 1
+    },
+    "truth": {
+      "fill": [
+        "0",
+        "1"
+      ],
+      "totalInput": "1",
+      "output": "2",
+      "welfareNumerator": "1500000000000000000",
+      "costNumerator": "500000000000000000",
+      "evaluated": 2,
+      "withoutWelfareNumerator": [
+        "1500000000000000000",
+        "1250000000000000000"
+      ],
+      "paymentNumerator": [
+        "0",
+        "750000000000000000"
+      ],
+      "floorPayment": [
+        "0",
+        "0"
+      ],
+      "ceilPayment": [
+        "0",
+        "1"
+      ],
+      "minimumPayment": [
+        "0",
+        "1"
+      ],
+      "unspent": [
+        "1",
+        "0"
+      ],
+      "rawDeficitNumerator": "-1250000000000000000",
+      "ceilDeficit": "0",
+      "ceilResidual": "1",
+      "floorIRFailures": [
+        1
+      ],
+      "quantityEvaluations": 6
+    },
+    "deviation": {
+      "fill": [
+        "1",
+        "0"
+      ],
+      "totalInput": "1",
+      "output": "2",
+      "welfareNumerator": "1750000000000000000",
+      "costNumerator": "250000000000000000",
+      "evaluated": 2,
+      "withoutWelfareNumerator": [
+        "1500000000000000000",
+        "1750000000000000000"
+      ],
+      "paymentNumerator": [
+        "500000000000000000",
+        "0"
+      ],
+      "floorPayment": [
+        "0",
+        "0"
+      ],
+      "ceilPayment": [
+        "1",
+        "0"
+      ],
+      "minimumPayment": [
+        "1",
+        "0"
+      ],
+      "unspent": [
+        "0",
+        "1"
+      ],
+      "rawDeficitNumerator": "-1500000000000000000",
+      "ceilDeficit": "0",
+      "ceilResidual": "1",
+      "floorIRFailures": [
+        0
+      ],
+      "quantityEvaluations": 6
+    },
+    "trueUtilityNumerator": "0",
+    "deviatingUtilityNumerator": "250000000000000000",
+    "gainNumerator": "250000000000000000"
+  },
+  "ceilPaymentFalseName": {
+    "snapshotPrice": "118842243771396506390315925504",
+    "limit": "118486783421133107069108599705",
+    "curve": [
+      "0",
+      "2",
+      "4",
+      null,
+      null
+    ],
+    "certificate": {
+      "contiguous": true,
+      "concave": true,
+      "supportedLots": 2,
+      "violationAt": null
+    },
+    "partialRequest": {
+      "status": 11,
+      "requestedInput": "3",
+      "consumedInput": "2",
+      "output": "4",
+      "sqrtPriceX96": "118486783421133107069108599705",
+      "tick": 8049,
+      "liquidity": "1000",
+      "bitmapWords": 1,
+      "initializedTicksCrossed": 0,
+      "steps": 1
+    },
+    "unsplitBids": [
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "ask": "250000000000000000",
+        "budget": "2"
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000003",
+        "ask": "500000000000000000",
+        "budget": "2"
+      }
+    ],
+    "splitBids": [
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "ask": "250000000000000000",
+        "budget": "1"
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+        "ask": "250000000000000000",
+        "budget": "1"
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000003",
+        "ask": "500000000000000000",
+        "budget": "2"
+      }
+    ],
+    "unsplit": {
+      "fill": [
+        "2",
+        "0"
+      ],
+      "totalInput": "2",
+      "output": "4",
+      "welfareNumerator": "3500000000000000000",
+      "costNumerator": "500000000000000000",
+      "evaluated": 3,
+      "withoutWelfareNumerator": [
+        "3000000000000000000",
+        "3500000000000000000"
+      ],
+      "paymentNumerator": [
+        "1000000000000000000",
+        "0"
+      ],
+      "floorPayment": [
+        "1",
+        "0"
+      ],
+      "ceilPayment": [
+        "1",
+        "0"
+      ],
+      "minimumPayment": [
+        "1",
+        "0"
+      ],
+      "unspent": [
+        "0",
+        "2"
+      ],
+      "rawDeficitNumerator": "-3000000000000000000",
+      "ceilDeficit": "0",
+      "ceilResidual": "3",
+      "floorIRFailures": [],
+      "quantityEvaluations": 9
+    },
+    "split": {
+      "fill": [
+        "1",
+        "1",
+        "0"
+      ],
+      "totalInput": "2",
+      "output": "4",
+      "welfareNumerator": "3500000000000000000",
+      "costNumerator": "500000000000000000",
+      "evaluated": 3,
+      "withoutWelfareNumerator": [
+        "3250000000000000000",
+        "3250000000000000000",
+        "3500000000000000000"
+      ],
+      "paymentNumerator": [
+        "500000000000000000",
+        "500000000000000000",
+        "0"
+      ],
+      "floorPayment": [
+        "0",
+        "0",
+        "0"
+      ],
+      "ceilPayment": [
+        "1",
+        "1",
+        "0"
+      ],
+      "minimumPayment": [
+        "1",
+        "1",
+        "0"
+      ],
+      "unspent": [
+        "0",
+        "0",
+        "2"
+      ],
+      "rawDeficitNumerator": "-3000000000000000000",
+      "ceilDeficit": "0",
+      "ceilResidual": "2",
+      "floorIRFailures": [
+        0,
+        1
+      ],
+      "quantityEvaluations": 12
+    },
+    "rawGainNumerator": "0",
+    "roundedGain": "1"
+  },
+  "minorityDust": {
+    "snapshotPrice": "118842243771396506390315925504",
+    "sellsCurrency1": {
+      "eligible": true,
+      "floorPayment": "0",
+      "minimumPayment": "1",
+      "ir": false
+    },
+    "sellsCurrency0": {
+      "eligible": true,
+      "floorPayment": "2",
+      "minimumPayment": "2",
+      "ir": true
+    }
+  }
+}

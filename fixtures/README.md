@@ -24,3 +24,24 @@ Run `cd solver && npm test` and the contract suite documented in the root README
 The bridge needs Node with TypeScript strip support on PATH; it reads no RPC,
 downloads no dependencies, and does not write benchmark or fixture artifacts.
 It is test infrastructure, not a production snapshot reader or an on-chain proof.
+
+`research/discrete-counterexamples.json` is a separate negative-control artifact
+from the bounded one-sided discrete laboratory. It records exact allocations,
+counterfactual payments, funding/IR failures, rounding deviations and partial
+capacity diagnostics. It is not an executable settlement witness or a saved
+economic benchmark; passing its failure assertions does not fix the legacy
+auction or establish incentive guarantees. See [checkpoint 4D](../reviews/CHECKPOINT_4D.md).
+
+Reproduce JSON to stdout with:
+
+```bash
+cd solver
+node --experimental-strip-types research/discrete-cli.ts
+```
+
+From that directory, append `> ../fixtures/research/discrete-counterexamples.json`
+to regenerate the research artifact deliberately. Every BigInt is a decimal
+string. `npm run test:discrete` checks it byte-for-byte, compares exact allocation
+and counterfactuals with independent Cartesian enumeration, and checks seeded
+cases and the limited single-identity rounding bound. It does not regenerate
+legacy verifier vectors or economic benchmark results.

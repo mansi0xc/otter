@@ -11,7 +11,10 @@ trader escrow, bounded v2 signed epochs, independent stored-order recovery,
 queued LP exits that precede the next epoch, and a bounded read-only execution
 oracle with an independent BigInt execution reference. Epochs now retain their
 opening pool state and authenticated LP roster, with validation before execution.
-See [checkpoint 4C](./reviews/CHECKPOINT_4C.md) for snapshot scope and limitations,
+Small-domain discrete research now exposes funding and rounding incentive failures
+in candidate integer adaptations; no production mechanism is selected.
+See [checkpoint 4D](./reviews/CHECKPOINT_4D.md) for those counterexamples and limits,
+[checkpoint 4C](./reviews/CHECKPOINT_4C.md) for snapshot scope and limitations,
 [checkpoint 4B](./reviews/CHECKPOINT_4B.md) for reference/domain comparisons and
 [checkpoint 4A](./reviews/CHECKPOINT_4A.md) for authenticated exact quotes,
 [checkpoint 3B](./reviews/CHECKPOINT_3B.md)
@@ -47,10 +50,10 @@ from.
 
 | Path | What lives here |
 | --- | --- |
-| `solver/` | Legacy mechanism references plus an independent bounded BigInt execution model, with property and differential tests. |
+| `solver/` | Legacy references, an independent BigInt execution model, and bounded discrete mechanism research with exhaustive comparison. |
 | `contracts/` | `OtterOrderBook`, `OtterSettlement`, `OtterHook`, and fixed-point invariant checks. |
 | `harness/` | Sandwich-attack comparison (vanilla Uniswap v4 vs. Otter) and settlement-cost benchmarks. |
-| `fixtures/` | Saved legacy verifier vectors and demo fixtures. |
+| `fixtures/` | Saved legacy verifier vectors, demo data and separately labeled discrete research counterexamples. |
 | `web/` | React/Vite dashboard with two modes: a guided **Demo story** that walks through a real settled batch (order ledger, sandwich-comparison chart, batch clock, proof rail, and outcome panel), and a **Sepolia sandbox** where you connect a wallet (RainbowKit/wagmi), mint demo tokens, and submit a real EIP-712-signed order to the deployed `OtterOrderBook`, with the batch countdown read live from the contract. No public solver runs against the sandbox yet, so settlement itself is shown through the Demo story's fixture rather than live. See [`deployment.md`](./deployment.md) for the exact contract addresses it talks to. |
 
 ## Limitations
@@ -92,6 +95,12 @@ The current hook enforces the following integration rules:
   result statuses. Tests compare it with the oracle and real PoolManager swaps.
   Missing bitmap/tick data fails explicitly. This is an offline execution model;
   the legacy auction solver still has its documented payment and tie failures.
+- **Discrete mechanism research.** `solver/src/discrete-research.ts` maximizes
+  exact linear welfare on fixed small one-sided domains and computes raw pivots,
+  with independent exhaustive checks. It preserves partial-capacity diagnostics
+  and exposes deficits without clamping. Candidate ceil/refund policies have
+  funding or incentive counterexamples; these tests do not enforce canonical
+  settlement or establish integer truthfulness or sybil resistance.
 - **Batch-active guards.** LP changes and fee collection are frozen from the
   first accepted order through complete settlement or explicit expiry.
   Anyone can expire an epoch at its fixed execution deadline without token
