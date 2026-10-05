@@ -25,7 +25,8 @@ contract MockLiquidityGuard is IOtterLiquidityGuard {
     {
         // Book-only unit tests do not claim real pool authentication.
         roster = new PositionSnapshot[](1);
-        roster[0] = PositionSnapshot(1, address(this), -887272, 887272, 1);
+        roster[0] = PositionSnapshot(1, address(this), -887272, 887272, 1e18);
+        pool.sqrtPriceX96 = uint160(1) << 96;
         pool.positionsHash = keccak256(abi.encode(roster));
     }
 

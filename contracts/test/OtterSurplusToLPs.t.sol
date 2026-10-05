@@ -22,21 +22,9 @@ interface IERC20S {
     function balanceOf(address) external view returns (uint256);
 }
 
-/// @notice Where the surplus actually goes.
-///
-/// The paper permits several destinations for the redistributed surplus and
-/// lists LP rewards first (§1.1, §3.6). Paying it to an address chosen at
-/// deployment satisfies the theorems and achieves nothing: the guarantee that
-/// matters is only that the payment is outcome-independent, and an EOA clears
-/// that bar as easily as the pool does. Paying it to the pool's LPs is the
-/// destination that makes the next batch cheaper to trade against, which is the
-/// mechanism's own stated reason for redistributing at all.
-///
-/// Three things need to be true for that to be honest, and each is a test here:
-///   1. the surplus reaches LPs, in full;
-///   2. a batch never donates its own surplus, only an earlier batch's, so no
-///      bidder's payout can be a function of its own report (Theorem 22);
-///   3. donating does not move the curve the next batch will be priced on.
+/// @notice Residual cash credits the opening LP owners in the same settlement.
+/// This validates historical eligibility/backing, not canonical trader payments
+/// or LP incentives. Deliberately underpaid legacy outcomes keep R2 visible.
 contract OtterSurplusToLPsTest is Deployers {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
@@ -174,94 +162,52 @@ contract OtterSurplusToLPsTest is Deployers {
         y[1] = MIN_BUDGET;
         x[1] = (c.y0 * MIN_BUDGET) / c.x0;
 
-        // `settle` drains whatever was pending (the previous batch's surplus,
-        // donated during this call) and then adds only this batch's own burn.
-        // So the pot's value right after `settle` already isolates this batch's
-        // surplus — no need to diff against what was there before.
         settlement.settle(
             otterKey, batchId, orders, OtterSettlement.Outcome({dominantSellsCurrency0: true, y: y, x: x})
         );
-        surplusCreated = settlement.pendingSurplus(otterId, currency1);
+        surplusCreated = settlement.rewardLedger()
+            .epochSurplus(
+                PoolId.unwrap(otterId), book.currentBatchId(PoolId.unwrap(otterId)), Currency.unwrap(currency1)
+            );
     }
 
-    // ------------------------------------------------------------------
-    // 1. the surplus reaches the LPs
-    // ------------------------------------------------------------------
-
-    function test_flushDonatesSurplusToLPs() public {
+    function test_settlementCreditsOpeningLPWithoutDonation() public {
         uint256 surplus = _runBatch(0, 1e15);
-        assertGt(surplus, 0, "batch should leave a surplus");
-
-        // Nothing has reached the LP yet: the pool is zero-fee and the batch's
-        // swap therefore generates no fee growth of its own.
-        (, uint256 beforeFees1) = _collectFees();
-        assertEq(beforeFees1, 0, "a zero-fee pool pays LPs nothing until the surplus is donated");
-
-        settlement.flushSurplus(otterKey);
-        assertEq(settlement.pendingSurplus(otterId, currency1), 0, "pot emptied");
-
-        (, uint256 got1) = _collectFees();
-        console2.log("surplus created ", surplus);
-        console2.log("collected by LP ", got1);
-
-        // Fee growth is a Q128 per-liquidity number, so a sole LP recovers the
-        // donation up to the truncation of one division and one multiplication.
-        assertApproxEqAbs(got1, surplus, 2, "LP should recover the donated surplus");
+        assertGt(surplus, 0);
+        assertEq(settlement.rewardLedger().claimable(address(this), Currency.unwrap(currency1)), surplus);
+        assertEq(IERC20S(Currency.unwrap(currency1)).balanceOf(address(settlement.rewardLedger())), surplus);
+        (, uint256 fees) = _collectFees();
+        assertEq(fees, 0, "historical rewards are separate from position fees");
+        uint256 beforeBalance = IERC20S(Currency.unwrap(currency1)).balanceOf(address(this));
+        settlement.rewardLedger().claim(Currency.unwrap(currency1), surplus, address(this));
+        assertEq(IERC20S(Currency.unwrap(currency1)).balanceOf(address(this)) - beforeBalance, surplus);
     }
 
-    function test_flushRevertsWhenThereIsNothingToDonate() public {
-        vm.expectRevert(OtterSettlement.NoSurplus.selector);
-        settlement.flushSurplus(otterKey);
-    }
-
-    // ------------------------------------------------------------------
-    // 2. the lag: a batch never donates its own surplus
-    // ------------------------------------------------------------------
-
-    function test_batchNeverDonatesItsOwnSurplus() public {
-        // Batch 1 creates surplus and donates nothing, because nothing preceded it.
-        uint256 s1 = _runBatch(0, 1e15);
-        (, uint256 fees1) = _collectFees();
-        assertEq(fees1, 0, "batch 1 must not donate its own surplus");
-        assertEq(settlement.pendingSurplus(otterId, currency1), s1, "batch 1's surplus is held back");
-
-        // Batch 2 donates exactly batch 1's surplus, and holds back its own.
-        uint256 s2 = _runBatch(1, 1e15);
-        (, uint256 fees2) = _collectFees();
-
-        console2.log("batch 1 surplus ", s1);
-        console2.log("donated at batch 2", fees2);
-        console2.log("batch 2 surplus ", s2);
-
-        assertApproxEqAbs(fees2, s1, 2, "batch 2 donates batch 1's surplus, in full");
-        assertEq(settlement.pendingSurplus(otterId, currency1), s2, "batch 2's own surplus is held back");
-    }
-
-    // ------------------------------------------------------------------
-    // 3. donating does not move the curve
-    // ------------------------------------------------------------------
-
-    /// @dev This is the claim that lets a donation share a settlement with the
-    ///      batch's own swap. `donate` writes only to feeGrowthGlobal; if it ever
-    ///      touched price or liquidity, the virtual reserves the mechanism is
-    ///      solved against would shift underneath the next batch and curve
-    ///      conservation would be measuring the wrong pool.
-    function test_donationLeavesPriceAndLiquidityUntouched() public {
+    function test_legacyFlushSelectorHasNoRoute() public {
         _runBatch(0, 1e15);
+        (bool ok,) = address(settlement)
+            .call(abi.encodeWithSignature("flushSurplus((address,address,uint24,int24,address))", otterKey));
+        assertFalse(ok);
+    }
 
-        (uint160 priceBefore,,,) = manager.getSlot0(otterId);
-        uint128 liquidityBefore = manager.getLiquidity(otterId);
-        (uint256 r0Before, uint256 r1Before) = OtterPoolMath.virtualReserves(priceBefore, liquidityBefore);
+    function test_repeatedEpochsRetainHistoricalCashUntilOwnersClaim() public {
+        uint256 s1 = _runBatch(0, 1e15);
+        uint256 s2 = _runBatch(1, 1e15);
+        assertEq(settlement.rewardLedger().epochSurplus(PoolId.unwrap(otterId), 0, Currency.unwrap(currency1)), s1);
+        assertEq(settlement.rewardLedger().epochSurplus(PoolId.unwrap(otterId), 1, Currency.unwrap(currency1)), s2);
+        assertEq(settlement.rewardLedger().claimable(address(this), Currency.unwrap(currency1)), s1 + s2);
+        assertEq(IERC20S(Currency.unwrap(currency1)).balanceOf(address(settlement.rewardLedger())), s1 + s2);
+        (, uint256 fees) = _collectFees();
+        assertEq(fees, 0);
+    }
 
-        settlement.flushSurplus(otterKey);
-
-        (uint160 priceAfter,,,) = manager.getSlot0(otterId);
-        uint128 liquidityAfter = manager.getLiquidity(otterId);
-        (uint256 r0After, uint256 r1After) = OtterPoolMath.virtualReserves(priceAfter, liquidityAfter);
-
-        assertEq(priceAfter, priceBefore, "donation moved the price");
-        assertEq(liquidityAfter, liquidityBefore, "donation moved the liquidity");
-        assertEq(r0After, r0Before, "donation moved the virtual reserve of currency0");
-        assertEq(r1After, r1Before, "donation moved the virtual reserve of currency1");
+    function test_rewardClaimLeavesPoolPriceAndLiquidityUntouched() public {
+        uint256 reward = _runBatch(0, 1e15);
+        (uint160 beforePrice,,,) = manager.getSlot0(otterId);
+        uint128 beforeLiquidity = manager.getLiquidity(otterId);
+        settlement.rewardLedger().claim(Currency.unwrap(currency1), reward, address(this));
+        (uint160 afterPrice,,,) = manager.getSlot0(otterId);
+        assertEq(afterPrice, beforePrice);
+        assertEq(manager.getLiquidity(otterId), beforeLiquidity);
     }
 }

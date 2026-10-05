@@ -301,7 +301,10 @@ contract OtterSettlementTest is Deployers {
             "minority filled in full at spot"
         );
 
-        uint256 burn = settlement.pendingSurplus(otterId, currency1);
+        uint256 burn = settlement.rewardLedger()
+            .epochSurplus(
+                PoolId.unwrap(otterId), book.currentBatchId(PoolId.unwrap(otterId)), Currency.unwrap(currency1)
+            );
         assertGt(burn, 0, "surplus should reach the sink");
         console2.log("surplus held for LPs", burn);
         console2.log("slack given up by dominant", uint256(1e15));
@@ -318,7 +321,13 @@ contract OtterSettlementTest is Deployers {
 
         settlement.settle(otterKey, batchId, orders, o);
         _claimAllTraders(book, otterKey, orders);
-        console2.log("burn at exact ceiling", settlement.pendingSurplus(otterId, currency1));
+        console2.log(
+            "burn at exact ceiling",
+            settlement.rewardLedger()
+                .epochSurplus(
+                    PoolId.unwrap(otterId), book.currentBatchId(PoolId.unwrap(otterId)), Currency.unwrap(currency1)
+                )
+        );
     }
 
     // ------------------------------------------------------------------

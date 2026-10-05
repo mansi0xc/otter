@@ -83,8 +83,8 @@ contract OtterEpochsTest is Test {
         book.setSettlement(address(this));
         token = new MockERC20("Epoch", "EPO", 18);
         guard = new MockLiquidityGuard();
-        book.registerPoolCurrencies(POOL, address(0), address(token), address(guard));
-        book.registerPoolCurrencies(OTHER, address(0), address(token), address(guard));
+        book.registerPoolCurrencies(POOL, address(0), address(token), address(guard), bytes32(uint256(1)));
+        book.registerPoolCurrencies(OTHER, address(0), address(token), address(guard), bytes32(uint256(1)));
         alice = vm.addr(PK);
         token.mint(alice, 1e24);
         vm.prank(alice);
@@ -349,11 +349,13 @@ contract OtterEpochsTest is Test {
         o.trader = address(new GasGriefWallet());
         (OtterOrderBook.Order[] memory os, bytes[] memory sigs) = _one(o);
         vm.expectRevert(abi.encodeWithSelector(OtterOrderBook.BadSignature.selector, 0));
-        book.submit{value: 1e18, gas: 400_000}(os, sigs);
+        // Opening now stores capital weights too. Give the admission call room
+        // for that work; the wallet's own 100k validation cap is unchanged.
+        book.submit{value: 1e18, gas: 800_000}(os, sigs);
         assertEq(book.nonceBitmap(o.trader, 0), 0);
         o.trader = address(new ReturnDataWallet());
         (os, sigs) = _one(o);
-        book.submit{value: 1e18, gas: 500_000}(os, sigs);
+        book.submit{value: 1e18, gas: 800_000}(os, sigs);
         o.nonce = 1;
         (os, sigs) = _one(o);
         sigs[0] = new bytes(513);

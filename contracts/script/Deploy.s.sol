@@ -34,6 +34,7 @@ import {HookMiner} from "../test/utils/HookMiner.sol";
 /// Optional env:
 ///   TOKEN0, TOKEN1        existing ERC20s. If unset, two MockERC20s are deployed
 ///                         and minted to the deployer.
+///   REWARD_COMMUNITY      fixed rounding-dust recipient. Default deployer.
 ///   WINDOW                batch window in seconds. Default 60.
 ///   NATIVE_ETH            true for native ETH/currency1. TOKEN0 must be unset.
 ///   SQRT_PRICE_X96        initial raw-unit price, Q64.96. Default 1:1.
@@ -72,8 +73,8 @@ contract Deploy is Script {
 
     /// Fee MUST be zero: a non-zero LP fee makes the realised swap diverge from F~
     /// and breaks curve conservation. LPs are paid from the redistributed surplus
-    /// instead, donated through the pool's own fee-growth accounting — see
-    /// OtterSettlement's `pendingSurplus` note.
+    /// instead, credited to the recorded opening LP owners in OtterRewardLedger.
+    /// Rounding dust has a fixed community recipient, defaulting to the deployer.
     uint24 constant FEE = 0;
     int24 constant TICK_SPACING = 1;
     uint256 constant SEPOLIA_CHAIN_ID = 11155111;
@@ -144,7 +145,7 @@ contract Deploy is Script {
 
         // Escrow needs to know which two tokens this poolId trades before any
         // order can be submitted against it — see OtterOrderBook's ESCROW note.
-        settlement.registerPool(key);
+        settlement.registerPool(key, vm.envOr("REWARD_COMMUNITY", deployer));
 
         // --- liquidity ------------------------------------------------
         OtterLiquidityVault vault = hook.liquidityVault();

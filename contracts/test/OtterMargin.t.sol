@@ -178,7 +178,8 @@ contract OtterMarginTest is Deployers {
         // model is not conservative enough. Any other revert is a setup problem.
         settlement.settle(k, batchId, orders, OtterSettlement.Outcome({dominantSellsCurrency0: true, y: y, x: x}));
 
-        uint256 burn = settlement.pendingSurplus(id, currency1);
+        uint256 burn = settlement.rewardLedger()
+            .epochSurplus(PoolId.unwrap(id), book.currentBatchId(PoolId.unwrap(id)), Currency.unwrap(currency1));
         console2.log("rounding margin (wei)", burn);
     }
 }

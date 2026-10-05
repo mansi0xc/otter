@@ -98,8 +98,8 @@ contract OtterAssetsTest is Test {
         book.setSettlement(address(this));
         token = new AssetToken();
         guard = address(new MockLiquidityGuard());
-        book.registerPoolCurrencies(POOL, address(0), address(token), guard);
-        book.registerPoolCurrencies(OTHER_POOL, address(0), address(token), guard);
+        book.registerPoolCurrencies(POOL, address(0), address(token), guard, bytes32(uint256(1)));
+        book.registerPoolCurrencies(OTHER_POOL, address(0), address(token), guard, bytes32(uint256(1)));
         alice = vm.addr(ALICE_PK);
         bob = vm.addr(BOB_PK);
         token.mint(alice, 100e18);
@@ -153,11 +153,11 @@ contract OtterAssetsTest is Test {
         assertTrue(book.registered(POOL));
         assertEq(book.currency0Of(POOL), address(0));
         vm.expectRevert(OtterOrderBook.PoolAlreadyRegistered.selector);
-        book.registerPoolCurrencies(POOL, address(0), address(token), guard);
+        book.registerPoolCurrencies(POOL, address(0), address(token), guard, bytes32(uint256(1)));
         vm.expectRevert(OtterOrderBook.InvalidCurrencies.selector);
-        book.registerPoolCurrencies(bytes32(uint256(3)), address(token), address(token), guard);
+        book.registerPoolCurrencies(bytes32(uint256(3)), address(token), address(token), guard, bytes32(uint256(1)));
         vm.expectRevert(OtterOrderBook.InvalidCurrencies.selector);
-        book.registerPoolCurrencies(bytes32(uint256(4)), address(0), address(0xBAD), guard);
+        book.registerPoolCurrencies(bytes32(uint256(4)), address(0), address(0xBAD), guard, bytes32(uint256(1)));
     }
 
     function test_nativeValueMustBeExactAndForcedFundsDoNotFundOrders() public {

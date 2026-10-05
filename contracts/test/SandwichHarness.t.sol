@@ -359,7 +359,13 @@ contract SandwichHarness is Deployers {
         console2.log("OTTER POOL");
         console2.log("  searcher swap: REVERTED at every capital level tested");
         console2.log("  victim output               ", otterOut);
-        console2.log("  burn to LPs                 ", settlement.pendingSurplus(otterId, currency1));
+        console2.log(
+            "  burn to LPs                 ",
+            settlement.rewardLedger()
+                .epochSurplus(
+                    PoolId.unwrap(otterId), book.currentBatchId(PoolId.unwrap(otterId)), Currency.unwrap(currency1)
+                )
+        );
         console2.log("========================================");
 
         // ---- 5. why Otter's victim gets MORE than fairOut, not just "not less"
@@ -565,7 +571,10 @@ contract SandwichHarness is Deployers {
         );
         _claimAllTraders(book, otterKey, orders);
 
-        uint256 burn = settlement.pendingSurplus(otterId, currency1);
+        uint256 burn = settlement.rewardLedger()
+            .epochSurplus(
+                PoolId.unwrap(otterId), book.currentBatchId(PoolId.unwrap(otterId)), Currency.unwrap(currency1)
+            );
 
         // The burn has two components and they should be reported separately.
         //

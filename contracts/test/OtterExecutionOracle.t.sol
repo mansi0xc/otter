@@ -447,7 +447,13 @@ contract OtterExecutionOracleIntegrationTest is OtterHookFixture {
         assertEq(price, q.sqrtPriceX96);
         assertEq(tick, q.tick);
         assertEq(manager.getLiquidity(otterId), q.liquidity);
-        assertEq(settlement.pendingSurplus(otterId, currency1), q.output - outcome.x[0]);
+        assertEq(
+            settlement.rewardLedger()
+                .epochSurplus(
+                    PoolId.unwrap(otterId), book.currentBatchId(PoolId.unwrap(otterId)), Currency.unwrap(currency1)
+                ),
+            q.output - outcome.x[0]
+        );
     }
 
     function test_authenticConcentratedQuoteDoesNotLiftAuctionAdmissionGate() public {

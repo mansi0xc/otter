@@ -76,19 +76,15 @@ contract GrantReviewSettlementTest is OtterSettlementTest {
         settlement.settle(otterKey, id, os, OtterSettlement.Outcome(true, y, x));
         _claimAllTraders(book, otterKey, os);
         assertEq(IERC20Minimal(Currency.unwrap(currency1)).balanceOf(dom), 1e18);
-        uint256 pot = settlement.pendingSurplus(otterId, currency1);
+        uint256 pot = settlement.rewardLedger()
+            .epochSurplus(
+                PoolId.unwrap(otterId), book.currentBatchId(PoolId.unwrap(otterId)), Currency.unwrap(currency1)
+            );
         assertGt(pot, 8e18);
-        settlement.flushSurplus(otterKey);
         uint256 before = IERC20Minimal(Currency.unwrap(currency1)).balanceOf(address(this));
-        _modifyLiquidity(
-            otterKey,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: TICK_LOWER, tickUpper: TICK_UPPER, liquidityDelta: 0, salt: 0
-            }),
-            ZERO_BYTES
-        );
+        settlement.rewardLedger().claim(Currency.unwrap(currency1), pot, address(this));
         uint256 collected = IERC20Minimal(Currency.unwrap(currency1)).balanceOf(address(this)) - before;
-        assertApproxEqAbs(collected, pot, 2);
+        assertEq(collected, pot);
     }
 
     function test_review_ExtremeAskRejectedBeforeEscrowAndBoundedAskClassifies() public {
@@ -142,7 +138,13 @@ contract GrantReviewSettlementTest is OtterSettlementTest {
         settlement.settle(otterKey, id, os, OtterSettlement.Outcome(true, y, x));
         _claimAllTraders(book, otterKey, os);
         assertEq(IERC20Minimal(Currency.unwrap(currency0)).balanceOf(min), 0);
-        assertEq(settlement.pendingSurplus(otterId, currency1), 1);
+        assertEq(
+            settlement.rewardLedger()
+                .epochSurplus(
+                    PoolId.unwrap(otterId), book.currentBatchId(PoolId.unwrap(otterId)), Currency.unwrap(currency1)
+                ),
+            1
+        );
     }
 
     function test_review_ProtocolFeeChangeRejectsSettlementAndAllowsRefund() public {
@@ -163,11 +165,14 @@ contract GrantReviewSettlementTest is OtterSettlementTest {
         assertEq(book.claimable(min, Currency.unwrap(currency1)), MIN_BUDGET);
     }
 
-    function test_review_JitLPCollectsPreviousTradersSurplus() public {
+    function test_review_LaterLPReceivesNoPreviousTradersSurplus() public {
         (uint256 id, OtterOrderBook.Order[] memory os) = _openBatch();
         settlement.settle(otterKey, id, os, _outcome(_curve(), 1e15));
         _claimAllTraders(book, otterKey, os);
-        uint256 pot = settlement.pendingSurplus(otterId, currency1);
+        uint256 pot = settlement.rewardLedger()
+            .epochSurplus(
+                PoolId.unwrap(otterId), book.currentBatchId(PoolId.unwrap(otterId)), Currency.unwrap(currency1)
+            );
         address attacker = address(0xBADE);
         _fund(currency0, attacker, 20000e18);
         _fund(currency1, attacker, 20000e18);
@@ -177,11 +182,10 @@ contract GrantReviewSettlementTest is OtterSettlementTest {
         IERC20Minimal(Currency.unwrap(currency1)).approve(address(vault), type(uint256).max);
         uint256 lpId =
             vault.createPosition(otterKey, TICK_LOWER, TICK_UPPER, 9e21, type(uint256).max, type(uint256).max);
-        settlement.flushSurplus(otterKey);
         vault.collectFees(lpId);
-        uint256 reward = vault.claims(attacker, currency1);
-        assertApproxEqAbs(reward, pot * 9 / 10, 2);
-        vault.claim(currency1, reward, attacker);
+        assertEq(vault.claims(attacker, currency1), 0);
+        assertEq(settlement.rewardLedger().claimable(attacker, Currency.unwrap(currency1)), 0);
+        assertEq(settlement.rewardLedger().claimable(address(this), Currency.unwrap(currency1)), pot);
         vault.removeLiquidity(lpId, 9e21, 0, 0);
         vm.stopPrank();
     }

@@ -33,7 +33,7 @@ contract OtterOrderBookViewTest is Test {
         currency1 = new MockERC20("TEST1", "T1", 18);
         if (address(currency0) > address(currency1)) (currency0, currency1) = (currency1, currency0);
         vm.prank(address(0x5E77));
-        book.registerPoolCurrencies(POOL, address(currency0), address(currency1), liquidityGuard);
+        book.registerPoolCurrencies(POOL, address(currency0), address(currency1), liquidityGuard, bytes32(uint256(1)));
 
         currency0.mint(alice, 100_000_000e18);
         vm.prank(alice);

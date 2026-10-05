@@ -3,7 +3,7 @@
 Prepared 2 October 2026. Baseline: user-created commit `63ec94e`.
 Sources: [grant readiness review](./GRANT_READINESS_REVIEW_2026-10-02.md), [remediation plan](./REMEDIATION_PLAN.md), the pinned v4 core, and [the paper](https://arxiv.org/html/2609.03474v1).
 
-**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. [3B](./CHECKPOINT_3B.md) implements queued exit priority and bounded donation accrual. [4A](./CHECKPOINT_4A.md) adds a bounded read-only exact execution quote; [4B](./CHECKPOINT_4B.md) adds an independent BigInt execution reference with matched domains and real-core comparisons. [4C](./CHECKPOINT_4C.md) records and revalidates opening pool state and LP ownership for the admitted full-range model. [4D](./CHECKPOINT_4D.md) adds bounded one-sided discrete allocation/payment research and counterexamples. [4E](./CHECKPOINT_4E.md) adds two-sided exact-lot candidate calculations and net-flow testing. [4F](./CHECKPOINT_4F.md) diagnoses compensation precision, fractional redemption/backing and actual-input gaps. [4G](./CHECKPOINT_4G.md) investigates exact integer cost grids, a finite one-sided argument and post-swap lot limits. [4H](./CHECKPOINT_4H.md) checks exact truthful whole-payment constraints and changed partial-fill limits. None selects a production mechanism. Concentrated snapshot integration, reward weights/claims, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
+**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. [3B](./CHECKPOINT_3B.md) implements queued exit priority and bounded donation accrual. [4A](./CHECKPOINT_4A.md) adds a bounded read-only exact execution quote; [4B](./CHECKPOINT_4B.md) adds an independent BigInt execution reference with matched domains and real-core comparisons. [4C](./CHECKPOINT_4C.md) records and revalidates opening pool state and LP ownership for the admitted full-range model. [4D](./CHECKPOINT_4D.md) adds bounded one-sided discrete allocation/payment research and counterexamples. [4E](./CHECKPOINT_4E.md) adds two-sided exact-lot candidate calculations and net-flow testing. [4F](./CHECKPOINT_4F.md) diagnoses compensation precision, fractional redemption/backing and actual-input gaps. [4G](./CHECKPOINT_4G.md) investigates exact integer cost grids, a finite one-sided argument and post-swap lot limits. [4H](./CHECKPOINT_4H.md) checks exact truthful whole-payment constraints and changed partial-fill limits. [6A](./CHECKPOINT_6A.md) implements funded historical rewards for admitted full-range pools. The research checkpoints select no auction mechanism. Concentrated snapshot/reward integration, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
 
 The user has selected **native ETH and concentrated liquidity support now**. These belong to this remediation, including contracts, the integer solver, recovery, deployment, and wallet flows. Supporting WETH alone or removing the full-range check alone does not meet this scope.
 
@@ -205,9 +205,11 @@ economic ranking. Changes to funded membership or liquidity increment a
 pool-specific version; exit reservations, donations, fee collection and claims
 do not. Fee growth and already accrued fee claims are excluded from the record.
 
-`snapshotHash` commits to a v1 domain tag, chain ID, order-book address, pool,
+`snapshotHash` now commits to the v2 opening-snapshot domain tag, chain ID, order-book address, pool,
 epoch, configuration, fixed clocks, opening block number, guard and complete
-pool record (which includes the roster hash). `EpochOpened` exposes that
+pool record (which includes the roster hash), plus the registered reward policy
+hash, total opening capital weight and hash of the frozen weight vector.
+Checkpoint 6A extends 4C’s earlier v1 record with these reward commitments. `EpochOpened` exposes that
 commitment. This is not an EIP-712 order field: existing v2 signatures authorize
 their epoch/ask/budget/time bounds, and its first admission selects the actual
 opening state. The block number identifies the opening transaction's block,
@@ -225,10 +227,14 @@ remain independent of pool reads and roster scans. Snapshots remain available
 after settlement, exits and later epochs; a pre-swap check is not expected to
 match the changed price after a successful swap.
 
-4C stores ownership and principal liquidity only. It neither computes the
-capital weights in section 6, enforces positive reward weight at opening, nor
-distributes batch rewards; raw liquidity is not a substitute for those weights.
-The legacy donation policy and R7 remain open until the reward ledger replaces it.
+Checkpoint 6A computes each opening position's rounded-down removable principal
+and values it using the exact squared opening sqrt price with full-precision
+multiplication/division. It freezes weights beside the authenticated roster and
+rejects a zero-total-weight opening before escrow. The ledger distributes the
+actual residual only to those recorded owners. This implements the admitted
+full-range historical policy in section 6. General range-value math is checked
+independently, but authenticated concentrated reward/auction integration remains
+gated; raw liquidity is not a substitute for capital weights.
 
 ### Execution and accounting
 
@@ -242,7 +248,7 @@ Use settlement and custody reentrancy guards plus authenticated unlock callbacks
 
 ## 6. Historical rewards and LP policy
 
-Do not donate Otter's residual batch assets to whoever is LP at a later `flushSurplus` call. Record the eligible owners and weights at epoch opening and credit the terminal residual to those identities. New deposits after settlement have no claim on that epoch. Exiting owners retain their claims. There is no unrestricted flush path.
+Checkpoint 6A removes the delayed-donation `flushSurplus` path. Do not donate Otter's residual batch assets to whoever is LP later. Record the eligible owners and weights at epoch opening and credit the terminal residual to those identities. New deposits after settlement have no claim on that epoch. Exiting owners retain their claims. There is no unrestricted flush path.
 
 For this expanded prototype, choose an explicit **capital-weighted policy**, not raw liquidity units across different ranges:
 
@@ -253,7 +259,30 @@ For this expanded prototype, choose an explicit **capital-weighted policy**, not
 
 Zero active liquidity at opening is unsupported. Reject opening before escrow if there is no eligible positive weight. Under this policy, inactive ranges with capital also receive weight; raw liquidity alone is inappropriate because range width changes the capital backing it. This is a selected prototype distribution policy, **not a proof of risk-fair LP compensation or an inheritance of the paper's incentive result**. Evaluate out-of-range capital, narrow ranges, bidder-as-LP, first-order timing, and repeated epochs. An LP arriving before the snapshot remains eligible; this specification fixes post-trade historical capture, not every possible pre-batch JIT strategy.
 
-External donations and ordinary position fee growth must be accounted separately. Their collection requires vault ownership and cannot reassign a prior Otter reward. The reward policy is versioned; changes affect future epochs only and require new mechanism/economic analysis.
+External donations and ordinary position fee growth must be accounted separately. Their collection requires vault ownership and cannot reassign a prior Otter reward. The reward policy is versioned and immutable for each registered pool in this
+prototype; a new policy requires a new deployment/configuration and economic
+analysis. `OtterRewardLedger` is deployed by settlement and accepts funding only
+from that settlement during the current executing epoch, after trader payouts.
+It pulls exact ERC20 cash or exact native value, then credits owner claims and
+the community dust claim without recipient calls. It records even zero-pot
+settlements once. Expired epochs create no reward. Failed funding rolls back
+the complete settlement; timeout recovery remains independent of reward delivery.
+
+Initial pool registration is owner-only for both overloads. The one-argument
+form declares that immutable settlement owner as the community dust recipient;
+the owner can supply a different recipient on first registration. No caller or
+later owner can replace it. Zero/ledger/settlement/order-book destinations are
+rejected. The deployment script exposes `REWARD_COMMUNITY`, defaulting to the
+deployer. These are local source changes; no deployment has occurred.
+
+Rewards use `rewardLedger.claim(currency, amount, recipient)` separately from
+order-book trader claims and vault principal/fee claims. Failed or taxed delivery
+rolls back that owner's withdrawal only. Cash is reserved against aggregate
+claims for every pool sharing a currency, with no administrative sweep or
+unsolicited-funds claim path. Retained `epochSurplus` and `epochDust` are immutable
+history, not amounts awaiting donation. Removing the old getters/flush and adding
+the registry policy field changes the local ABI; the earlier dashboard requires
+migration before it can operate this stack.
 
 ## 7. Discrete mechanism: required contract and unresolved gates
 
@@ -436,16 +465,19 @@ supplies representation/backing, redemption and actual-input diagnostics.
 Checkpoint 4G was committed as `5841493` and supplies exact integer-cost
 research, the finite one-sided argument and post-swap lot failure. Checkpoint 4H
 supplies exact original-WAD truthful-payment constraints and changed partial-fill
-limits; its report records the pending user-created commit. Step 4 remains
+limits and was committed as `ed69b3e`. Step 4 remains
 incomplete. A compatible design must address original valuations, whole-token
 IR, finite capacity and changing prices with explicit efficiency/incentive and
 backing/redemption arguments under G1/G2, then measured full verification for G3.
 The legacy auction retains its known boundary/payment failures.
 
-After the 4H commit, fix historical surplus capture independently using recorded
-opening full-range LP ownership. Retain prior-owner claims after exits and exclude
-later owners from past rewards without assuming that legacy payments are
-canonical. Concentrated capital weights/admission remain pending. This safety
-slice does not declare all of step 6 complete. Canonical settlement and expanded
-concentrated execution still require sections 5–7; correct historical accounting,
-claims and exits do not resolve G1–G3.
+Checkpoint 4H was committed as `ed69b3e`. Checkpoint 6A implements the admitted
+full-range historical reward path, frozen opening capital weights, exact funded
+claims/dust and a local R7 prevention regression. Its report records the pending
+user-created commit. Different-width/inactive-range arithmetic is checked, but
+concentrated ownership/execution integration and LP economic guarantees remain
+unfinished. The complete step 6 scope is not closed, and R2/R6 remain active.
+Next evaluate rounding/splitting, LP/bidder overlap and opening timing under the
+selected policy while preserving G1–G3. Canonical settlement and expanded
+concentrated execution still require sections 5–7; historical accounting,
+claims and exits do not resolve the discrete mechanism's incompatibilities.

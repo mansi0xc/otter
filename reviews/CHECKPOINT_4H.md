@@ -1,7 +1,7 @@
 # Checkpoint 4H — whole payments and partial-allocation limits
 
 Prepared 5 October 2026. Starting revision: user-created commit `5841493`.
-Status: implemented and validated locally, pending the user-created commit.
+Status: committed by the user as `ed69b3e`; clean tree inspected before 6A.
 The tree was clean at the start. The user creates every commit.
 
 ## Outcome
@@ -241,4 +241,5 @@ Suggested explanation:
 
 > Add exact truthful-payment constraints with verifiable infeasibility certificates. Check every raw fill in a real-v4 case and document the scoped partial-allocation welfare conflict without selecting weaker guarantees.
 
-Create the commit and confirm completion before the next implementation slice.
+Committed by the user as `ed69b3e`. This handoff is retained as history;
+checkpoint 6A contains the current pending commit instructions.

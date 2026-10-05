@@ -168,7 +168,10 @@ contract SolverEndToEndTest is Deployers {
         }
 
         Currency burnCurrency = domSellsC0 ? currency1 : currency0;
-        uint256 burn = settlement.pendingSurplus(otterId, burnCurrency);
+        uint256 burn = settlement.rewardLedger()
+            .epochSurplus(
+                PoolId.unwrap(otterId), book.currentBatchId(PoolId.unwrap(otterId)), Currency.unwrap(burnCurrency)
+            );
         uint256 expected = json.readUint(".burn");
 
         console2.log("solver burn ", expected);

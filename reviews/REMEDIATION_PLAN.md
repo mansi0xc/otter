@@ -366,7 +366,7 @@ full incentive/efficiency and actual backing/redemption arguments. More passing
 restricted grids cannot settle that design choice; G3 and independent review
 remain prerequisites for canonical settlement.
 
-**4H is pending the user's commit.** After it, address R7 independently through
+**4H was committed by the user as `ed69b3e`; clean tree inspected before 6A.** Address R7 independently through
 bounded historical reward accounting using recorded opening LP ownership in the
 admitted full-range model. New liquidity must receive no past surplus; opening
 owners retain claims after exit. Preserve shared-currency backing, independent
@@ -374,3 +374,25 @@ claims, callback guards and exit priority. Concentrated capital weights and
 auction admission remain pending; this safety slice does not complete step 6
 or authorize noncanonical legacy allocations. Keep the original mechanism
 guarantee priority while that separate design requires a compatible basis.
+
+
+## Checkpoint 6A: funded historical rewards for admitted pools
+
+See [the reward checkpoint report](./CHECKPOINT_6A.md) for opening capital weights,
+versioned snapshot/policy commitments and the separately funded reward ledger.
+The admitted full-range path assigns every residual pot to opening owners during
+settlement, records and credits exact rounding dust to a fixed community recipient,
+and retains independent claims after exits. There is no delayed donation or flush.
+The R7 regression now asserts that later LPs get no prior rewards. External
+position fees remain separate. Owner-only initial pool registration prevents a
+caller from front-running the immutable treasury choice. Owners still claim
+independently, and settlement remains permissionless after exclusivity.
+
+**6A is pending the user's commit.** This fixes post-settlement historical capture
+locally, not the complete LP incentive problem, canonical allocations or expanded
+concentrated auctions. R2 and R6 remain active findings. Keep the mechanism's
+G1–G3 gates and independent review. Next validate capital rounding, owner splitting,
+LP/bidder overlap and opening timing as an economic policy, including the boundary
+for concentrated integration; do not enable concentrated auctions merely because
+range-value arithmetic passes. Wallet/ABI migration, resource limits, testnet
+execution and grant evidence remain unfinished.

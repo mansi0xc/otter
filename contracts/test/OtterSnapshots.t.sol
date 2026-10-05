@@ -138,7 +138,10 @@ contract OtterSnapshotsTest is OtterHookFixture {
                 book.executionDeadline(_pool(), 0),
                 uint256(1234),
                 address(vault),
-                s
+                s,
+                book.rewardPolicyHashOf(_pool()),
+                book.openingRewardWeight(_pool(), 0),
+                keccak256(abi.encode(book.openingRewardWeights(_pool(), 0)))
             )
         );
         assertEq(book.snapshotHash(_pool(), 0), expected);

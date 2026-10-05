@@ -169,7 +169,8 @@ contract OtterSettlementSellXTest is Deployers {
 
         domReceived = IERC20X(Currency.unwrap(domOut)).balanceOf(dom);
         minReceived = IERC20X(Currency.unwrap(domIn)).balanceOf(min);
-        burn = settlement.pendingSurplus(otterId, domOut);
+        burn = settlement.rewardLedger()
+            .epochSurplus(PoolId.unwrap(otterId), book.currentBatchId(PoolId.unwrap(otterId)), Currency.unwrap(domOut));
     }
 
     // ------------------------------------------------------------------

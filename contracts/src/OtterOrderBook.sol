@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {IOtterLiquidityGuard} from "./interfaces/IOtterLiquidityGuard.sol";
+import {OtterRewardMath} from "./OtterRewardMath.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 
@@ -12,7 +13,8 @@ import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 /// Expiry changes one epoch state without replay or token calls. Each stored
 /// order can then be recovered independently into its signed trader's claim.
 /// Withdrawals remain isolated by owner/currency. The legacy settlement verifier
-/// and historical LP reward policy still require their separate remediation.
+/// still requires canonical mechanism remediation. LP reward weights are frozen
+/// here at opening; the separate funded reward ledger delivers historical claims.
 contract OtterOrderBook {
     // ------------------------------------------------------------------
     // Types
@@ -122,7 +124,10 @@ contract OtterOrderBook {
     mapping(bytes32 => mapping(uint256 => IOtterLiquidityGuard.PositionSnapshot[])) private _openingPositions;
     mapping(bytes32 => mapping(uint256 => bytes32)) public snapshotHash;
     mapping(bytes32 => mapping(uint256 => uint256)) public openingBlock;
-    bytes32 public constant SNAPSHOT_TYPEHASH = keccak256("OtterOpeningSnapshot/v1");
+    bytes32 public constant SNAPSHOT_TYPEHASH = keccak256("OtterOpeningSnapshot/v2");
+    mapping(bytes32 => bytes32) public rewardPolicyHashOf;
+    mapping(bytes32 => mapping(uint256 => uint256[])) private _openingRewardWeights;
+    mapping(bytes32 => mapping(uint256 => uint256)) public openingRewardWeight;
 
     /// @notice Zero currency0 denotes native ETH, so registration uses an
     /// explicit flag instead of an address sentinel.
@@ -214,6 +219,8 @@ contract OtterOrderBook {
     error FeesStillSupported();
     error SnapshotMissing();
     error InvalidSnapshot();
+    error NoRewardWeight();
+    error InvalidRewardPolicy();
     error InvalidClock();
     error AdmissionPaused();
     event AdmissionPauseSet(bool paused);
@@ -261,9 +268,13 @@ contract OtterOrderBook {
     /// @notice Register the two tokens a pool trades, so `submit` can escrow
     ///         against it. Callable once per pool, only by `settlement` (which
     ///         holds the v4 `PoolKey` this `poolId` was derived from).
-    function registerPoolCurrencies(bytes32 poolId, address currency0, address currency1, address liquidityGuard)
-        external
-    {
+    function registerPoolCurrencies(
+        bytes32 poolId,
+        address currency0,
+        address currency1,
+        address liquidityGuard,
+        bytes32 rewardPolicyHash
+    ) external {
         if (msg.sender != settlement) revert NotSettlement();
         if (registered[poolId]) revert PoolAlreadyRegistered();
         if (currency1 == address(0)) revert ZeroCurrency();
@@ -272,11 +283,13 @@ contract OtterOrderBook {
                 || (currency0 != address(0) && currency0.code.length == 0)
         ) revert InvalidCurrencies();
         if (liquidityGuard.code.length == 0) revert InvalidLiquidityGuard();
+        if (rewardPolicyHash == bytes32(0)) revert InvalidRewardPolicy();
         registered[poolId] = true;
         configVersionOf[poolId] = 1;
         currency0Of[poolId] = currency0;
         currency1Of[poolId] = currency1;
         liquidityGuardOf[poolId] = liquidityGuard;
+        rewardPolicyHashOf[poolId] = rewardPolicyHash;
         emit PoolRegistered(poolId, currency0, currency1);
     }
 
@@ -356,6 +369,11 @@ contract OtterOrderBook {
     {
         if (snapshotHash[poolId][epoch] == bytes32(0)) revert SnapshotMissing();
         return _openingPositions[poolId][epoch];
+    }
+
+    function openingRewardWeights(bytes32 poolId, uint256 epoch) external view returns (uint256[] memory) {
+        if (snapshotHash[poolId][epoch] == bytes32(0)) revert SnapshotMissing();
+        return _openingRewardWeights[poolId][epoch];
     }
 
     /// @notice Checks the recorded pre-swap state, not a historical state after
@@ -563,9 +581,16 @@ contract OtterOrderBook {
             revert InvalidSnapshot();
         }
         _openingSnapshots[poolId][epoch] = pool;
+        uint256[] memory weights = new uint256[](roster.length);
+        uint256 totalWeight;
         for (uint256 i; i < roster.length; ++i) {
             _openingPositions[poolId][epoch].push(roster[i]);
+            weights[i] = OtterRewardMath.weight(pool.sqrtPriceX96, roster[i]);
+            totalWeight += weights[i];
+            _openingRewardWeights[poolId][epoch].push(weights[i]);
         }
+        if (totalWeight == 0) revert NoRewardWeight();
+        openingRewardWeight[poolId][epoch] = totalWeight;
         openingBlock[poolId][epoch] = block.number;
         bytes32 commitment = keccak256(
             abi.encode(
@@ -579,7 +604,10 @@ contract OtterOrderBook {
                 batch.executeUntil,
                 block.number,
                 guard,
-                pool
+                pool,
+                rewardPolicyHashOf[poolId],
+                totalWeight,
+                keccak256(abi.encode(weights))
             )
         );
         snapshotHash[poolId][epoch] = commitment;

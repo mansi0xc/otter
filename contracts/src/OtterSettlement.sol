@@ -16,6 +16,7 @@ import {FixedPointMathLib} from "solmate/src/utils/FixedPointMathLib.sol";
 import {OtterMath} from "./OtterMath.sol";
 import {OtterHook, OtterPoolMath} from "./OtterHook.sol";
 import {OtterOrderBook} from "./OtterOrderBook.sol";
+import {OtterRewardLedger} from "./OtterRewardLedger.sol";
 import {IOtterLiquidityGuard} from "./interfaces/IOtterLiquidityGuard.sol";
 
 /// @title OtterSettlement
@@ -40,6 +41,7 @@ contract OtterSettlement is IUnlockCallback {
     IPoolManager public immutable poolManager;
     OtterOrderBook public immutable orderBook;
     address public immutable owner;
+    OtterRewardLedger public immutable rewardLedger;
     uint256 private _reentrancyLock = 1;
     bytes32 private _callbackHash;
     bool private _callbackPending;
@@ -61,19 +63,6 @@ contract OtterSettlement is IUnlockCallback {
     ///         may settle it.
     uint64 public immutable exclusivityWindow;
 
-    /// @notice Surplus held back from settled batches, awaiting donation to the
-    ///         pool's liquidity providers. Keyed by pool and by the token it is
-    ///         denominated in, because which token the surplus lands in depends
-    ///         on which side was dominant in the batch that produced it.
-    ///
-    /// Legacy distribution: a subsequent settlement or flush donates this
-    /// pot to the liquidity present at that time. Newly arrived LPs can capture
-    /// it, and caller/LP overlap can exploit payment discretion. The vault's
-    /// principal/fee claims do not supply historical batch reward eligibility;
-    /// R7 remains open until the snapshot reward ledger replaces this policy.
-    mapping(PoolId poolId => mapping(Currency currency => uint256)) public pendingSurplus;
-    mapping(Currency currency => uint256) public totalPendingSurplus;
-
     /// @param dominantSellsCurrency0 which side of the book is the dominant side
     /// @param y per-order amount sold, in that order's input token
     /// @param x per-order amount received, in that order's output token
@@ -85,14 +74,10 @@ contract OtterSettlement is IUnlockCallback {
 
     /// @param amountIn residual dominant-side input sent through the pool. Zero
     ///        when the batch cleared entirely against the minority side.
-    /// @param donate0 currency0 surplus from earlier batches, paid to LPs
-    /// @param donate1 currency1 surplus from earlier batches, paid to LPs
     struct CallbackArgs {
         PoolKey key;
         bool zeroForOne;
         uint256 amountIn;
-        uint256 donate0;
-        uint256 donate1;
     }
 
     error LengthMismatch();
@@ -102,7 +87,6 @@ contract OtterSettlement is IUnlockCallback {
     error IneligibleMustBeUnfilled(uint256 i);
     error PoolOutputShortfall(uint256 have, uint256 owed);
     error NoLiquidity();
-    error NoSurplus();
     error NotExclusiveSolver(uint256 exclusiveUntil);
     error InvalidExecutionWindow();
     error NotOwner();
@@ -143,13 +127,6 @@ contract OtterSettlement is IUnlockCallback {
         uint256 burn
     );
 
-    /// @notice Surplus from earlier batches handed to this pool's LPs.
-    /// @dev `donate` moves fee growth only — `slot0.sqrtPriceX96` and
-    ///      `liquidity` are untouched — so the virtual reserves the mechanism
-    ///      was solved against are the same before and after. That is why this
-    ///      can share a settlement with the batch's own swap without perturbing
-    ///      the curve the batch was priced on.
-    event SurplusDonated(PoolId indexed poolId, uint256 amount0, uint256 amount1);
     event HookSet(address indexed hook);
 
     constructor(IPoolManager poolManager_, OtterOrderBook orderBook_, address solver_, uint64 exclusivityWindow_) {
@@ -157,6 +134,7 @@ contract OtterSettlement is IUnlockCallback {
         poolManager = poolManager_;
         orderBook = orderBook_;
         owner = msg.sender;
+        rewardLedger = new OtterRewardLedger(orderBook_);
         solver = solver_;
         exclusivityWindow = exclusivityWindow_;
     }
@@ -173,17 +151,34 @@ contract OtterSettlement is IUnlockCallback {
         emit HookSet(hook);
     }
 
+    /// @notice Default rounding-dust destination is the immutable deployment
+    /// owner. Registration is owner-only so a caller cannot front-run a planned
+    /// treasury choice by permanently registering the default destination.
     function registerPool(PoolKey calldata key) external {
+        if (msg.sender != owner) revert NotOwner();
+        _registerPool(key, owner);
+    }
+
+    /// @notice The owner can choose a community treasury at initial registration.
+    /// The recipient and reward policy are immutable for this pool afterwards.
+    function registerPool(PoolKey calldata key, address communityRecipient) external {
+        if (msg.sender != owner) revert NotOwner();
+        _registerPool(key, communityRecipient);
+    }
+
+    function _registerPool(PoolKey calldata key, address communityRecipient) private {
         if (address(key.hooks) != approvedHook) revert InvalidHook(address(key.hooks));
         if (key.fee != 0) revert NonZeroFee(key.fee);
         (,, uint24 protocolFee, uint24 lpFee) = poolManager.getSlot0(key.toId());
         if (protocolFee != 0) revert UnsupportedProtocolFee(protocolFee);
         if (lpFee != 0) revert NonZeroFee(lpFee);
+        bytes32 policy = rewardLedger.registerPool(PoolId.unwrap(key.toId()), communityRecipient);
         orderBook.registerPoolCurrencies(
             PoolId.unwrap(key.toId()),
             Currency.unwrap(key.currency0),
             Currency.unwrap(key.currency1),
-            address(OtterHook(address(key.hooks)).liquidityVault())
+            address(OtterHook(address(key.hooks)).liquidityVault()),
+            policy
         );
     }
 
@@ -239,8 +234,7 @@ contract OtterSettlement is IUnlockCallback {
         uint256 realisedBurn = _executeAndDistribute(key, outcome, totalIn, minorityPaid, dMinority, totalPaid);
 
         _fundPayouts(key, orders, outcome);
-        _assertSurplusBacked(key.currency0);
-        _assertSurplusBacked(key.currency1);
+        _fundRewards(key, batchId, outcome.dominantSellsCurrency0, realisedBurn);
         orderBook.completeExecution(poolId);
 
         emit Settled(key.toId(), batchId, outcome.dominantSellsCurrency0, totalIn, totalPaid, realisedBurn);
@@ -354,37 +348,15 @@ contract OtterSettlement is IUnlockCallback {
         if (protocolFee != 0) revert UnsupportedProtocolFee(protocolFee);
         if (lpFee != 0 || key.fee != 0) revert NonZeroFee(lpFee == 0 ? key.fee : lpFee);
         orderBook.assertSnapshot(poolId, orderBook.currentBatchId(poolId));
-        Currency dominantOut = outcome.dominantSellsCurrency0 ? key.currency1 : key.currency0;
 
         // Only the imbalance beyond M touches the pool. The first M units of
         // dominant input are reserved for minority claims at spot.
         uint256 netIn = totalIn - minorityPaid;
 
-        // Take the lagged pot BEFORE this batch's surplus is computed, so that
-        // what gets donated here cannot be a function of this batch's reports.
-        PoolId id = key.toId();
-        uint256 donate0 = pendingSurplus[id][key.currency0];
-        uint256 donate1 = pendingSurplus[id][key.currency1];
-        pendingSurplus[id][key.currency0] = 0;
-        pendingSurplus[id][key.currency1] = 0;
-        totalPendingSurplus[key.currency0] -= donate0;
-        totalPendingSurplus[key.currency1] -= donate1;
-
         uint256 received;
-        if (netIn > 0 || donate0 > 0 || donate1 > 0) {
-            bytes memory result = _unlock(
-                abi.encode(
-                    CallbackArgs({
-                        key: key,
-                        zeroForOne: outcome.dominantSellsCurrency0,
-                        amountIn: netIn,
-                        donate0: donate0,
-                        donate1: donate1
-                    })
-                )
-            );
-            received = abi.decode(result, (uint256));
-            if (donate0 > 0 || donate1 > 0) emit SurplusDonated(id, donate0, donate1);
+        if (netIn > 0) {
+            received =
+                abi.decode(_unlock(abi.encode(CallbackArgs(key, outcome.dominantSellsCurrency0, netIn))), (uint256));
         }
 
         // The authoritative conservation check. We hold `dMinority` of the output
@@ -394,53 +366,23 @@ contract OtterSettlement is IUnlockCallback {
         uint256 available = dMinority + received;
         if (available < totalPaid) revert PoolOutputShortfall(available, totalPaid);
 
-        // The surplus stays in this contract and joins the pot. The next
-        // settlement on this pool hands it to the LPs.
         burn = available - totalPaid;
-        if (burn > 0) {
-            pendingSurplus[id][dominantOut] += burn;
-            totalPendingSurplus[dominantOut] += burn;
-        }
     }
 
-    // ------------------------------------------------------------------
-    // Surplus
-    // ------------------------------------------------------------------
-
-    /// @notice Donate a pool's accumulated surplus to its LPs without waiting for
-    ///         the next batch. Permissionless: it can only move surplus to the
-    ///         pool, never out of it, and it has no access to batch funds.
-    /// @dev Exists so that a pool which stops receiving batches does not strand
-    ///      its last surplus forever. Reverts when there is nothing to move
-    ///      rather than burning gas on a no-op unlock.
-    ///
-    ///      KNOWN VECTOR, stated rather than buried: `donate` splits by the
-    ///      liquidity in range at the moment it lands, so an LP can add
-    ///      liquidity immediately before a donation and remove it after,
-    ///      capturing a share it never bore risk for. This is the standard JIT
-    ///      problem and it applies to the donation inside `settle` too. It costs
-    ///      the batch's traders nothing — the surplus is already theirs to give
-    ///      up — but it does defeat the intent of paying LPs who actually carried
-    ///      the pool. Historical eligibility or a specified independent
-    ///      destination is needed; a delay or vesting alone does not fix it.
-    function flushSurplus(PoolKey calldata key) external nonReentrant {
-        PoolId id = key.toId();
-        uint256 donate0 = pendingSurplus[id][key.currency0];
-        uint256 donate1 = pendingSurplus[id][key.currency1];
-        if (donate0 == 0 && donate1 == 0) revert NoSurplus();
-
-        pendingSurplus[id][key.currency0] = 0;
-        pendingSurplus[id][key.currency1] = 0;
-
-        totalPendingSurplus[key.currency0] -= donate0;
-        totalPendingSurplus[key.currency1] -= donate1;
-
-        _unlock(
-            abi.encode(CallbackArgs({key: key, zeroForOne: false, amountIn: 0, donate0: donate0, donate1: donate1}))
+    /// @dev Credit even a zero-pot epoch once, after all trader outputs were
+    /// funded and before releasing the economic lock. No LP recipient is called.
+    function _fundRewards(PoolKey calldata key, uint256 epoch, bool dominantDown, uint256 burn) private {
+        uint256 amount0 = dominantDown ? 0 : burn;
+        uint256 amount1 = dominantDown ? burn : 0;
+        if (!key.currency0.isAddressZero() && amount0 != 0) {
+            SafeTransferLib.safeApprove(ERC20(Currency.unwrap(key.currency0)), address(rewardLedger), amount0);
+        }
+        if (amount1 != 0) {
+            SafeTransferLib.safeApprove(ERC20(Currency.unwrap(key.currency1)), address(rewardLedger), amount1);
+        }
+        rewardLedger.creditEpoch{value: key.currency0.isAddressZero() ? amount0 : 0}(
+            PoolId.unwrap(key.toId()), epoch, amount0, amount1
         );
-        _assertSurplusBacked(key.currency0);
-        _assertSurplusBacked(key.currency1);
-        emit SurplusDonated(id, donate0, donate1);
     }
 
     // ------------------------------------------------------------------
@@ -453,12 +395,8 @@ contract OtterSettlement is IUnlockCallback {
         _callbackPending = false;
         CallbackArgs memory a = abi.decode(data, (CallbackArgs));
 
-        // Both the swap and the donation create deltas against this contract.
-        // Accumulate them per currency and settle once, rather than settling the
-        // swap and then discovering the donation has opened a second debt on the
-        // same token.
-        uint256 owed0 = a.donate0;
-        uint256 owed1 = a.donate1;
+        uint256 owed0;
+        uint256 owed1;
         uint256 credit0;
         uint256 credit1;
         uint256 received;
@@ -497,14 +435,6 @@ contract OtterSettlement is IUnlockCallback {
                 owed1 += a.amountIn;
                 credit0 = received;
             }
-        }
-
-        // Donate AFTER the swap. `donate` does not move price or liquidity, so
-        // the order does not change the swap's output — doing it second just
-        // keeps the swap reading against exactly the state the batch was priced
-        // on, with nothing of ours in between.
-        if (a.donate0 > 0 || a.donate1 > 0) {
-            poolManager.donate(a.key, a.donate0, a.donate1, "");
         }
 
         _settleNet(a.key.currency0, owed0, credit0);
@@ -548,10 +478,6 @@ contract OtterSettlement is IUnlockCallback {
         result = poolManager.unlock(data);
         if (_callbackPending) revert InvalidCallback();
         delete _callbackHash;
-    }
-
-    function _assertSurplusBacked(Currency c) private view {
-        if (c.balanceOfSelf() < totalPendingSurplus[c]) revert Insolvent(c);
     }
 
     receive() external payable {

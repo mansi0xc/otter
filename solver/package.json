@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node --experimental-strip-types test/properties.ts && node --experimental-strip-types test/execution.ts && node --experimental-strip-types test/discrete-research.ts && node --experimental-strip-types test/lot-candidate.ts && node --experimental-strip-types test/representation-research.ts && node --experimental-strip-types test/cost-grid-research.ts && node --experimental-strip-types test/transfer-research.ts",
+    "test": "node --experimental-strip-types test/properties.ts && node --experimental-strip-types test/execution.ts && node --experimental-strip-types test/discrete-research.ts && node --experimental-strip-types test/lot-candidate.ts && node --experimental-strip-types test/representation-research.ts && node --experimental-strip-types test/cost-grid-research.ts && node --experimental-strip-types test/transfer-research.ts && node --experimental-strip-types test/rewards.ts",
     "test:execution": "node --experimental-strip-types test/execution.ts",
     "test:discrete": "node --experimental-strip-types test/discrete-research.ts",
     "research:discrete": "node --experimental-strip-types research/discrete-cli.ts",
@@ -15,6 +15,7 @@
     "research:cost-grid": "node --experimental-strip-types research/cost-grid-cli.ts",
     "test:transfers": "node --experimental-strip-types test/transfer-research.ts",
     "research:transfers": "node --experimental-strip-types research/transfer-cli.ts",
+    "test:rewards": "node --experimental-strip-types test/rewards.ts",
     "mutation": "node --experimental-strip-types test/mutation.ts",
     "bench": "node --experimental-strip-types test/bench.ts",
     "vectors": "node --experimental-strip-types src/cli.ts ../fixtures/vectors",

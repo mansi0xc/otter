@@ -131,12 +131,21 @@ contract OtterNativeSettlementTest is OtterHookFixture {
         uint256 expectedNative = dominantNative ? out.x[1] : out.x[0];
         assertEq((dominantNative ? bob : alice).balance, expectedNative);
         Currency surplusCurrency = dominantNative ? currency1 : Currency.wrap(address(0));
-        uint256 pot = settlement.pendingSurplus(nativeId, surplusCurrency);
-        assertEq(settlement.totalPendingSurplus(surplusCurrency), pot);
-        assertEq(dominantNative ? currency1.balanceOf(address(settlement)) : address(settlement).balance, pot);
+        uint256 pot = settlement.rewardLedger()
+            .epochSurplus(
+                PoolId.unwrap(nativeId), book.currentBatchId(PoolId.unwrap(nativeId)), Currency.unwrap(surplusCurrency)
+            );
+        assertEq(settlement.rewardLedger().totalClaimable(Currency.unwrap(surplusCurrency)), pot);
+        assertEq(dominantNative ? currency1.balanceOf(address(settlement)) : address(settlement).balance, 0);
+        assertEq(
+            dominantNative
+                ? currency1.balanceOf(address(settlement.rewardLedger()))
+                : address(settlement.rewardLedger()).balance,
+            pot
+        );
         if (pot != 0) {
-            settlement.flushSurplus(ethKey);
-            assertEq(settlement.totalPendingSurplus(surplusCurrency), 0);
+            settlement.rewardLedger().claim(Currency.unwrap(surplusCurrency), pot, address(0xCAFE));
+            assertEq(settlement.rewardLedger().totalClaimable(Currency.unwrap(surplusCurrency)), 0);
         }
     }
 

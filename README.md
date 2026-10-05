@@ -11,11 +11,14 @@ trader escrow, bounded v2 signed epochs, independent stored-order recovery,
 queued LP exits that precede the next epoch, and a bounded read-only execution
 oracle with an independent BigInt execution reference. Epochs now retain their
 opening pool state and authenticated LP roster, with validation before execution.
+Historical residual rewards now credit opening owners through a separate funded
+ledger; later liquidity cannot capture a past epoch’s surplus.
 Small-domain discrete research now exposes funding and rounding incentive failures
 in candidate integer adaptations; no production mechanism is selected.
 The two-sided exact-lot candidate has further price-support and fractional
 redemption limits. The paper's incentive guarantees remain the research target.
-See [checkpoint 4E](./reviews/CHECKPOINT_4E.md) for that candidate and its net-flow
+See [checkpoint 6A](./reviews/CHECKPOINT_6A.md) for historical reward accounting,
+[checkpoint 4E](./reviews/CHECKPOINT_4E.md) for that candidate and its net-flow
 tests, [checkpoint 4D](./reviews/CHECKPOINT_4D.md) for the original discrete counterexamples,
 [checkpoint 4C](./reviews/CHECKPOINT_4C.md) for snapshot scope and limitations,
 [checkpoint 4B](./reviews/CHECKPOINT_4B.md) for reference/domain comparisons and
@@ -28,7 +31,8 @@ Sepolia addresses still target the earlier prototype.
 
 The current settlement verifier accepts feasible allocations without enforcing
 the paper's canonical allocation/payments. Integer incentive guarantees
-and historical LP rewards remain unfinished. Concentrated positions can be
+remain unresolved. Historical rewards are implemented for admitted full-range
+pools; concentrated reward/auction integration remains unfinished. Concentrated positions can be
 custodied, but concentrated
 batch execution is blocked pending concentrated snapshot/execution integration and mechanism
 gates. The quote/reference alone do not implement canonical payments or
@@ -83,7 +87,8 @@ The current hook enforces the following integration rules:
   manager, price/tick/liquidity, fee fields and up to 32 authenticated LP records.
   Later admission and settlement check the opening state; donations and exit
   reservations leave it intact. Historical records survive exits and new epochs.
-  This does not yet allocate historical rewards or supply a production RPC reader.
+  The v2 snapshot also binds capital weights and the fixed reward policy.
+  A production RPC reader remains to implement.
 - **Concentrated execution gate.** Range positions are supported for custody.
   Order admission and swaps reject pools containing funded concentrated
   positions while the legacy auction still uses constant-product reserves.
@@ -147,8 +152,13 @@ The current hook enforces the following integration rules:
 - **Zero swap fees.** Registration and settlement reject nonzero LP or protocol
   fees. An authenticated later fee change permits immediate epoch expiry and
   stored refunds.
-  The current delayed donation policy remains vulnerable to historical LP
-  reward capture and will be replaced by snapshot-based claims.
+- **Historical LP rewards.** Residual cash is assigned during settlement using
+  opening principal-value weights. Owners retain independently withdrawable
+  claims after exit; new liquidity receives no past pot. Exact rounding dust
+  is credited to a fixed community recipient. Initial registration is owner-only;
+  the default dust recipient is that deployment owner. Otter surplus never enters
+  position fee growth. This does not resolve solver payment discretion or prove
+  LP/builder incentive compatibility.
 
 ## Prior art
 
