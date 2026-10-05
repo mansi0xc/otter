@@ -9,6 +9,12 @@ rejects minority payments below signed whole-unit minima. The witnesses and
 mechanism questions below remain open. The current evidence snapshot and runbook
 include that patch; the original 8A manifest retains the earlier baseline bytes.
 
+Local 4J update starts from the user-created signed-minimum commit `6cf5348`.
+The solver preflight now validates minority outcomes and numeric bounds and
+derives crossing totals from orders. It remains an offline current-rule
+arithmetic check, with real-settlement comparisons, not an authenticated
+execution check or canonical/incentive verifier. See [4J](./CHECKPOINT_4J.md).
+
 ## Decision the review must support
 
 Determine whether a useful v4 mechanism can meet the requested incentive targets
@@ -166,7 +172,7 @@ scope and compensation; do not label internal tests as independent review.
 
 Use the full repository with submodules populated. The selected evidence files
 and their Solidity import closure are hashed in
-[EVIDENCE_MANIFEST_4I.json](./EVIDENCE_MANIFEST_4I.json). That manifest records the
+[EVIDENCE_MANIFEST_4J.json](./EVIDENCE_MANIFEST_4J.json). That manifest records the
 pre-patch baseline, local checkpoint, dependency commits and observed tools.
 It identifies the post-patch selected bytes and does not hash this brief or later
 status edits, authenticate an author, inspect unlisted files, or certify safety.
@@ -176,7 +182,7 @@ relying on submodule HEAD alone. Review the verifier before running it.
 From the repository root, with the already available tools:
 
 ```sh
-python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4I.json
+python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4J.json
 ```
 
 From `solver/`:
@@ -206,6 +212,15 @@ For the signed-minimum safety patch and stored recovery, also run:
 forge test --offline --match-contract '^(OtterMinimumOutputTest|GrantReviewSettlementTest)$'
 ```
 
+`OtterMinimumOutputTest` now includes live local-Node preflight comparisons for
+78 deterministic native/ERC20/direction/order-position cases, followed by actual
+settlement or exact revert and stored recovery. Its 512 recovery fuzz cases run
+on-chain without FFI; the solver separately samples 512 exact BigInt boundaries
+and exhausts small minority minimum cases. These are checks of the current rule,
+not independent mechanism review or an exhaustive deviation proof. Codes 0–6
+retain the original dominant mapping; 7–10 identify length, numeric support,
+ineligible minority fill and incorrect minority floor/fill respectively.
+
 These use local solc 0.8.26, Cancun, via-IR, optimizer 200 and 512 fuzz runs.
 Review `foundry.toml`: FFI is enabled for local reference comparisons and the
 test-only gas ceiling is artificially large. That ceiling is not deployment
@@ -219,6 +234,10 @@ verification is for the `2c24344` baseline/archive, and is expected to detect th
 later Solidity patch in the current checkout. Do not rewrite old hashes to hide
 differences. The [8A report](./CHECKPOINT_8A.md) records the original packet;
 [checkpoint 4I](./CHECKPOINT_4I.md) records the safety patch and fresh checks.
+The [4I snapshot](./EVIDENCE_MANIFEST_4I.json) is also frozen at its checkpoint
+bytes. The separate 4J snapshot adds the checker, local CLI bridge and tests;
+changes to the previously hashed solver/test sources are explicitly identified
+in the [4J report](./CHECKPOINT_4J.md).
 A reviewer should retain their own tool versions,
 logs and content identifiers, and explain any reproduction difference. No
 external transfer or publication is authorized by this local packet.

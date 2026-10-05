@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node --experimental-strip-types test/properties.ts && node --experimental-strip-types test/execution.ts && node --experimental-strip-types test/discrete-research.ts && node --experimental-strip-types test/lot-candidate.ts && node --experimental-strip-types test/representation-research.ts && node --experimental-strip-types test/cost-grid-research.ts && node --experimental-strip-types test/transfer-research.ts && node --experimental-strip-types test/rewards.ts && node --experimental-strip-types test/reward-composition-research.ts && node --experimental-strip-types test/redistribution-research.ts",
+    "test": "node --experimental-strip-types test/properties.ts && node --experimental-strip-types test/execution.ts && node --experimental-strip-types test/discrete-research.ts && node --experimental-strip-types test/lot-candidate.ts && node --experimental-strip-types test/representation-research.ts && node --experimental-strip-types test/cost-grid-research.ts && node --experimental-strip-types test/transfer-research.ts && node --experimental-strip-types test/rewards.ts && node --experimental-strip-types test/reward-composition-research.ts && node --experimental-strip-types test/redistribution-research.ts && node --experimental-strip-types test/settlement-check.ts",
     "test:execution": "node --experimental-strip-types test/execution.ts",
     "test:discrete": "node --experimental-strip-types test/discrete-research.ts",
     "research:discrete": "node --experimental-strip-types research/discrete-cli.ts",
@@ -24,6 +24,7 @@
     "test:reward-composition": "node --experimental-strip-types test/reward-composition-research.ts",
     "research:reward-composition": "node --experimental-strip-types research/reward-composition-cli.ts",
     "test:redistribution": "node --experimental-strip-types test/redistribution-research.ts",
-    "research:redistribution": "node --experimental-strip-types research/redistribution-cli.ts"
+    "research:redistribution": "node --experimental-strip-types research/redistribution-cli.ts",
+    "test:settlement-check": "node --experimental-strip-types test/settlement-check.ts"
   }
 }

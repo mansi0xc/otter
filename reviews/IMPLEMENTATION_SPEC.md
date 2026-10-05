@@ -583,3 +583,18 @@ from the legacy allowance comments. The prior evidence manifest remains frozen;
 a separate 4I manifest identifies post-patch evidence bytes. R2, the remaining R6
 mechanism/liveness issues and G1–G4 remain open. The patch is local and requires
 a newly reviewed deployment fingerprint before any wallet use.
+
+Checkpoint 4I was committed by the user as `6cf5348`; the tree was clean before
+4J. [Checkpoint 4J](./CHECKPOINT_4J.md) hardens the legacy solver preflight to
+classify the actual minority orders, enforce their exact spot floor and signed
+minimum, and derive the crossing from their eligible budgets. Unsupported
+counts, unsigned widths, reserve bounds and per-side aggregates fail before
+arithmetic. The original dominant error mapping is unchanged. Diagnostics,
+clamp displacement and a claimed burn cannot influence acceptance.
+
+This check describes current full-range arithmetic feasibility only. It does
+not authenticate orders or live state, check actual execution/delivery, enforce
+canonical direction/allocation/payments or establish G1–G4. The generator's
+numerical rule and saved fixtures remain unchanged and can still produce
+rejected candidates. The reserve bound is an arithmetic support envelope,
+not admission of a synthetic reserve pair as an authenticated pool snapshot.

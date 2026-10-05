@@ -1,8 +1,7 @@
 /**
- * Fuzzes the exact solver against its own verifier. The claim being tested is the
- * one the whole solver-to-contract bridge rests on: an outcome produced by
- * solveExact passes the same checks OtterMath.verify performs, with no repair step
- * on the Solidity side.
+ * Historical mid-scale random candidate coverage against the offline preflight.
+ * Uses floating-point random scaling; passing is not a dust/domain/incentive
+ * proof. settlement-check.ts supplies exact boundary and minority regressions.
  */
 import { solveExact, selfCheck, type Order } from "../src/exact.ts";
 import { OK } from "../src/fixed.ts";

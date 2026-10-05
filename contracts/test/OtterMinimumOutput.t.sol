@@ -14,6 +14,7 @@ import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {OtterOrderBook} from "../src/OtterOrderBook.sol";
 import {OtterSettlement} from "../src/OtterSettlement.sol";
 import {OtterMath} from "../src/OtterMath.sol";
+import {OtterPoolMath} from "../src/OtterHook.sol";
 
 /// @notice Signed-minimum safety regressions, not a discrete mechanism proof.
 /// Uses real book/vault/hook/settlement with 18/6-decimal ERC20s or native/6-decimal
@@ -33,6 +34,53 @@ contract OtterMinimumOutputTest is OtterHookFixture {
         uint256 minorityIndex;
         OtterOrderBook.Order[] orders;
         OtterSettlement.Outcome outcome;
+    }
+
+    struct CheckVerdict {
+        uint256 code;
+        uint256 index;
+        uint256 arg0;
+        uint256 arg1;
+        uint256 totalIn;
+        uint256 totalPaid;
+        uint256 modelBurn;
+    }
+
+    /// Actual pool reserves go into the offline checker, never solver metadata.
+    function _crossCheck(Case memory c, uint256 code, uint256 index) private returns (CheckVerdict memory v) {
+        (uint160 price,,,) = manager.getSlot0(c.key.toId());
+        (uint256 r0, uint256 r1) = OtterPoolMath.virtualReserves(price, manager.getLiquidity(c.key.toId()));
+        string[] memory args = new string[](6 + 5 * c.orders.length);
+        args[0] = "node";
+        args[1] = "--experimental-strip-types";
+        args[2] = "../solver/src/settlement-check-cli.ts";
+        args[3] = vm.toString(r0);
+        args[4] = vm.toString(r1);
+        args[5] = c.outcome.dominantSellsCurrency0 ? "1" : "0";
+        for (uint256 i; i < c.orders.length; ++i) {
+            uint256 p = 6 + 5 * i;
+            args[p] = c.orders[i].sellingCurrency0 ? "1" : "0";
+            args[p + 1] = vm.toString(c.orders[i].ask);
+            args[p + 2] = vm.toString(c.orders[i].budget);
+            args[p + 3] = vm.toString(c.outcome.y[i]);
+            args[p + 4] = vm.toString(c.outcome.x[i]);
+        }
+        v = abi.decode(vm.ffi(args), (CheckVerdict));
+        assertEq(v.code, code, "offline arithmetic code");
+        assertEq(v.index, code == 0 ? 0 : index, "original record index");
+        if (code == 0) {
+            uint256 input;
+            uint256 paid;
+            for (uint256 i; i < c.orders.length; ++i) {
+                if (c.orders[i].sellingCurrency0 != c.outcome.dominantSellsCurrency0) continue;
+                input += c.outcome.y[i];
+                paid += c.outcome.x[i];
+            }
+            assertEq(v.totalIn, input);
+            assertEq(v.totalPaid, paid);
+            // All successful cases here are exactly crossed, with no residual.
+            assertEq(v.modelBurn, 0);
+        }
     }
 
     function _open(bool dominant0, bool nativePair, uint256 budget, uint256 ask, bool minorityFirst, uint256 domAsk)
@@ -106,6 +154,10 @@ contract OtterMinimumOutputTest is OtterHookFixture {
     }
 
     function _rejectAndRecover(Case memory c, uint256 rejectedIndex) private {
+        _rejectAndRecoverWith(c, abi.encodeWithSelector(OtterMath.IndividualRationality.selector, rejectedIndex));
+    }
+
+    function _rejectAndRecoverWith(Case memory c, bytes memory expected) private {
         address c0 = Currency.unwrap(c.key.currency0);
         address c1 = Currency.unwrap(c.key.currency1);
         uint256 escrow0 = book.totalEscrow(c0);
@@ -113,7 +165,7 @@ contract OtterMinimumOutputTest is OtterHookFixture {
         (uint160 price, int24 tick,,) = manager.getSlot0(c.key.toId());
         uint128 liquidity = manager.getLiquidity(c.key.toId());
         bytes32 snapshot = book.snapshotHash(c.pool, c.epoch);
-        vm.expectRevert(abi.encodeWithSelector(OtterMath.IndividualRationality.selector, rejectedIndex));
+        vm.expectRevert(expected);
         settlement.settle(c.key, c.epoch, c.orders, c.outcome);
         assertEq(uint8(book.batchState(c.pool, c.epoch)), uint8(OtterOrderBook.State.Closed));
         assertFalse(book.executionInProgress(c.pool));
@@ -177,6 +229,7 @@ contract OtterMinimumOutputTest is OtterHookFixture {
         for (uint256 flags; flags < 4; ++flags) {
             uint256 checkpoint = vm.snapshotState();
             Case memory c = _open(flags & 1 != 0, flags & 2 != 0, budget, ask, false, 0);
+            _crossCheck(c, rejected ? 4 : 0, c.minorityIndex);
             if (rejected) _rejectAndRecover(c, c.minorityIndex);
             else _accept(c);
             assertTrue(vm.revertToState(checkpoint));
@@ -216,7 +269,87 @@ contract OtterMinimumOutputTest is OtterHookFixture {
     function test_dominantMinimumStillRejectsAndPreservesRecovery() public {
         Case memory c = _open(true, false, 4, WAD / 4, false, 4 * WAD);
         c.outcome.x[0] = 3; // Sold 1 with signed minimum 4.
+        _crossCheck(c, 4, 0);
         _rejectAndRecover(c, 0);
+    }
+
+    function test_offlineCheckMatchesWrongMinorityFillAndPayment() public {
+        for (uint256 flags; flags < 8; ++flags) {
+            for (uint256 mutation; mutation < 3; ++mutation) {
+                uint256 checkpoint = vm.snapshotState();
+                Case memory c = _open(flags & 1 != 0, flags & 2 != 0, 4, WAD / 4, flags & 4 != 0, 0);
+                uint256 i = c.minorityIndex;
+                if (mutation == 0) c.outcome.y[i] = 3;
+                else c.outcome.x[i] = mutation == 1 ? 0 : 2;
+                _crossCheck(c, 10, i);
+                _rejectAndRecoverWith(c, abi.encodeWithSelector(OtterSettlement.MinorityFillWrong.selector, i));
+                assertTrue(vm.revertToState(checkpoint));
+            }
+        }
+    }
+
+    function test_offlineCheckMatchesIneligibleMinorityAndAllowsZeroProposal() public {
+        for (uint256 flags; flags < 8; ++flags) {
+            uint256 checkpoint = vm.snapshotState();
+            Case memory c = _open(flags & 1 != 0, flags & 2 != 0, 4, WAD / 4 + 1, flags & 4 != 0, 0);
+            uint256 opened = vm.snapshotState();
+            _crossCheck(c, 9, c.minorityIndex);
+            _rejectAndRecoverWith(
+                c, abi.encodeWithSelector(OtterSettlement.IneligibleMustBeUnfilled.selector, c.minorityIndex)
+            );
+            assertTrue(vm.revertToStateAndDelete(opened));
+            // Current feasibility checks permit this inefficient zero proposal.
+            // Matching that behavior does not solve canonical allocation (R2).
+            c.outcome.y = new uint256[](2);
+            c.outcome.x = new uint256[](2);
+            _crossCheck(c, 0, 0);
+            _accept(c);
+            assertTrue(vm.revertToState(checkpoint));
+        }
+    }
+
+    function test_offlineCheckDerivesCrossingWithoutDiagnosticTotals() public {
+        Case memory c = _open(true, true, 4, WAD / 4, true, 0);
+        c.outcome.y[1] = 0;
+        c.outcome.x[1] = 0;
+        CheckVerdict memory v = _crossCheck(c, 5, 0);
+        assertEq(v.arg0, 0);
+        assertEq(v.arg1, 1);
+        _rejectAndRecoverWith(c, abi.encodeWithSelector(OtterMath.DominanceViolated.selector, 0, 1));
+    }
+
+    function test_offlineCheckMatchesClassificationBeforeDominantIR() public {
+        Case memory c = _open(true, false, 4, WAD / 4, false, 4 * WAD);
+        c.outcome.x[0] = 3;
+        c.outcome.x[1] = 0;
+        _crossCheck(c, 10, 1);
+        _rejectAndRecoverWith(c, abi.encodeWithSelector(OtterSettlement.MinorityFillWrong.selector, 1));
+    }
+
+    function test_offlineCheckMatchesDominantBudgetSpotAndMarginalErrors() public {
+        for (uint256 mutation; mutation < 3; ++mutation) {
+            uint256 checkpoint = vm.snapshotState();
+            Case memory c = _open(true, false, 4, mutation == 2 ? WAD / 4 + 1 : WAD / 4, false, 0);
+            bytes4 selector;
+            uint256 code;
+            if (mutation == 0) {
+                c.outcome.y[0] = 2;
+                selector = OtterMath.BudgetExceeded.selector;
+                code = 1;
+            } else if (mutation == 1) {
+                c.outcome.x[0] = 5;
+                selector = OtterMath.PaymentExceedsSpot.selector;
+                code = 2;
+            } else {
+                c.outcome.y[1] = 0;
+                c.outcome.x[1] = 0;
+                selector = OtterMath.PaymentExceedsMarginal.selector;
+                code = 3;
+            }
+            _crossCheck(c, code, 0);
+            _rejectAndRecoverWith(c, abi.encodeWithSelector(selector, 0));
+            assertTrue(vm.revertToState(checkpoint));
+        }
     }
 
     function testFuzz_signedMinorityBoundaryAndRecovery(

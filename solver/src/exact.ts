@@ -1,19 +1,21 @@
 /**
- * Exact-integer two-sided solve.
+ * Legacy BigInt two-sided candidate generator, not a selected discrete rule.
  *
  * `otter.ts` is the reference implementation and works in float64 — good for
  * property testing the mechanism, useless for producing an outcome a contract will
  * accept, because `OtterMath.verify` checks wei-exact bounds.
  *
- * This computes the same mechanism entirely in BigInt, with the same rounding
- * directions as OtterMath.sol, so its output settles on-chain unmodified.
+ * Integer arithmetic does not preserve the continuous paper's guarantees.
+ * Empty payment intervals, minority dust minima and arrival ties remain known
+ * failures. Call selfCheck before using a candidate; it can reject this output.
+ * Passing that offline preflight does not establish canonicality or settlement.
  *
  * Pivots are computed the NAIVE way here: n leave-one-out welfare evaluations,
  * O(n^2 log n). That is deliberate. The layer-cake form from the paper's Lemma 16
  * (see onesided.ts) is 57x faster at n=5,000, but it integrates 2*sqrt(k)*sqrt(t)
  * and carrying that to wei-exactness in fixed point is a different problem from
- * carrying it to 1e-10 in floats. For batch sizes that fit in a block — 630, see
- * the gas curve — the naive path runs in milliseconds. Correctness first.
+ * carrying it to 1e-10 in floats. Current admission is bounded to 32 orders;
+ * the historical gas curve does not establish canonical-verifier capacity.
  */
 
 import {
@@ -24,10 +26,9 @@ import {
   fTildeUp,
   fTildeSettleable,
   spotDown,
-  verify,
   type Curve,
-  type Fill,
 } from "./fixed.ts";
+import { checkLegacyOutcome } from './settlement-check.ts';
 
 /** Integer square root, Newton's method. */
 export function isqrt(n: bigint): bigint {
@@ -87,9 +88,9 @@ function K(c: Curve, ask: bigint): bigint {
 
 /**
  * Allocation rule (Fact 11). Fill in ascending ask order, each bidder up to K(ask).
- * Using K rather than a strict marginal-price test is what implements the paper's
- * quantity-maximising tie rule at equality — and is what makes Fact 13 (Q_Y >= M)
- * fall out, since every eligible ask has K(ask) >= K(sigma0) = M.
+ * This is the legacy continuous inverse-marginal walk evaluated in integers.
+ * Equal asks retain arrival order. It is not an independently established
+ * welfare/tie rule for exact v4 execution and the original valuation domain.
  */
 function allocate(c: Curve, bids: Bid[]): Map<number, bigint> {
   const order = [...bids].sort((a, b) => (a.ask < b.ask ? -1 : a.ask > b.ask ? 1 : 0));
@@ -125,15 +126,15 @@ function welfare(c: Curve, bids: Bid[]): bigint {
 }
 
 /**
- * Solve a batch against a pool, exactly.
+ * Produce a legacy integer candidate against virtual reserves.
  *
- * Raw Clarke payments are clamped into the feasible integer set:
+ * The legacy clamp uses these nominal integer bounds:
  *   lower  = ceil(ask_i * y_i / WAD)              individual rationality
  *   upper  = min(spotDown(y_i), F~s(Y) - F~u(Y - y_i))   Theorem 12(b)
- * The clamp is reported per order in `clampDisplacement`, because a clamp that
- * moves payments by more than a few wei would mean the mechanism and the on-chain
- * bounds disagree about something real, and that should be visible rather than
- * silently absorbed.
+ * The interval can be empty; this legacy clamp can then produce a payment below
+ * the signed minimum. Clamp displacement is diagnostic, not an incentive bound.
+ * Numerical behavior is retained for reproductions, without repairing outcomes
+ * or selecting this allocation/payment policy for the hardened mechanism.
  */
 export function solveExact(r0: bigint, r1: bigint, orders: Order[]): Outcome {
   // eligibility and side totals, in each side's own orientation
@@ -226,17 +227,7 @@ export function solveExact(r0: bigint, r1: bigint, orders: Order[]): Outcome {
   };
 }
 
-/** Run the outcome through the same checks OtterMath.verify performs. */
+/** Offline current-rule arithmetic preflight; see settlement-check.ts for limits. */
 export function selfCheck(r0: bigint, r1: bigint, orders: Order[], out: Outcome) {
-  const c: Curve = out.dominantSellsCurrency0
-    ? { x0: r1, y0: r0, M: 0n }
-    : { x0: r0, y0: r1, M: 0n };
-  c.M = mulDivDown(c.y0, out.diagnostics.dMinority, c.x0);
-
-  const fills: Fill[] = orders.map((o, i) =>
-    o.sellingCurrency0 === out.dominantSellsCurrency0
-      ? { ask: o.ask, budget: o.budget, y: out.y[i], x: out.x[i] }
-      : { ask: 0n, budget: 0n, y: 0n, x: 0n },
-  );
-  return verify(c, fills);
+  return checkLegacyOutcome(r0, r1, orders, out);
 }

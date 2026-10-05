@@ -2,7 +2,7 @@
 
 Prepared 5 October 2026. Starting commit:
 `149db343cf6d3e9c76151f14fd54668cbef26432`. The working tree was clean.
-Status: **local safety patch verified; waiting for the user's commit**.
+Status: **committed by the user as `6cf5348`; clean tree inspected before 4J**.
 
 ## Outcome
 

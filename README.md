@@ -88,6 +88,12 @@ Stated up front rather than buried:
   [checkpoint 4I](./reviews/CHECKPOINT_4I.md).
   **Canonical welfare-optimal allocations and payments are not enforced
   on-chain.**
+- The legacy solver's `selfCheck` now checks minority fills/payments/minima and
+  derives crossing totals from the orders, with bounded unsigned inputs. Its
+  success means offline arithmetic feasibility for the current full-range rule;
+  it does not authenticate pool state or establish successful execution,
+  canonical payments or incentives. `solveExact` can still return a rejected
+  candidate. See [checkpoint 4J](./reviews/CHECKPOINT_4J.md).
 - Opening ownership prevents later LPs from taking historical rewards. It does
   not preserve combined trader/LP truthfulness: an exact-pivot counterexample
   increases an existing LP trader's funded reward with the same trade and pool

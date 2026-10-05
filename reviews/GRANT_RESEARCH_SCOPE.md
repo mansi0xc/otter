@@ -8,6 +8,13 @@ Local 4I update, starting from `149db34`: signed minimum output is now enforced
 on both sides. The research milestones and unresolved mechanism gates below
 remain unchanged; this safety patch is not a deployment-readiness claim.
 
+Local 4J update, starting from the user's `6cf5348` commit: the solver preflight
+now rejects malformed numeric inputs and minority outcomes rejected by the
+current settlement rule, without trusting solver diagnostic totals. This
+reusable offline check is supported by real-settlement comparisons; it supplies
+neither a selected incentive mechanism nor live-state authentication. See
+[the checkpoint report](./CHECKPOINT_4J.md) and current review runbook.
+
 ## Proposed project and public benefit
 
 **Title:** Exact settlement and incentive research for Otter on Uniswap v4.

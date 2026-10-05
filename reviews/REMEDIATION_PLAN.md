@@ -517,7 +517,31 @@ the local minimum-output check from complete integer incentive guarantees.
 
 The 8A evidence manifest is unchanged and still identifies its original baseline.
 A separate 4I content snapshot covers the post-patch sources and tests; a changed
-hash against the old manifest is expected, not hidden. **4I is pending the user's
-commit.** Its report lists the exact files, fresh validation and suggested message.
+hash against the old manifest is expected, not hidden. **4I was committed by the
+user as `6cf5348`; the tree was clean before 4J.** Its report lists the exact files,
+fresh validation and suggested message.
 After the commit, continue the complete asset/curve/utility design and canonical
 verification; do not treat safe rejection/refunds as a guarantee of useful fills.
+
+## Checkpoint 4J: reject unsafe legacy candidates in the offline preflight
+
+[The checker checkpoint](./CHECKPOINT_4J.md) removes the solver's false-positive
+acceptance of minority underpayment and forged crossing diagnostics. `selfCheck`
+delegates to a bounded current-rule arithmetic check over the actual order and
+outcome arrays. It validates full minority fills, exact spot floors, both-side
+signed minima, zero ineligible minority fills, and dominant feasibility. It
+ignores diagnostic metadata and rejects unsupported unsigned/count/aggregate
+inputs before arithmetic. Real settlement comparisons retain original record
+indices and independent full-budget recovery.
+
+This does not change production Solidity, the legacy generator's allocation or
+payments, eligibility, direction policy, ties, assets, rewards or useful-fill
+guarantees. An OK arithmetic verdict is not order/snapshot authentication,
+actual-swap fundability, canonicality, or a proof under G1–G4. Feasible zero
+proposals and the generator's known dust/tie failures remain explicit.
+
+The old manifests remain frozen. A separate 4J snapshot identifies the new
+selected bytes and local reference bridge. **4J is pending the user's commit.**
+Its report contains the exact handoff and fresh checks. Continue the complete
+asset/curve/utility and canonical-verification work only after confirmation;
+do not treat this preflight as a selected mechanism or deployment readiness.
