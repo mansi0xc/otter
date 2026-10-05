@@ -51,12 +51,12 @@ library OtterMath {
     ///      measured point with at least 1.5x margin. On a 10e18 trade at 10%
     ///      impact that is 22 wei, or 2e-16% of the trade.
     ///
-    ///      This is a fixed function of the batch's own size, not of any bidder's
-    ///      report, so it does not create an outcome-dependent transfer and leaves
-    ///      incentive compatibility intact (cf. Theorem 22 on builder payments).
-    ///      It does shave individual rationality at the very margin: a bidder
-    ///      whose ask exactly equals its compensation could be underpaid by up to
-    ///      the allowance. Stated in the README rather than buried.
+    ///      This is a legacy measured allowance, not an incentive proof. Filled
+    ///      input can depend on reports, so a fixed formula does not establish
+    ///      outcome independence. The signed minimum remains a hard lower bound:
+    ///      if it exceeds the allowed upper bound, verification rejects rather
+    ///      than shaving the trader's payment. Empty intervals and canonical
+    ///      integer payments remain unresolved mechanism questions.
     uint256 internal constant IMPACT_ALLOWANCE_NUM = 200;
     uint256 internal constant ALLOWANCE_FLOOR = 2;
 

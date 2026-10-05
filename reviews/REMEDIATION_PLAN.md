@@ -488,7 +488,8 @@ independent review, external contact, upload or application occurred.
 Fresh checks reproduce the existing solver/fixture evidence and targeted real-core,
 cash and authentic historical ownership tests. No contract, solver, wallet,
 dependency, saved economic fixture, deployment or benchmark changed.
-**8A is pending the user's commit.** [Its report](./CHECKPOINT_8A.md) lists the
+**8A was committed by the user as `149db34`; the tree was clean before 4I.**
+[Its report](./CHECKPOINT_8A.md) lists the
 exact files, validation and suggested message. Step 8 remains incomplete, as do
 G1–G4 and the gated concentrated/canonical integrations.
 
@@ -497,3 +498,26 @@ review questions. Do not contact a reviewer or submit/share this packet without
 the user's explicit authorization for that external action. An eventual proposal
 must identify any incompatible product requirements and their consequences before
 requesting a change to the user's selected guarantee priority.
+
+## Checkpoint 4I: enforce both-side signed minima without choosing a new rule
+
+The legacy minority spot floor could be below an order's signed whole-output
+minimum. [The safety patch](./CHECKPOINT_4I.md) rejects that outcome before any
+escrow release/swap/payout, preserving the stored order, opening snapshot and
+independent timeout refunds. It neither tops up the minority payment nor changes
+its eligibility/allocation. Valid floors still settle, including the raw zero-ask
+domain. Broader R6 interval/tie/liveness questions, R2 and G1–G4 remain unresolved.
+
+This bounded safety work is authorized independently of adopting a mechanism.
+Actual book/vault/hook/settlement regressions cover both directions, native ETH,
+18/6-decimal ERC20s, zero/nonzero underpayments, signed-price boundaries, original
+record indices and full uint96 budgets. The original grant-review reproduction
+now asserts rejection and stored recovery. Dashboard/review claims distinguish
+the local minimum-output check from complete integer incentive guarantees.
+
+The 8A evidence manifest is unchanged and still identifies its original baseline.
+A separate 4I content snapshot covers the post-patch sources and tests; a changed
+hash against the old manifest is expected, not hidden. **4I is pending the user's
+commit.** Its report lists the exact files, fresh validation and suggested message.
+After the commit, continue the complete asset/curve/utility design and canonical
+verification; do not treat safe rejection/refunds as a guarantee of useful fills.

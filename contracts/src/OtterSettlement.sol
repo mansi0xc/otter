@@ -24,8 +24,9 @@ import {IOtterLiquidityGuard} from "./interfaces/IOtterLiquidityGuard.sol";
 ///         the residual imbalance through the v4 pool, and distributes.
 ///
 /// TRUST MODEL: this remains the legacy feasibility verifier. It does not
-/// enforce the canonical allocation or pivot payments, and minority dust can
-/// violate integer IR. A solver can choose a lower feasible trader payment and
+/// enforce the canonical allocation or pivot payments. Both sides enforce their
+/// signed whole-unit minimum, rejecting a minority spot floor below that minimum.
+/// A solver can choose a lower feasible trader payment and
 /// divert the residual to LPs it controls. Exclusivity selects a caller; it does
 /// not resolve that economic discretion. See the review and specification gates.
 ///
@@ -272,8 +273,10 @@ contract OtterSettlement is IUnlockCallback {
     }
 
     /// @dev Splits the book, enforces the minority rule (§3.4: every eligible
-    ///      minority order fills IN FULL at the initial spot price, no auction),
-    ///      and returns the dominant side shaped for OtterMath.
+    ///      minority order fills IN FULL at the initial spot price, no auction).
+    ///      Reject a rounded minority payment below its signed minimum instead
+    ///      of changing its fill/payment or silently dropping the stored order.
+    ///      This safety check does not resolve discrete mechanism liveness.
     function _classify(OtterMath.Curve memory curve, OtterOrderBook.Order[] calldata orders, Outcome calldata outcome)
         private
         pure
@@ -305,6 +308,9 @@ contract OtterSettlement is IUnlockCallback {
             // sells its whole budget, receives rho0 * budget rounded down
             uint256 owed = FixedPointMathLib.mulDivDown(curve.y0, orders[i].budget, curve.x0);
             if (outcome.y[i] != orders[i].budget || outcome.x[i] != owed) revert MinorityFillWrong(i);
+            if (owed < FixedPointMathLib.mulDivUp(orders[i].ask, orders[i].budget, OtterMath.WAD)) {
+                revert OtterMath.IndividualRationality(i);
+            }
 
             dMinority += orders[i].budget;
             minorityPaid += owed;

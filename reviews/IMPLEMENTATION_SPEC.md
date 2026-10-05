@@ -297,6 +297,15 @@ migration before it can operate this stack.
 
 The current solver's clamp, marginal bounds, and constant-product `F` are not the v2 canonical mechanism. Preserve them as historical/research references, not production correctness checks. Do not replace an empty payment interval with a below-minimum output or silently omit a stored order.
 
+Checkpoint 4I enforces the signed whole-unit minimum at minority classification,
+in addition to the existing dominant-side check: if the prescribed full-budget
+spot floor is below `ceil(ask * budget / WAD)`, settlement reverts atomically with
+the stored order index. It does not round the payout up, change eligibility/fills,
+or drop a record. Such a batch may remain unexecutable under the legacy rule;
+timeout expiry and independent full-budget refunds are the recovery path. This
+closes the accepted minority underpayment path within R6, not its allocation,
+tie, empty-interval or incentive questions. No canonical rule is selected.
+
 The mechanism must be a versioned deterministic function of the complete admitted batch, authenticated pool snapshot, exact execution oracle, and declared policy. It produces direction, integer fills, both sides' outputs, unspent budgets, actual AMM consumption, residual assets, and a unique outcome commitment. A caller provides no additional economic discretion.
 
 Minimum enforceable postconditions are:
@@ -565,3 +574,12 @@ no application was submitted. The review and grant research package is preparato
 work within step 8; canonical implementation and expanded testnet work retain their
 existing gates. [Its report](./CHECKPOINT_8A.md) records fresh checks and the
 user-created commit handoff.
+
+Checkpoint 8A was committed by the user as `149db34`; the tree was clean before
+4I. [Checkpoint 4I](./CHECKPOINT_4I.md) hardens the signed minimum-output condition
+on the legacy minority branch, with native/unequal-decimal and stored-refund
+regressions. It also removes unsupported incentive-neutrality/IR-shaving claims
+from the legacy allowance comments. The prior evidence manifest remains frozen;
+a separate 4I manifest identifies post-patch evidence bytes. R2, the remaining R6
+mechanism/liveness issues and G1–G4 remain open. The patch is local and requires
+a newly reviewed deployment fingerprint before any wallet use.

@@ -81,8 +81,11 @@ Stated up front rather than buried:
 
 - The mechanism's guarantees require **censorship resilience at the consensus
   layer** (Theorem 23). A testnet does not provide this.
-- The legacy contract checks budget/curve feasibility and dominant-side
-  individual rationality. Minority dust payments can still violate IR.
+- The local settlement checks budget/curve feasibility and signed minimum output
+  on both sides. A minority spot floor below its signed minimum now reverts;
+  it is neither topped up nor omitted. Some batches can therefore require expiry
+  and stored refunds while the full discrete rule remains unresolved. See
+  [checkpoint 4I](./reviews/CHECKPOINT_4I.md).
   **Canonical welfare-optimal allocations and payments are not enforced
   on-chain.**
 - Opening ownership prevents later LPs from taking historical rewards. It does

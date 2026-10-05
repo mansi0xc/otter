@@ -29,7 +29,7 @@ function WaveLogo() {
 
 const INVARIANTS = [
   { label: 'Feasibility', desc: 'Pool conservation holds — net swap matches the curve.' },
-  { label: 'Individual rationality', desc: 'Dominant-side check; minority rounding still has known failures.' },
+  { label: 'Signed minimum output', desc: 'Settlement rejects payments below signed minima on either side.' },
   { label: 'Budget bounds', desc: 'No order filled beyond its own budget.' },
   { label: 'Curve conservation', desc: 'Virtual reserves after settlement satisfy the invariant.' },
 ]
@@ -181,8 +181,8 @@ export function HomePage({ onEnterDemo, onEnterSepolia }: HomePageProps) {
               </div>
               <h3 className={styles.mechanismCardTitle}>On-chain verification</h3>
               <p className={styles.mechanismCardBody}>
-                The legacy verifier checks feasibility and budget/curve bounds. It still permits
-                noncanonical payments, and minority-side rounding can violate individual rationality.
+                The local verifier checks signed minimum output on both sides and budget/curve bounds.
+                Canonical allocations and pivot payments remain unimplemented.
               </p>
             </div>
           </div>
@@ -195,8 +195,8 @@ export function HomePage({ onEnterDemo, onEnterSepolia }: HomePageProps) {
           <span className={styles.sectionLabel}>Prototype checks</span>
           <h2 id="invariants-title" className={styles.sectionTitle}>Checks with known limits</h2>
           <p className={styles.sectionLead}>
-            These describe the legacy verifier’s checks. They do not enforce canonical payouts,
-            establish integer IR for all orders, or resolve the combined trader/LP incentive gap.
+            These checks enforce signed minima at settlement. A complete integer mechanism,
+            canonical payouts and combined trader/LP incentives remain unresolved.
           </p>
           <div className={styles.invariantList}>
             {INVARIANTS.map((inv, i) => (
@@ -325,7 +325,8 @@ export function HomePage({ onEnterDemo, onEnterSepolia }: HomePageProps) {
               <span className={styles.limitIcon} aria-hidden="true">△</span>
               <p className={styles.limitText}>
                 <strong>Economic guarantees.</strong> Canonical allocation and pivot payments are not
-                enforced. Integer rounding can violate IR, and an LP trader can benefit from a false ask through surplus rewards.
+                enforced. Rounded outcomes below signed minima are rejected and can require timeout refunds.
+                An LP trader can still benefit from a false ask through surplus rewards.
               </p>
             </div>
             <div className={styles.limitRow}>

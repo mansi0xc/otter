@@ -4,6 +4,10 @@ Prepared 5 October 2026 against source baseline `2c24344`.
 **Local draft, not a submitted application. Funding amount, contributors,
 availability and independent reviewer are not yet confirmed.**
 
+Local 4I update, starting from `149db34`: signed minimum output is now enforced
+on both sides. The research milestones and unresolved mechanism gates below
+remain unchanged; this safety patch is not a deployment-readiness claim.
+
 ## Proposed project and public benefit
 
 **Title:** Exact settlement and incentive research for Otter on Uniswap v4.
@@ -32,7 +36,7 @@ Confirm the current application route and terms before submission.
 
 | Gap | Consequence for the proposal | Proposed funded result |
 |---|---|---|
-| Feasibility is accepted without canonical payments; minority dust IR remains | A grant reviewer cannot infer the advertised mechanism from the deployed or local verifier | A complete rule and acceptance conditions, followed by a measured verification design only if the rule passes review |
+| Feasibility is accepted without canonical payments; both-side signed minima now reject underpayment, but empty intervals/ties remain | A grant reviewer cannot infer the advertised mechanism or execution liveness from the deployed or local verifier | A complete rule and acceptance conditions, followed by a measured verification design only if the rule passes review |
 | Whole outputs conflict with exact truthful allocation responses on a published finite domain | Another rounding patch cannot support a blanket guarantee claim | Proof-quality representation/domain analysis, including a precise negative result if requirements conflict |
 | Existing LP traders benefit from changing other traders' pivots and current surplus | Historical ownership accounting alone does not restore incentives | Joint trader/LP/builder/community utility, current-pot routing and repeated-epoch analysis |
 | Concentrated custody and quotes exist, but concentrated auctions are gated | Expanded support has not been delivered end to end | A supported curve/domain specification and exact execution regressions; auction integration contingent on proof and verification gates |

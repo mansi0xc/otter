@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-// R1, R3, R4, R5, R8 and fee policy now assert prevention. R2/R6/R7 remain open. Other review reproductions still assert
-// unsafe behavior and remain open until their owning remediation step lands.
+// R1, R3, R4, R5, R7, R8 and fee policy now assert prevention. R6's minority
+// underpayment path is rejected; its wider discrete mechanism issues and R2
+// remain open. Passing an unsafe-behavior reproduction does not close a finding.
 import {OtterSettlementTest, IERC20Minimal} from "./OtterSettlement.t.sol";
 import {OtterOrderBookTest} from "./OtterOrderBook.t.sol";
 import {OtterOrderBook} from "../src/OtterOrderBook.sol";
@@ -113,7 +114,7 @@ contract GrantReviewSettlementTest is OtterSettlementTest {
         assertEq(uint8(book.batchState(PoolId.unwrap(otterId), id)), uint8(OtterOrderBook.State.Settled));
     }
 
-    function test_review_MinorityCanReceiveZeroBelowItsAsk() public {
+    function test_review_MinorityBelowSignedMinimumRejectsAndStoredOrdersRefund() public {
         (otterKey, otterId) = initPool(currency0, currency1, IHooks(address(hook)), 0, 2, SQRT_PRICE_1_1 * 2);
         settlement.registerPool(otterKey);
         _modifyLiquidity(
@@ -135,16 +136,20 @@ contract GrantReviewSettlementTest is OtterSettlementTest {
         uint256[] memory y = new uint256[](2);
         uint256[] memory x = new uint256[](2);
         y[1] = 1;
+        vm.expectRevert(abi.encodeWithSelector(OtterMath.IndividualRationality.selector, 1));
         settlement.settle(otterKey, id, os, OtterSettlement.Outcome(true, y, x));
-        _claimAllTraders(book, otterKey, os);
-        assertEq(IERC20Minimal(Currency.unwrap(currency0)).balanceOf(min), 0);
-        assertEq(
-            settlement.rewardLedger()
-                .epochSurplus(
-                    PoolId.unwrap(otterId), book.currentBatchId(PoolId.unwrap(otterId)), Currency.unwrap(currency1)
-                ),
-            1
-        );
+        bytes32 pool = PoolId.unwrap(otterId);
+        assertFalse(book.executionInProgress(pool));
+        assertFalse(book.payoutsCredited(pool, id));
+        assertFalse(settlement.rewardLedger().credited(pool, id));
+        assertEq(book.totalEscrow(Currency.unwrap(currency0)), DOM_BUDGET);
+        assertEq(book.totalEscrow(Currency.unwrap(currency1)), 1);
+        vm.warp(book.executionDeadline(pool, id));
+        book.expire(pool, id);
+        book.refundOrder(pool, id, 1);
+        book.refundOrder(pool, id, 0);
+        assertEq(book.claimable(dom, Currency.unwrap(currency0)), DOM_BUDGET);
+        assertEq(book.claimable(min, Currency.unwrap(currency1)), 1);
     }
 
     function test_review_ProtocolFeeChangeRejectsSettlementAndAllowsRefund() public {

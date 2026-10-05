@@ -4,6 +4,11 @@ Prepared 5 October 2026 against commit
 `2c2434476f48a6e96dbaef8f2051259c084e6d88`. **Request prepared locally; no reviewer
 has been contacted and no independent review has occurred.**
 
+Local safety update 4I starts from user-created commit `149db34`: settlement now
+rejects minority payments below signed whole-unit minima. The witnesses and
+mechanism questions below remain open. The current evidence snapshot and runbook
+include that patch; the original 8A manifest retains the earlier baseline bytes.
+
 ## Decision the review must support
 
 Determine whether a useful v4 mechanism can meet the requested incentive targets
@@ -43,8 +48,11 @@ opening-owner cash rewards are implemented locally. The source wallet uses v2
 signatures and receipt-based recovery, but its deployment manifest is null.
 The published September addresses and tracked web build are historical.
 
-Production settlement still accepts feasible noncanonical outcomes (**R2**) and
-retains the minority dust IR defect (**R6**). Historical reward accounting fixes
+Local settlement still accepts feasible noncanonical outcomes (**R2**). It now
+checks signed minima on both sides, rejecting the minority dust underpayment
+path. **R6** remains open for empty payment intervals, ties and complete integer
+incentives/liveness; rejecting an unsafe proposal does not supply a new rule.
+Historical reward accounting fixes
 later-entry capture locally (**R7**), but its current residual allocation has the
 combined-role incentive failure below. Concentrated positions can be custodied;
 concentrated auction admission and swaps remain gated. No independent security
@@ -158,8 +166,9 @@ scope and compensation; do not label internal tests as independent review.
 
 Use the full repository with submodules populated. The selected evidence files
 and their Solidity import closure are hashed in
-[EVIDENCE_MANIFEST.json](./EVIDENCE_MANIFEST.json). The manifest records baseline,
-dependency commits and observed tools. It does not hash this brief or later
+[EVIDENCE_MANIFEST_4I.json](./EVIDENCE_MANIFEST_4I.json). That manifest records the
+pre-patch baseline, local checkpoint, dependency commits and observed tools.
+It identifies the post-patch selected bytes and does not hash this brief or later
 status edits, authenticate an author, inspect unlisted files, or certify safety.
 Source content hashes also cover the imported vendor Solidity, rather than
 relying on submodule HEAD alone. Review the verifier before running it.
@@ -167,7 +176,7 @@ relying on submodule HEAD alone. Review the verifier before running it.
 From the repository root, with the already available tools:
 
 ```sh
-python3 reviews/verify_evidence.py --root .
+python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4I.json
 ```
 
 From `solver/`:
@@ -191,7 +200,13 @@ From `contracts/`, run one Forge job at a time:
 forge test --offline --match-contract '^(OtterTransferResearchTest|OtterRepresentationTest|OtterCostGridTest|OtterRewardCompositionTest|OtterExecutionOracleTest|OtterExecutionOracleIntegrationTest|OtterHistoricalRewardsTest)$'
 ```
 
-This uses local solc 0.8.26, Cancun, via-IR, optimizer 200 and 512 fuzz runs.
+For the signed-minimum safety patch and stored recovery, also run:
+
+```sh
+forge test --offline --match-contract '^(OtterMinimumOutputTest|GrantReviewSettlementTest)$'
+```
+
+These use local solc 0.8.26, Cancun, via-IR, optimizer 200 and 512 fuzz runs.
 Review `foundry.toml`: FFI is enabled for local reference comparisons and the
 test-only gas ceiling is artificially large. That ceiling is not deployment
 capacity evidence. Avoid `GasCurveTest` and `SandwichHarness` when preserving the
@@ -199,7 +214,11 @@ historical benchmark files; those suites overwrite results. Offline compilation
 needs the compiler and dependency checkouts already available. For fresh tooling,
 agree on setup separately rather than changing pins to make a test pass.
 
-Fresh results and exact checkpoint scope are recorded in
-[checkpoint 8A](./CHECKPOINT_8A.md). A reviewer should retain their own tool versions,
+The [original 8A manifest](./EVIDENCE_MANIFEST.json) remains immutable: its default
+verification is for the `2c24344` baseline/archive, and is expected to detect the
+later Solidity patch in the current checkout. Do not rewrite old hashes to hide
+differences. The [8A report](./CHECKPOINT_8A.md) records the original packet;
+[checkpoint 4I](./CHECKPOINT_4I.md) records the safety patch and fresh checks.
+A reviewer should retain their own tool versions,
 logs and content identifiers, and explain any reproduction difference. No
 external transfer or publication is authorized by this local packet.
