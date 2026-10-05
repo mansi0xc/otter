@@ -2,6 +2,7 @@ import { useBatchStatus, EPOCH_STATES } from '@/hooks/useBatchStatus'
 import { deployment } from '@/config/deployment'
 import { OrderComposer } from './OrderComposer'
 import { RecoveryPanel } from './RecoveryPanel'
+import { LiquidityExitPanel } from './LiquidityExitPanel'
 import styles from './SepoliaStatus.module.css'
 export function SepoliaStatus() {
   const { status, loading, error } = useBatchStatus()
@@ -21,6 +22,6 @@ export function SepoliaStatus() {
     </div>}
     {error && <p role="status" className={deployment ? styles.errorNote : styles.disclaimer}>{error}</p>}
     {deployment && <div className={styles.links}>{Object.entries(deployment.contracts).map(([name, c]) => <a key={name} className={styles.link} href={`https://sepolia.etherscan.io/address/${c.address}#code`} target="_blank" rel="noopener noreferrer">{name} ↗</a>)}</div>}
-    {deployment && <><hr className="divider"/><OrderComposer/><hr className="divider"/><RecoveryPanel/></>}
+    {deployment && <><hr className="divider"/><OrderComposer/><hr className="divider"/><LiquidityExitPanel/><hr className="divider"/><RecoveryPanel/></>}
   </div>
 }

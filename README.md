@@ -31,6 +31,10 @@ deployment manifest and uses receipt-based signing/recovery flows; it is disable
 by default because no reviewed deployment is configured. Published Sepolia
 addresses and the tracked legacy web build still identify the earlier prototype.
 See [checkpoint 7A](./reviews/CHECKPOINT_7A.md) and [wallet setup](./web/README.md).
+The source wallet also exposes owner-checked LP exit requests, idle-pool processing
+and separate native/ERC20 vault-credit withdrawals. Requests are irrevocable and
+have no token-output minimum. This is a local recovery flow, not a deployment or
+concentrated-auction completion; see [checkpoint 7B](./reviews/CHECKPOINT_7B.md).
 
 The next mechanism decision is documented in
 [the independent review brief](./reviews/MECHANISM_REVIEW_BRIEF.md), with a hashed

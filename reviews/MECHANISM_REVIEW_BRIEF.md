@@ -15,6 +15,12 @@ derives crossing totals from orders. It remains an offline current-rule
 arithmetic check, with real-settlement comparisons, not an authenticated
 execution check or canonical/incentive verifier. See [4J](./CHECKPOINT_4J.md).
 
+Local 7B update starts from the user-created `2404cce` commit. The source wallet
+adds owned-position exit requests, idle processing and separate vault principal/
+fee claims, with its manifest still null. It changes no mechanism or contract
+policy. The latest snapshot additionally selects the wallet source/config/test
+closure; [7B](./CHECKPOINT_7B.md) records local mock-wallet and real-core evidence.
+
 ## Decision the review must support
 
 Determine whether a useful v4 mechanism can meet the requested incentive targets
@@ -172,7 +178,7 @@ scope and compensation; do not label internal tests as independent review.
 
 Use the full repository with submodules populated. The selected evidence files
 and their Solidity import closure are hashed in
-[EVIDENCE_MANIFEST_4J.json](./EVIDENCE_MANIFEST_4J.json). That manifest records the
+[EVIDENCE_MANIFEST_7B.json](./EVIDENCE_MANIFEST_7B.json). That manifest records the
 pre-patch baseline, local checkpoint, dependency commits and observed tools.
 It identifies the post-patch selected bytes and does not hash this brief or later
 status edits, authenticate an author, inspect unlisted files, or certify safety.
@@ -182,7 +188,7 @@ relying on submodule HEAD alone. Review the verifier before running it.
 From the repository root, with the already available tools:
 
 ```sh
-python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4J.json
+python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_7B.json
 ```
 
 From `solver/`:
@@ -222,6 +228,14 @@ retain the original dominant mapping; 7–10 identify length, numeric support,
 ineligible minority fill and incorrect minority floor/fill respectively.
 
 These use local solc 0.8.26, Cancun, via-IR, optimizer 200 and 512 fuzz runs.
+
+To reproduce the local LP exit wallet slice, run `npm test` from `web/`, then
+`forge test --offline --match-contract '^(OtterExitsTest|OtterLiquidityVaultTest)$'`
+from `contracts/`. Wallet tests check the selected ABI against local generated
+artifacts, mocked-RPC/session/receipt failures and exact vault claim routing;
+the contract suites exercise real custody and execution. These are separate
+layers, not a connected-wallet testnet demonstration. The default wallet remains
+unconfigured, and no public transaction is required by the runbook.
 Review `foundry.toml`: FFI is enabled for local reference comparisons and the
 test-only gas ceiling is artificially large. That ceiling is not deployment
 capacity evidence. Avoid `GasCurveTest` and `SandwichHarness` when preserving the
@@ -238,6 +252,10 @@ The [4I snapshot](./EVIDENCE_MANIFEST_4I.json) is also frozen at its checkpoint
 bytes. The separate 4J snapshot adds the checker, local CLI bridge and tests;
 changes to the previously hashed solver/test sources are explicitly identified
 in the [4J report](./CHECKPOINT_4J.md).
+The frozen 4J selection is unchanged by the wallet slice: it selected only the
+dashboard from `web/`, so a passing older hash check does not cover the new wallet
+changes. The separate 7B snapshot includes wallet files, build configuration,
+the existing lockfile and tests, excluding installed packages and generated builds.
 A reviewer should retain their own tool versions,
 logs and content identifiers, and explain any reproduction difference. No
 external transfer or publication is authorized by this local packet.

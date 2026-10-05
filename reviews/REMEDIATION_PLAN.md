@@ -541,7 +541,33 @@ actual-swap fundability, canonicality, or a proof under G1–G4. Feasible zero
 proposals and the generator's known dust/tie failures remain explicit.
 
 The old manifests remain frozen. A separate 4J snapshot identifies the new
-selected bytes and local reference bridge. **4J is pending the user's commit.**
+selected bytes and local reference bridge. **4J was committed by the user as
+`2404cce`; the tree was clean before 7B.**
 Its report contains the exact handoff and fresh checks. Continue the complete
 asset/curve/utility and canonical-verification work only after confirmation;
 do not treat this preflight as a selected mechanism or deployment readiness.
+
+## Checkpoint 7B: owner LP exits and independent vault-credit withdrawals
+
+[The wallet exit checkpoint](./CHECKPOINT_7B.md) adds manual position-ID inspection,
+irrevocable owner exit requests, idle-pool processing and separate principal/core
+fee credit withdrawals. Current pool activity comes from `isBatchActive`, not an
+expired local timer. Each action rechecks ownership, pool, reservation and wallet
+session; request/processing confirmations require a matching vault event. Related
+position reads share the deployment-check block. The manifest also checks the
+vault's immutable book wiring before any wallet action.
+
+The existing contract policy remains: a queued request cannot be cancelled or
+specify token-output minima; current settlement can change the withdrawn principal.
+The UI makes that decision explicit. Processing credits the owner, and asset
+withdrawal is separate, with uint120 chunks for large vault balances. Native/ERC20
+claims are distinct from trader and Otter reward claims. The default manifest is
+still null. No Solidity, mechanism rule, fixture, deployment or dependency changed.
+
+This completes a bounded local LP exit interface, not step 7. Deposits, automated
+position discovery/queue processing, persistent transaction recovery/indexing,
+reorg handling, actual contract-wallet flows, concentrated auction execution and
+end-to-end testnet evidence remain. G1–G4 and the guarantee priority are unchanged.
+**7B is pending the user's commit.** Its report gives the exact files, fresh tests,
+synthetic interface checks and handoff. The new evidence selection includes the
+wallet source/config/test closure; earlier manifests remain immutable.

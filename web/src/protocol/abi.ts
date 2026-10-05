@@ -1,6 +1,7 @@
 // Generated subset of local Foundry artifacts; verified by the offline wallet tests.
 
 export const ORDER_BOOK_ABI = [
+  {"type":"function","name":"isBatchActive","inputs":[{"name":"poolId","type":"bytes32","internalType":"bytes32"}],"outputs":[{"name":"","type":"bool","internalType":"bool"}],"stateMutability":"view"},
   {"type":"function","name":"DOMAIN_SEPARATOR","inputs":[],"outputs":[{"name":"","type":"bytes32","internalType":"bytes32"}],"stateMutability":"view"},
   {"type":"function","name":"ORDER_TYPEHASH","inputs":[],"outputs":[{"name":"","type":"bytes32","internalType":"bytes32"}],"stateMutability":"view"},
   {"type":"function","name":"SNAPSHOT_TYPEHASH","inputs":[],"outputs":[{"name":"","type":"bytes32","internalType":"bytes32"}],"stateMutability":"view"},
@@ -136,4 +137,41 @@ export const ERC20_ABI = [
   {"type":"function","name":"decimals","inputs":[],"outputs":[{"type":"uint8","name":""}],"stateMutability":"view"},
   {"type":"function","name":"allowance","inputs":[{"type":"address","name":"owner"},{"type":"address","name":"spender"}],"outputs":[{"type":"uint256","name":""}],"stateMutability":"view"},
   {"type":"function","name":"approve","inputs":[{"type":"address","name":"spender"},{"type":"uint256","name":"amount"}],"outputs":[{"type":"bool","name":""}],"stateMutability":"nonpayable"}
+] as const
+
+export const LIQUIDITY_VAULT_ABI = [
+  {"type":"function","name":"MAX_AMOUNT","inputs":[],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"claim","inputs":[{"name":"currency","type":"address","internalType":"Currency"},{"name":"amount","type":"uint256","internalType":"uint256"},{"name":"recipient","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"claims","inputs":[{"name":"","type":"address","internalType":"address"},{"name":"","type":"address","internalType":"Currency"}],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"orderBook","inputs":[],"outputs":[{"name":"","type":"address","internalType":"contract IOtterBatchStatus"}],"stateMutability":"view"},
+  {"type":"function","name":"positions","inputs":[{"name":"","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"owner","type":"address","internalType":"address"},{"name":"poolId","type":"bytes32","internalType":"bytes32"},{"name":"tickLower","type":"int24","internalType":"int24"},{"name":"tickUpper","type":"int24","internalType":"int24"},{"name":"liquidity","type":"uint128","internalType":"uint128"}],"stateMutability":"view"},
+  {"type":"function","name":"processExit","inputs":[{"name":"id","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"credited0","type":"uint256","internalType":"uint256"},{"name":"credited1","type":"uint256","internalType":"uint256"}],"stateMutability":"nonpayable"},
+  {"type":"function","name":"queuedLiquidity","inputs":[{"name":"","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"","type":"uint128","internalType":"uint128"}],"stateMutability":"view"},
+  {"type":"function","name":"requestExit","inputs":[{"name":"id","type":"uint256","internalType":"uint256"},{"name":"liquidity","type":"uint128","internalType":"uint128"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"event","name":"ExitProcessed","inputs":[{"name":"positionId","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"poolId","type":"bytes32","indexed":true,"internalType":"bytes32"},{"name":"owner","type":"address","indexed":true,"internalType":"address"},{"name":"liquidity","type":"uint128","indexed":false,"internalType":"uint128"},{"name":"credited0","type":"uint256","indexed":false,"internalType":"uint256"},{"name":"credited1","type":"uint256","indexed":false,"internalType":"uint256"}],"anonymous":false},
+  {"type":"event","name":"ExitRequested","inputs":[{"name":"positionId","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"poolId","type":"bytes32","indexed":true,"internalType":"bytes32"},{"name":"owner","type":"address","indexed":true,"internalType":"address"},{"name":"liquidity","type":"uint128","indexed":false,"internalType":"uint128"}],"anonymous":false},
+  {"type":"error","name":"ActiveBatch","inputs":[]},
+  {"type":"error","name":"AmountOutOfRange","inputs":[]},
+  {"type":"error","name":"ConcentratedExecutionUnavailable","inputs":[]},
+  {"type":"error","name":"EscrowMismatch","inputs":[{"name":"received","type":"uint256","internalType":"uint256"},{"name":"required","type":"uint256","internalType":"uint256"}]},
+  {"type":"error","name":"ExitAlreadyQueued","inputs":[]},
+  {"type":"error","name":"ExitNotQueued","inputs":[]},
+  {"type":"error","name":"InFlightLiquidity","inputs":[]},
+  {"type":"error","name":"InexactTransfer","inputs":[{"name":"currency","type":"address","internalType":"Currency"},{"name":"amount","type":"uint256","internalType":"uint256"}]},
+  {"type":"error","name":"InvalidClaim","inputs":[]},
+  {"type":"error","name":"InvalidConfiguration","inputs":[]},
+  {"type":"error","name":"InvalidDelta","inputs":[]},
+  {"type":"error","name":"InvalidLiquidity","inputs":[]},
+  {"type":"error","name":"InvalidPool","inputs":[]},
+  {"type":"error","name":"InvalidRange","inputs":[]},
+  {"type":"error","name":"NativeValueMismatch","inputs":[{"name":"supplied","type":"uint256","internalType":"uint256"},{"name":"required","type":"uint256","internalType":"uint256"}]},
+  {"type":"error","name":"NotPositionOwner","inputs":[]},
+  {"type":"error","name":"PendingExits","inputs":[]},
+  {"type":"error","name":"PositionLimit","inputs":[]},
+  {"type":"error","name":"PriceOutOfRange","inputs":[]},
+  {"type":"error","name":"ReentrantCall","inputs":[]},
+  {"type":"error","name":"SlippageExceeded","inputs":[]},
+  {"type":"error","name":"SnapshotMismatch","inputs":[]},
+  {"type":"error","name":"UnauthorizedCallback","inputs":[]},
+  {"type":"error","name":"UnsupportedPoolState","inputs":[]}
 ] as const

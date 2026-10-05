@@ -9,7 +9,7 @@ import { type Progress, type Transport } from '@/protocol/client'
 import { type Order } from '@/protocol/orders'
 import { type Deployment } from '@/protocol/deployment'
 
-// Serializes wallet writes across both panels in this tab.
+// Serializes wallet writes across submission, liquidity and recovery in this tab.
 let actionInFlight = false
 export function getTransport(): Transport {
   const publicClient = getPublicClient(wagmiConfig)

@@ -598,3 +598,24 @@ canonical direction/allocation/payments or establish G1–G4. The generator's
 numerical rule and saved fixtures remain unchanged and can still produce
 rejected candidates. The reserve bound is an arithmetic support envelope,
 not admission of a synthetic reserve pair as an authenticated pool snapshot.
+
+Checkpoint 4J was committed by the user as `2404cce`; the tree was clean before
+7B. [Checkpoint 7B](./CHECKPOINT_7B.md) supplies a local LP exit wallet flow for
+positions in the configured pool: manually inspect an owned ID, explicitly
+acknowledge an irrevocable request without token-output minima, reserve liquidity,
+process when the book says the pool is idle, and separately withdraw funded vault
+principal/core-fee credits in either asset. Runtime/domain/configuration checks
+include immutable vault/book wiring. Position reads are pinned, actions refresh
+ownership/state, and exact request/processing events are required before reporting
+success. The browser restricts processing to the connected owner's position; the
+contract remains permissionless and always credits that owner.
+
+Large vault credits use withdrawals of at most uint120 max per call. The wallet
+also excludes all four configured custody addresses as vault-credit recipients,
+a conservative UI rule beyond the vault contract's nonzero-recipient requirement.
+This does not change custody or economic semantics. The default manifest stays
+null; no live wallet, deployment or transaction is supplied. LP deposits, discovery,
+cross-pool navigation, persistent transaction/indexer/reorg recovery and real
+contract-wallet/testnet demonstrations remain unfinished. G1–G4 and concentrated
+trading retain their gates; the legacy allocation, payments and reward rule are
+unchanged.

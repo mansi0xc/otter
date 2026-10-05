@@ -64,6 +64,8 @@
 /* ---- Fields ---- */
 .fields { display: flex; flex-direction: column; gap: 0.625rem; }
 .field { display: flex; flex-direction: column; gap: 0.25rem; }
+.exitAcknowledgement { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.78rem; line-height: 1.5; }
+.exitAcknowledgement input { width: auto; margin-top: 0.2rem; flex-shrink: 0; }
 
 .fieldHint {
   font-size: 0.7rem;

@@ -1,5 +1,5 @@
 import { decodeEventLog, hashDomain, keccak256, stringToHex, zeroAddress, type Abi, type Address, type Hash, type Hex } from 'viem'
-import { ORDER_BOOK_ABI, SETTLEMENT_ABI, REWARD_LEDGER_ABI, ERC20_ABI } from './abi.ts'
+import { ORDER_BOOK_ABI, SETTLEMENT_ABI, REWARD_LEDGER_ABI, LIQUIDITY_VAULT_ABI, ERC20_ABI } from './abi.ts'
 import { address, uint, type Deployment } from './deployment.ts'
 import { freeNonce, nonceMask, orderHash, typedOrder, type Order } from './orders.ts'
 
@@ -55,11 +55,12 @@ export async function checkDeployment(io: Transport, d: Deployment): Promise<Blo
     { address: ledger, abi: REWARD_LEDGER_ABI, functionName: 'orderBook' },
     { address: ledger, abi: REWARD_LEDGER_ABI, functionName: 'settlement' },
     { address: ledger, abi: REWARD_LEDGER_ABI, functionName: 'policyHashOf', args: [d.poolId] },
+    { address: d.contracts.liquidityGuard.address, abi: LIQUIDITY_VAULT_ABI, functionName: 'orderBook' },
   ]
   const values = await Promise.all(reads.map(call => io.read(call, block.number)))
   const expected = [domain, keccak256(stringToHex('Order(address trader,bytes32 poolId,bool sellingCurrency0,uint256 ask,uint256 budget,uint256 deadline,uint256 nonce,uint256 configVersion,uint256 epoch,uint256 maxExecutionTime)')),
     keccak256(stringToHex('OtterOpeningSnapshot/v2')), settlement, true, d.assets[0].address, d.assets[1].address,
-    d.configVersion, d.contracts.liquidityGuard.address, d.rewardPolicyHash, book, ledger, book, settlement, d.rewardPolicyHash]
+    d.configVersion, d.contracts.liquidityGuard.address, d.rewardPolicyHash, book, ledger, book, settlement, d.rewardPolicyHash, book]
   need(values.every((v, i) => typeof v === 'string' && typeof expected[i] === 'string'
     ? same(v, expected[i] as string) : v === expected[i]), 'Order domain, pool configuration or contract wiring does not match the manifest.')
   await Promise.all(d.assets.filter(a => a.address !== zeroAddress).map(async a => {
@@ -194,20 +195,80 @@ export async function recoverOrder(io: Transport, d: Deployment, account: Addres
 }
 export async function readClaims(io: Transport, d: Deployment, account: Address) {
   const block = await checkDeployment(io, d)
-  return Promise.all((['orderBook', 'rewardLedger'] as const).flatMap(target => d.assets.map(asset =>
-    io.read({ address: d.contracts[target].address, abi: target === 'orderBook' ? ORDER_BOOK_ABI : REWARD_LEDGER_ABI,
-      functionName: 'claimable', args: [account, asset.address] }, block.number) as Promise<bigint>)))
+  return Promise.all((['orderBook', 'rewardLedger', 'liquidityGuard'] as const).flatMap(target => d.assets.map(asset =>
+    io.read({ address: d.contracts[target].address, abi: claimAbi(target),
+      functionName: target === 'liquidityGuard' ? 'claims' : 'claimable', args: [account, asset.address] }, block.number) as Promise<bigint>)))
 }
-export async function claim(io: Transport, d: Deployment, account: Address, target: 'orderBook' | 'rewardLedger', assetIndex: 0 | 1, amount: bigint, recipientText: string, progress: Progress) {
+export type ClaimTarget = 'orderBook' | 'rewardLedger' | 'liquidityGuard'
+const claimAbi = (target: ClaimTarget): Abi => target === 'orderBook' ? ORDER_BOOK_ABI : target === 'rewardLedger' ? REWARD_LEDGER_ABI : LIQUIDITY_VAULT_ABI
+export async function claim(io: Transport, d: Deployment, account: Address, target: ClaimTarget, assetIndex: 0 | 1, amount: bigint, recipientText: string, progress: Progress) {
   const recipient = address(recipientText)
   const excluded = target === 'orderBook' ? [d.contracts.orderBook.address]
-    : [d.contracts.rewardLedger.address, d.contracts.orderBook.address, d.contracts.settlement.address]
-  need(!excluded.some(a => same(a, recipient)), 'This recipient is not permitted by the claim contract.')
-  uint(amount.toString()); need(amount > 0n, 'Claim amount must be positive.')
+    : target === 'rewardLedger' ? [d.contracts.rewardLedger.address, d.contracts.orderBook.address, d.contracts.settlement.address]
+    : Object.values(d.contracts).map(c => c.address)
+  need(!excluded.some(a => same(a, recipient)), 'Choose a recipient outside the protocol custody contracts.')
+  uint(amount.toString(), target === 'liquidityGuard' ? 120 : 256); need(amount > 0n, 'Claim amount must be positive.')
   const claims = await readClaims(io, d, account)
-  need(amount <= claims[(target === 'orderBook' ? 0 : 2) + assetIndex], 'Amount exceeds your currently funded claim.')
-  return transact(io, d, account, { address: d.contracts[target].address, abi: target === 'orderBook' ? ORDER_BOOK_ABI : REWARD_LEDGER_ABI,
+  need(amount <= claims[(target === 'orderBook' ? 0 : target === 'rewardLedger' ? 2 : 4) + assetIndex], 'Amount exceeds your currently funded claim.')
+  return transact(io, d, account, { address: d.contracts[target].address, abi: claimAbi(target),
     functionName: 'claim', args: [d.assets[assetIndex].address, amount, recipient] }, progress, 'Confirm claim withdrawal in your wallet')
+}
+
+export interface VaultPosition {
+  id: bigint; owner: Address; poolId: Hash; lower: number; upper: number
+  liquidity: bigint; queued: bigint; active: boolean; blockNumber: bigint
+}
+export async function readVaultPosition(io: Transport, d: Deployment, account: Address, id: bigint): Promise<VaultPosition> {
+  uint(id.toString()); need(id > 0n, 'Position ID must be positive.')
+  await assertSession(io, d, account)
+  const block = await checkDeployment(io, d)
+  const vault = d.contracts.liquidityGuard.address
+  const [position, queued, active] = await Promise.all([
+    io.read({ address: vault, abi: LIQUIDITY_VAULT_ABI, functionName: 'positions', args: [id] }, block.number),
+    io.read({ address: vault, abi: LIQUIDITY_VAULT_ABI, functionName: 'queuedLiquidity', args: [id] }, block.number),
+    io.read(readBook(d, 'isBatchActive', [d.poolId]), block.number),
+  ])
+  const [owner, poolId, lower, upper, liquidity] = position as readonly [Address, Hash, number, number, bigint]
+  need(same(owner, account), 'This position does not exist or belongs to another wallet.')
+  need(same(poolId, d.poolId), 'This position belongs to a different pool than the configured deployment.')
+  uint(liquidity.toString(), 128); uint((queued as bigint).toString(), 128)
+  need((queued as bigint) <= liquidity && typeof active === 'boolean', 'Invalid position or batch status returned by the RPC.')
+  await assertSession(io, d, account)
+  return { id, owner, poolId, lower, upper, liquidity, queued: queued as bigint, active: active as boolean, blockNumber: block.number }
+}
+
+function exitLogs(receipt: Receipt, d: Deployment) {
+  return receipt.logs.flatMap(log => {
+    if (!same(log.address, d.contracts.liquidityGuard.address)) return []
+    try { return [decodeEventLog({ abi: LIQUIDITY_VAULT_ABI, data: log.data, topics: log.topics as [Hex, ...Hex[]] })] }
+    catch { return [] }
+  })
+}
+
+export async function requestVaultExit(io: Transport, d: Deployment, account: Address, id: bigint, liquidity: bigint, progress: Progress) {
+  uint(liquidity.toString(), 128); need(liquidity > 0n, 'Exit liquidity must be positive.')
+  const position = await readVaultPosition(io, d, account, id)
+  need(position.queued === 0n, 'This position already has an irrevocable exit request.')
+  need(liquidity <= position.liquidity, 'Exit liquidity exceeds the position balance.')
+  const receipt = await transact(io, d, account, { address: d.contracts.liquidityGuard.address, abi: LIQUIDITY_VAULT_ABI,
+    functionName: 'requestExit', args: [id, liquidity] }, progress, 'Confirm irrevocable exit request in your wallet')
+  const events = exitLogs(receipt, d).filter(e => e.eventName === 'ExitRequested'
+    && e.args.positionId === id && same(e.args.poolId, d.poolId) && same(e.args.owner, account) && e.args.liquidity === liquidity)
+  need(events.length === 1, 'Successful receipt did not contain exactly one matching exit request. Inspect it before retrying.')
+  return { hash: receipt.transactionHash, positionId: id, liquidity }
+}
+
+export async function processVaultExit(io: Transport, d: Deployment, account: Address, id: bigint, progress: Progress) {
+  const position = await readVaultPosition(io, d, account, id)
+  need(position.queued > 0n, 'This position has no queued exit.')
+  need(!position.active, 'The pool is still active. Wait for settlement or expire the timed-out epoch before processing.')
+  const receipt = await transact(io, d, account, { address: d.contracts.liquidityGuard.address, abi: LIQUIDITY_VAULT_ABI,
+    functionName: 'processExit', args: [id] }, progress, 'Confirm exit processing into vault credits in your wallet')
+  const events = exitLogs(receipt, d).flatMap(e => e.eventName === 'ExitProcessed'
+    && e.args.positionId === id && same(e.args.poolId, d.poolId) && same(e.args.owner, account) && e.args.liquidity === position.queued
+    ? [e.args] : [])
+  need(events.length === 1, 'Successful receipt did not contain exactly one matching processed exit. Inspect it before retrying.')
+  return { hash: receipt.transactionHash, positionId: id, liquidity: position.queued, credited0: events[0].credited0, credited1: events[0].credited1 }
 }
 export async function invalidateNonce(io: Transport, d: Deployment, account: Address, nonce: bigint, progress: Progress) {
   await checkDeployment(io, d)

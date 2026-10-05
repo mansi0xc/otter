@@ -4,7 +4,7 @@ Vite + React + TypeScript with wagmi/RainbowKit. The guided story uses historica
 fixtures. The September Sepolia addresses in `src/config/contracts.ts` are
 explorer references only. No public solver or hardened deployment is configured.
 The default `src/config/deployment.json` contains `{"deployment":null}`: no
-order approvals, signatures, submissions, faucets or recovery writes are offered.
+order approvals, signatures, submissions, faucets, LP exits or recovery writes are offered.
 
 With existing dependencies:
 
@@ -58,7 +58,7 @@ There is no environment-variable fallback or wallet-entered deployment selector.
 
 Each action checks the RPC chain, all four code fingerprints, book domain/type
 and snapshot version, pool registration/currencies/configuration/guard/policy,
-settlement/book/ledger wiring, and ERC20 decimals. Related reads use one block.
+settlement/book/ledger wiring, the vault's immutable book, and ERC20 decimals. Related reads use one block.
 RPC responses are still trusted; this is not a deployment audit or a proof of
 economic correctness. Wallet account and chain are checked again at signing,
 simulation, broadcast and confirmation boundaries.
@@ -100,6 +100,49 @@ safe. No demo-token mint function is exposed against a newly configured asset.
 - Withdraw whole or partial funded claims by source/currency. Invalidate a
   selected signature nonce in any word; this does not refund admitted escrow.
 
+## LP exit and vault credits
+
+Use the vault position ID from a deposit receipt for the configured pool. The
+wallet reads ownership, pool ID, range ticks, liquidity, reserved exit and the
+book's actual `isBatchActive` status at one checked block. It accepts only the
+connected owner's position in that pool, including retained IDs after full removal.
+It does not discover all positions or navigate arbitrary vault pools.
+
+An owner can queue an exit during collection or execution. **The request is
+irrevocable and has no token-output minimum.** The current batch may change the
+principal before removal. The interface requires acknowledging this and displays
+the exact liquidity units being authorized; liquidity is not a token amount.
+There is one pending request per position. The API refreshes ownership/liquidity/
+reservation before simulation, and requires one exact matching `ExitRequested`
+event before reporting confirmation. UI reads become stale when the account,
+network or position changes.
+
+Process the reserved exit after settlement or expiry makes the pool idle. A
+passed execution deadline alone is insufficient; use epoch expiry when needed.
+Processing mints owner credits and invokes no beneficiary transfer. It precedes
+new epoch admission and does not veto the current swap. The wallet requires a
+matching `ExitProcessed` event and displays its actual credited amounts, rather
+than a deposit-price estimate. The contract permits any caller to process a
+request and always credits the position owner; this interface selects only the
+connected owner's position.
+
+Choose **Liquidity exit / fee credit** in recovery to withdraw vault principal
+and harvested core fees, separately from trader credits and Otter historical
+rewards. Balances aggregate the owner's credits per currency across vault
+positions/pools, rather than belonging exclusively to the displayed position.
+Read current balances, select either asset and an alternate recipient,
+and withdraw a partial amount. Each vault withdrawal is limited to
+`2^120 - 1` raw units; larger balances require multiple calls. Native claims use
+the native currency address and no approval or attached ETH value. A blocked
+recipient/asset affects only its claim. The wallet also refuses vault-credit
+delivery to any of the four configured custody addresses, a conservative UI
+restriction beyond the vault's nonzero-recipient check.
+
+Each request, process and withdrawal is simulated and confirmed with the shared
+wallet account/chain/transaction-intent checks. A hash is pending; failed or
+unmatched confirmations must be inspected before retrying. Queueing does not
+promise when processing will occur or guarantee a token amount or economic return.
+
 ## Evidence and remaining work
 
 `npm test` runs offline mocked-RPC/wallet failure tests and checks the ABI subset
@@ -115,7 +158,11 @@ No real wallet, RPC transaction or deployment is used by these tests.
 
 One confirmation is a mined receipt, not reorg-proof finality. Pending transaction
 recovery across reloads, robust indexing/reorg handling, demonstrated contract
-wallet/EIP-1271 connector flows, LP deposits/exits, concentrated batch execution,
+wallet/EIP-1271 connector flows, LP deposits/discovery and cross-pool navigation,
+automated exit processing, concentrated batch execution,
 public solver operation and testnet end-to-end evidence remain unfinished. Save
 admission IDs and inspect any broadcast transaction before retrying after an error.
 See [checkpoint 7A](../reviews/CHECKPOINT_7A.md).
+The local exit interface and fresh validation are recorded in
+[checkpoint 7B](../reviews/CHECKPOINT_7B.md). Its visual preview uses synthetic
+state and disabled writes; it is not a real wallet connection or live deployment.

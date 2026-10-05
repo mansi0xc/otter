@@ -27,7 +27,7 @@ export function RecoveryPanel() {
     } catch (e) { setReadError(e instanceof Error ? e.message : 'Recovery read failed.') }
     finally { setReading(false) }
   }
-  const target = selected < 2 ? 'orderBook' as const : 'rewardLedger' as const
+  const target = selected < 2 ? 'orderBook' as const : selected < 4 ? 'rewardLedger' as const : 'liquidityGuard' as const
   const assetIndex = (selected % 2) as 0 | 1, asset = d.assets[assetIndex]
   const run = (fn: Parameters<typeof action.run>[0]) => { void action.run(fn).then(() => { setClaims(null); setStatus(null) }) }
   return <div className={styles.composer}>
@@ -44,7 +44,8 @@ export function RecoveryPanel() {
       <button className="btn btn-ghost btn-sm" disabled={action.busy} onClick={() => run((io, config, owner, progress) => expireEpoch(io, config, owner, uint(epoch), progress, true))}>Expire if pool fees are unsupported</button>
       <button className="btn btn-primary btn-sm" disabled={action.busy} onClick={() => run((io, config, owner, progress) => recoverOrder(io, config, owner, uint(epoch), uint(index), progress))}>Recover my stored order</button>
     </div>
-    <div className={styles.field}><label htmlFor="claim-source">Funded claim to withdraw</label><select id="claim-source" value={selected} onChange={e => { setSelected(Number(e.target.value)); setAmount('') }} disabled={action.busy}>{[0, 1, 2, 3].map(i => <option key={i} value={i}>{i < 2 ? 'Trader' : 'LP / community reward'}: {d.assets[i % 2].symbol}{claims ? ` — ${formatUnits(claims[i], d.assets[i % 2].decimals)}` : ' — refresh to read'}</option>)}</select></div>
+    <div className={styles.field}><label htmlFor="claim-source">Funded claim to withdraw</label><select id="claim-source" value={selected} onChange={e => { setSelected(Number(e.target.value)); setAmount('') }} disabled={action.busy}>{[0, 1, 2, 3, 4, 5].map(i => <option key={i} value={i}>{i < 2 ? 'Trader' : i < 4 ? 'LP / community reward' : 'Liquidity exit / fee credit'}: {d.assets[i % 2].symbol}{claims ? ` — ${formatUnits(claims[i], d.assets[i % 2].decimals)}` : ' — refresh to read'}</option>)}</select></div>
+    {target === 'liquidityGuard' && <p className={styles.hint}>These vault credits contain liquidity principal and collected core fees, separately from Otter rewards. Large balances may need multiple withdrawals; each is capped at {(2n ** 120n - 1n).toString()} raw units.</p>}
     <div className={styles.field}><label htmlFor="claim-amount">Amount ({asset.symbol})</label><input id="claim-amount" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} disabled={action.busy}/></div>
     <div className={styles.field}><label htmlFor="claim-recipient">Recipient address</label><input id="claim-recipient" value={recipient} onChange={e => setRecipient(e.target.value)} disabled={action.busy}/></div>
     <button className="btn btn-primary" disabled={action.busy || !amount || !recipient} onClick={() => run((io, config, owner, progress) => claim(io, config, owner, target, assetIndex, exactUnits(amount, asset.decimals), recipient, progress))}>Withdraw selected funded claim</button>

@@ -2,10 +2,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { encodeAbiParameters, encodeEventTopics, encodeFunctionData, hashDomain, keccak256, stringToHex, zeroAddress, type Address, type Hash, type Hex, type PublicClient, type WalletClient } from 'viem'
-import { ORDER_BOOK_ABI, SETTLEMENT_ABI, REWARD_LEDGER_ABI } from '../src/protocol/abi.ts'
+import { ORDER_BOOK_ABI, SETTLEMENT_ABI, REWARD_LEDGER_ABI, LIQUIDITY_VAULT_ABI } from '../src/protocol/abi.ts'
 import { parseDeployment, uint, type Deployment } from '../src/protocol/deployment.ts'
 import { exactUnits, freeNonce, nonceMask, orderAmounts, orderDigest, orderHash, typedOrder, type Order } from '../src/protocol/orders.ts'
-import { approveBudget, checkDeployment, claim, expireEpoch, invalidateNonce, readClaims, readEpoch, recoverOrder, submitOrder, type Call, type Receipt, type Transport } from '../src/protocol/client.ts'
+import { approveBudget, checkDeployment, claim, expireEpoch, invalidateNonce, readClaims, readEpoch, recoverOrder, submitOrder, readVaultPosition, requestVaultExit, processVaultExit, type Call, type Receipt, type Transport } from '../src/protocol/client.ts'
 import { viemTransport } from '../src/protocol/viemTransport.ts'
 
 const addr = (n: number) => `0x${n.toString(16).padStart(40, '0')}` as Address
@@ -25,14 +25,17 @@ function fake(d = deployment()) {
     executeUntil: 1360n, config: 1n, count: 1, paused: false, allowance: 0n, nonceWords: new Map<bigint, bigint>(),
     badCode: false, badDomain: false, badWiring: false, badDecimals: false, recovered: false, receiptStatus: 'success' as Receipt['status'],
     noEvent: false, wrongEvent: false, duplicateEvent: false, readFailure: '', simulateFailure: '',
+    badVaultBook: false, positionOwner: account, positionPool: d.poolId, liquidity: 100n, queued: 0n, active: true,
+    vaultClaims: [9n, 8n], exitFailure: '', readBlocks: [] as { name: string; block: bigint | undefined }[], onRead: () => {},
     signCount: 0, signed: null as Order | null, simulations: [] as Call[], sent: [] as Call[], reads: [] as Call[],
     onSign: () => {}, onSimulate: () => {}, onWait: () => {} }
   const io: Transport = {
     chainId: async () => s.chain, block: async () => ({ number: 10n, timestamp: s.now }),
     code: async a => s.badCode ? '0x' : codes.get(a),
     session: async () => ({ address: s.wallet, chainId: s.walletChain }),
-    read: async c => {
+    read: async (c, block) => {
       s.reads.push(c)
+      s.readBlocks.push({ name: c.functionName, block }); s.onRead()
       if (c.functionName === s.readFailure) throw new Error('read unavailable')
       const b = d.contracts.orderBook.address, settle = d.contracts.settlement.address, ledger = d.contracts.rewardLedger.address
       switch (c.functionName) {
@@ -40,7 +43,7 @@ function fake(d = deployment()) {
         case 'ORDER_TYPEHASH': return keccak256(stringToHex('Order(address trader,bytes32 poolId,bool sellingCurrency0,uint256 ask,uint256 budget,uint256 deadline,uint256 nonce,uint256 configVersion,uint256 epoch,uint256 maxExecutionTime)'))
         case 'SNAPSHOT_TYPEHASH': return keccak256(stringToHex('OtterOpeningSnapshot/v2'))
         case 'settlement': return s.badWiring ? other : settle
-        case 'orderBook': return b
+        case 'orderBook': return c.address === d.contracts.liquidityGuard.address && s.badVaultBook ? other : b
         case 'rewardLedger': return ledger
         case 'registered': return true
         case 'currency0Of': return d.assets[0].address
@@ -60,6 +63,10 @@ function fake(d = deployment()) {
         case 'orderRecovered': return s.recovered
         case 'getOrders': return [s.signed ?? { trader: account }]
         case 'claimable': return c.address === b ? 12n : 5n
+        case 'claims': return s.vaultClaims[c.args![1] === d.assets[0].address ? 0 : 1]
+        case 'positions': return [s.positionOwner, s.positionPool, -120, 120, s.liquidity]
+        case 'queuedLiquidity': return s.queued
+        case 'isBatchActive': return s.active
         default: throw new Error(`Unexpected read ${c.functionName}`)
       }
     },
@@ -78,6 +85,19 @@ function fake(d = deployment()) {
           data: encodeAbiParameters(eventInputs, [0, s.wrongEvent ? hash(444) : orderHash(o), o]) }
         logs.push(log); if (s.duplicateEvent) logs.push(log)
       }
+      if (['requestExit', 'processExit'].includes(c.functionName) && s.exitFailure !== 'missing') {
+        const processing = c.functionName === 'processExit'
+        const eventName = (processing !== (s.exitFailure === 'kind')) ? 'ExitProcessed' : 'ExitRequested'
+        const owner = s.exitFailure === 'owner' ? other : account, poolId = s.exitFailure === 'pool' ? hash(888) : d.poolId
+        const positionId = s.exitFailure === 'id' ? 2n : c.args![0] as bigint
+        const liquidity = (processing ? s.queued : c.args![1] as bigint) + (s.exitFailure === 'amount' ? 1n : 0n)
+        const event = LIQUIDITY_VAULT_ABI.find(a => a.type === 'event' && a.name === eventName)!
+        const inputs = event.type === 'event' ? event.inputs.filter(a => !a.indexed) : []
+        const log = { address: s.exitFailure === 'address' ? other : d.contracts.liquidityGuard.address,
+          topics: encodeEventTopics({ abi: LIQUIDITY_VAULT_ABI, eventName, args: { positionId, poolId, owner } }),
+          data: encodeAbiParameters(inputs, eventName === 'ExitProcessed' ? [liquidity, 3n, 4n] : [liquidity]) }
+        logs.push(log); if (s.exitFailure === 'duplicate') logs.push(log)
+      }
       return { status: s.receiptStatus, transactionHash: txHash, logs }
     },
   }
@@ -95,7 +115,7 @@ test('manifest is absent by default; invalid network, fingerprints, currencies a
   assert.throws(() => parseDeployment({ ...rawManifest(true), assets: [{ address: zeroAddress, symbol: 'ETH', decimals: 6 }, rawManifest().assets[1]] }))
 })
 test('ABI subset matches current compiled contracts including payable submit and event fields', () => {
-  for (const [name, selected] of [['OtterOrderBook', ORDER_BOOK_ABI], ['OtterSettlement', SETTLEMENT_ABI], ['OtterRewardLedger', REWARD_LEDGER_ABI]] as const) {
+  for (const [name, selected] of [['OtterOrderBook', ORDER_BOOK_ABI], ['OtterSettlement', SETTLEMENT_ABI], ['OtterRewardLedger', REWARD_LEDGER_ABI], ['OtterLiquidityVault', LIQUIDITY_VAULT_ABI]] as const) {
     const full = JSON.parse(readFileSync(new URL(`../../contracts/out/${name}.sol/${name}.json`, import.meta.url), 'utf8')).abi
     for (const entry of selected) assert.ok(full.some((a: unknown) => JSON.stringify(a) === JSON.stringify(entry)), `${name}: ${entry.name}`)
   }
@@ -225,7 +245,7 @@ test('fee invalidation is simulated; settled/executing epochs cannot recover', a
 })
 test('trader/reward claims use independent owners and currencies, partial amounts and alternate recipients', async () => {
   const f = fake(deployment(true)); f.s.paused = true
-  assert.deepEqual(await readClaims(f.io, f.d, account), [12n, 12n, 5n, 5n])
+  assert.deepEqual(await readClaims(f.io, f.d, account), [12n, 12n, 5n, 5n, 9n, 8n])
   await claim(f.io, f.d, account, 'orderBook', 0, 3n, other, quiet)
   await claim(f.io, f.d, account, 'rewardLedger', 1, 2n, other, quiet)
   assert.deepEqual(f.s.sent.map(c => [c.address, c.args]), [ [f.d.contracts.orderBook.address, [zeroAddress, 3n, other]], [f.d.contracts.rewardLedger.address, [addr(11), 2n, other]] ])
@@ -243,6 +263,98 @@ test('failed claim delivery or wallet switch cannot report a confirmed withdrawa
 test('signature invalidation targets any word and makes no escrow/refund claim', async () => {
   const f = fake(); await invalidateNonce(f.io, f.d, account, 768n + 19n, quiet)
   assert.equal(f.s.sent[0].functionName, 'invalidateNonces'); assert.deepEqual(f.s.sent[0].args, [3n, 1n << 19n])
+})
+
+test('vault position reads pin ownership, pool, reservation and activity to the checked block', async () => {
+  const f = fake(); f.s.queued = 50n
+  const p = await readVaultPosition(f.io, f.d, account, 1n)
+  assert.deepEqual(p, { id: 1n, owner: account, poolId: f.d.poolId, lower: -120, upper: 120, liquidity: 100n, queued: 50n, active: true, blockNumber: 10n })
+  assert.ok(f.s.readBlocks.filter(r => ['positions', 'queuedLiquidity', 'isBatchActive'].includes(r.name)).every(r => r.block === 10n))
+  for (const [field, value] of [['positionOwner', other], ['positionOwner', zeroAddress], ['positionPool', hash(888)], ['badVaultBook', true], ['queued', 101n], ['readFailure', 'positions']] as const) {
+    const bad = fake(); Object.assign(bad.s, { [field]: value }); await assert.rejects(readVaultPosition(bad.io, bad.d, account, 1n)); assert.equal(bad.s.sent.length, 0)
+  }
+  await assert.rejects(readVaultPosition(f.io, f.d, account, 0n), /positive/)
+})
+test('exit reservation works during an active or paused batch without approvals or asset delivery', async () => {
+  for (const native of [false, true]) {
+    const f = fake(deployment(native)); f.s.paused = true
+    f.s.liquidity = (1n << 88n) - 1n
+    const id = (1n << 200n) + 1n, liquidity = (1n << 87n) + 1n
+    const r = await requestVaultExit(f.io, f.d, account, id, liquidity, quiet)
+    assert.deepEqual(r, { hash: txHash, positionId: id, liquidity })
+    assert.deepEqual(f.s.sent.map(c => [c.address, c.functionName, c.args, c.value ?? 0n]), [[f.d.contracts.liquidityGuard.address, 'requestExit', [id, liquidity], 0n]])
+    assert.equal(f.s.signCount, 0)
+  }
+})
+test('exit reservation rejects invalid amounts and a stale or already reserved position before sending', async () => {
+  for (const amount of [0n, -1n, 101n, 1n << 128n]) {
+    const f = fake(); await assert.rejects(requestVaultExit(f.io, f.d, account, 1n, amount, quiet)); assert.equal(f.s.sent.length, 0)
+  }
+  const queued = fake(); queued.s.queued = 1n
+  await assert.rejects(requestVaultExit(queued.io, queued.d, account, 1n, 1n, quiet), /already/)
+  const stale = fake(); await readVaultPosition(stale.io, stale.d, account, 1n); stale.s.positionOwner = other
+  await assert.rejects(requestVaultExit(stale.io, stale.d, account, 1n, 1n, quiet), /another wallet/)
+  assert.equal(stale.s.sent.length, 0)
+})
+test('exit processing uses actual pool activity rather than a passed wall-clock deadline', async () => {
+  const f = fake(); f.s.queued = 50n; f.s.now = 2000n
+  await assert.rejects(processVaultExit(f.io, f.d, account, 1n, quiet), /still active/)
+  assert.equal(f.s.simulations.length, 0)
+  f.s.active = false; f.s.paused = true
+  const r = await processVaultExit(f.io, f.d, account, 1n, quiet)
+  assert.deepEqual(r, { hash: txHash, positionId: 1n, liquidity: 50n, credited0: 3n, credited1: 4n })
+  assert.deepEqual(f.s.sent.map(c => [c.functionName, c.args]), [['processExit', [1n]]])
+  const missing = fake(); missing.s.active = false
+  await assert.rejects(processVaultExit(missing.io, missing.d, account, 1n, quiet), /no queued exit/)
+})
+test('exit confirmation requires one matching event from the vault for the owner, pool, ID and amount', async () => {
+  for (const process of [false, true]) for (const failure of ['missing', 'kind', 'owner', 'pool', 'id', 'amount', 'address', 'duplicate']) {
+    const f = fake(); f.s.exitFailure = failure; f.s.active = false; f.s.queued = process ? 50n : 0n
+    const action = process ? processVaultExit(f.io, f.d, account, 1n, quiet) : requestVaultExit(f.io, f.d, account, 1n, 50n, quiet)
+    await assert.rejects(action, /exactly one matching/)
+  }
+})
+test('a broadcast exit stays pending until its successful matching receipt arrives', async () => {
+  const f = fake(), original = f.io.wait
+  let release!: () => void, done = false
+  const pending = new Promise<void>(r => { release = r })
+  f.io.wait = async h => { await pending; return original(h) }
+  const action = requestVaultExit(f.io, f.d, account, 1n, 50n, quiet).then(r => { done = true; return r })
+  await new Promise<void>(r => setImmediate(r))
+  assert.equal(f.s.sent.length, 1); assert.equal(done, false)
+  release(); await action; assert.equal(done, true)
+})
+test('exit failures and account/network switches never become a confirmed request or credit', async () => {
+  for (const processing of [false, true]) {
+    const invoke = (f: ReturnType<typeof fake>) => processing ? processVaultExit(f.io, f.d, account, 1n, quiet) : requestVaultExit(f.io, f.d, account, 1n, 50n, quiet)
+    const make = () => { const f = fake(); f.s.queued = processing ? 50n : 0n; f.s.active = false; return f }
+    const reverted = make(); reverted.s.receiptStatus = 'reverted'; await assert.rejects(invoke(reverted), /reverted/)
+    const failed = make(); failed.s.simulateFailure = processing ? 'processExit' : 'requestExit'; await assert.rejects(invoke(failed), /simulation/); assert.equal(failed.s.sent.length, 0)
+    const readSwitch = make(); readSwitch.s.onRead = () => { readSwitch.s.wallet = other }; await assert.rejects(invoke(readSwitch), /changed/); assert.equal(readSwitch.s.sent.length, 0)
+    const simSwitch = make(); simSwitch.s.onSimulate = () => { simSwitch.s.walletChain = 1 }; await assert.rejects(invoke(simSwitch), /changed/); assert.equal(simSwitch.s.sent.length, 0)
+    const waitSwitch = make(); waitSwitch.s.onWait = () => { waitSwitch.s.wallet = other }; await assert.rejects(invoke(waitSwitch), /changed/)
+  }
+})
+test('vault principal/fee claims are separate from rewards and deliver either asset in exact chunks', async () => {
+  for (const native of [false, true]) {
+    const f = fake(deployment(native)); f.s.paused = true; f.s.queued = 50n
+    const cap = (1n << 120n) - 1n; f.s.vaultClaims = [cap + 10n, 8n]
+    await claim(f.io, f.d, account, 'liquidityGuard', 0, cap, other, quiet)
+    await claim(f.io, f.d, account, 'liquidityGuard', 1, 3n, other, quiet)
+    assert.deepEqual(f.s.sent.map(c => [c.address, c.args, c.value ?? 0n]), [[f.d.contracts.liquidityGuard.address, [f.d.assets[0].address, cap, other], 0n], [f.d.contracts.liquidityGuard.address, [f.d.assets[1].address, 3n, other], 0n]])
+    await assert.rejects(claim(f.io, f.d, account, 'liquidityGuard', 0, cap + 1n, other, quiet), /uint120/)
+    await assert.rejects(claim(f.io, f.d, account, 'liquidityGuard', 1, 9n, other, quiet), /exceeds/)
+    for (const c of Object.values(f.d.contracts)) await assert.rejects(claim(f.io, f.d, account, 'liquidityGuard', 0, 1n, c.address, quiet), /custody contracts/)
+  }
+})
+test('failed vault-credit delivery does not report success or use a different claim ledger', async () => {
+  const f = fake(deployment(true)); f.s.receiptStatus = 'reverted'
+  await assert.rejects(claim(f.io, f.d, account, 'liquidityGuard', 0, 3n, other, quiet), /reverted/)
+  assert.equal(f.s.sent[0].address, f.d.contracts.liquidityGuard.address)
+  assert.deepEqual(f.s.sent[0].args, [zeroAddress, 3n, other])
+  const readFailure = fake(); readFailure.s.readFailure = 'claims'
+  await assert.rejects(claim(readFailure.io, readFailure.d, account, 'liquidityGuard', 0, 3n, other, quiet), /unavailable/)
+  assert.equal(readFailure.s.sent.length, 0)
 })
 
 function adapterFixture(reason?: 'repriced' | 'cancelled' | 'replaced', altered = false) {
