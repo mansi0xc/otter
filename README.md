@@ -32,6 +32,14 @@ by default because no reviewed deployment is configured. Published Sepolia
 addresses and the tracked legacy web build still identify the earlier prototype.
 See [checkpoint 7A](./reviews/CHECKPOINT_7A.md) and [wallet setup](./web/README.md).
 
+The next mechanism decision is documented in
+[the independent review brief](./reviews/MECHANISM_REVIEW_BRIEF.md), with a hashed
+source/fixture baseline and local reproduction commands. A
+[research grant scope draft](./reviews/GRANT_RESEARCH_SCOPE.md) defines milestones,
+evaluation criteria and outstanding budget inputs. Neither an independent review
+nor a grant submission has occurred; [checkpoint 8A](./reviews/CHECKPOINT_8A.md)
+records the prepared packet and fresh evidence checks.
+
 The current settlement verifier accepts feasible allocations without enforcing
 the paper's canonical allocation/payments. Integer incentive guarantees
 remain unresolved. Opening LP rewards can also make an ask misreport profitable

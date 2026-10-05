@@ -459,11 +459,41 @@ epoch recovery and separate funded claims. Historical deployment references and
 fixtures are labeled accordingly; overclaimed truthfulness/IR and legacy capacity
 figures are corrected in the source dashboard.
 
-**7A is pending the user's commit.** The report lists its files and suggested
-title/body. No new mechanism, treasury, calendar, fractional asset, deployment or
+**7A was committed by the user as `2c24344`; the tree was clean before 8A.**
+The report retains its files and suggested title/body. No new mechanism, treasury,
+calendar, fractional asset, deployment or
 contract policy was selected. The default manifest is null, so the wallet cannot
 write to the old stack. Step 7 still requires real contract-wallet flows, persistent
 transaction/indexer/reorg handling, LP exit UX and end-to-end testnet execution
 after the relevant mechanism/concentrated gates. Continue guarantee-preserving
 asset/curve/utility design and independent review; do not treat UI migration as
 evidence that G1–G4 or concentrated trading are resolved.
+
+## Checkpoint 8A: independent review packet and research grant scope
+
+The [review brief](./MECHANISM_REVIEW_BRIEF.md) turns the existing evidence into
+specific G1–G4 questions and requested review deliverables. The selected baseline
+is the user-created wallet commit `2c24344`; 212 evidence files include all seven
+research fixtures and 85 imported vendor Solidity sources. A read-only SHA256
+verifier works on the repository or an equivalent archive without Git metadata.
+Hashes identify content; they do not certify a theorem, audit or deployment.
+
+The [research grant draft](./GRANT_RESEARCH_SCOPE.md) defines a provisional
+eight-week research sequence, measurable artifacts, go/no-go criteria and a budget
+worksheet. Team capacity, reviewer quotes, requested amount and program terms need
+factual confirmation before submission. A qualified negative result is a useful
+research outcome; it is not permission to ship a weaker rule. No funding agreement,
+independent review, external contact, upload or application occurred.
+
+Fresh checks reproduce the existing solver/fixture evidence and targeted real-core,
+cash and authentic historical ownership tests. No contract, solver, wallet,
+dependency, saved economic fixture, deployment or benchmark changed.
+**8A is pending the user's commit.** [Its report](./CHECKPOINT_8A.md) lists the
+exact files, validation and suggested message. Step 8 remains incomplete, as do
+G1–G4 and the gated concentrated/canonical integrations.
+
+After the commit, continue the complete asset/curve/utility design against the
+review questions. Do not contact a reviewer or submit/share this packet without
+the user's explicit authorization for that external action. An eventual proposal
+must identify any incompatible product requirements and their consequences before
+requesting a change to the user's selected guarantee priority.

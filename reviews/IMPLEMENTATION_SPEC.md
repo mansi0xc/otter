@@ -308,7 +308,7 @@ Minimum enforceable postconditions are:
 - Equal economic solutions use a declared total ordering. Initial tie key: `(ask, hash(v2 signed order fields))`, independent of submission index. Hash ties do not establish sybil resistance: traders can choose nonces/identities and grind order hashes. Test and disclose that limit.
 - Direction selection, allocation, payment rounding, and every leave-one-out/counterfactual calculation follow the **same published function** on chain and in the reference implementation. Fallback callers follow identical rules.
 
-Three gates remain. These are technical acceptance gates, not requests for another user permission.
+Four gates remain. These are technical acceptance gates, not requests for another user permission.
 
 **G1 — Complete the discrete allocation/payment definition.** Derive a rule with a nonempty integer payment interval, both-side IR, deterministic side selection/ties, and an explicit treatment of dust and finite capacity. State the objective and its units for each side; if introducing a cross-side welfare comparison, define and justify its common units rather than attributing that additional rule to the paper. Define leave-one-out outcomes, rounding order, and zero allocation. Use independent exhaustive rational/integer optimization on small domains to find counterexamples before selecting the scalable implementation. Define any deviation from continuous pivot payments and quantify an incentive error only if supported. Postconditions alone are not an algorithm or a truthfulness proof.
 
@@ -536,7 +536,8 @@ The user committed it as `8517538`; the tree was clean before 7A. Native/ERC20 d
 real ownership/clock authentication, selected current-pot routing and complete
 multi-epoch/LP guarantees are not implemented by that model. G1–G4 remain open.
 
-Checkpoint 7A migrates the source wallet to the actual v2 tuple/domain, checked
+Checkpoint 7A was committed by the user as `2c24344`; the tree was clean before
+8A. It migrates the source wallet to the actual v2 tuple/domain, checked
 deployment manifest, bounded multiword nonce reads, exact human/raw-unit price
 conversion and successful-receipt admission. The manifest defaults to null;
 historical Sepolia addresses are never transaction targets. Recovery distinguishes
@@ -553,3 +554,14 @@ The current UI supports token decimals 0–36; the contract remains raw-unit bas
 One confirmation does not establish reorg-proof finality. No new deployment,
 contract-wallet connector demo, persistent indexer, LP exit UI or concentrated
 auction is supplied. Step 7 and G1–G4 remain open; see its checkpoint report.
+
+Checkpoint 8A prepares [the independent mechanism review request](./MECHANISM_REVIEW_BRIEF.md),
+a selected source/import/fixture hash manifest with a read-only verifier, and
+[a research-focused grant scope](./GRANT_RESEARCH_SCOPE.md). It consolidates the
+whole-payment, actual-input/changing-price and combined-role evidence into explicit
+G1–G4 review questions. It selects no new mechanism, asset, reward destination,
+funding obligation or weaker guarantee. No independent reviewer was contacted and
+no application was submitted. The review and grant research package is preparatory
+work within step 8; canonical implementation and expanded testnet work retain their
+existing gates. [Its report](./CHECKPOINT_8A.md) records fresh checks and the
+user-created commit handoff.

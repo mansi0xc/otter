@@ -1,7 +1,8 @@
 # Checkpoint 7A — checked v2 wallet and individual recovery
 
 Prepared 5 October 2026. Starting commit: `8517538`. The working tree was clean.
-Status: **local source changes verified; waiting for the user's commit**.
+Status: **committed by the user as `2c24344`; clean tree inspected before 8A**.
+The commit handoff below is retained as the historical record of this checkpoint.
 
 ## Outcome
 
