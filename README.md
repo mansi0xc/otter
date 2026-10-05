@@ -124,6 +124,12 @@ The current hook enforces the following integration rules:
   valuations into that grid fails in published cases. Larger value-preserving
   lots also lose next-batch admissibility after a real v4 swap. The production
   order domain and minimum-output contract are unchanged.
+- **Whole-payment allocation limits.** `solver/src/transfer-research.ts` checks
+  original WAD-valued fill responses against exact truthful-payment constraints.
+  In a real-v4 case, all raw partial fills still force a welfare tradeoff under
+  whole payments. Verifiable negative cycles prove scoped infeasibility; this
+  is necessary single-user research, not a full mechanism impossibility claim.
+  See [checkpoint 4H](reviews/CHECKPOINT_4H.md) for the assumptions and limits.
 - **Batch-active guards.** LP changes and fee collection are frozen from the
   first accepted order through complete settlement or explicit expiry.
   Anyone can expire an epoch at its fixed execution deadline without token

@@ -1,0 +1,274 @@
+{
+  "schema": "otter/transfer-research/v1",
+  "qualification": "Offline necessary single-identity truthfulness constraints with fixed others/budget. No production rule or universal paper impossibility claim.",
+  "rawCurve": {
+    "lotSize": "1",
+    "output": [
+      "0",
+      "2",
+      "4",
+      "6",
+      "8",
+      null
+    ],
+    "quotes": [
+      {
+        "status": 10,
+        "requestedInput": "0",
+        "consumedInput": "0",
+        "output": "0",
+        "sqrtPriceX96": "118842243771396506390315925504",
+        "tick": 8109,
+        "liquidity": "1000",
+        "bitmapWords": 0,
+        "initializedTicksCrossed": 0,
+        "steps": 0
+      },
+      {
+        "status": 10,
+        "requestedInput": "1",
+        "consumedInput": "1",
+        "output": "2",
+        "sqrtPriceX96": "118664247400296062296870619575",
+        "tick": 8079,
+        "liquidity": "1000",
+        "bitmapWords": 1,
+        "initializedTicksCrossed": 0,
+        "steps": 1
+      },
+      {
+        "status": 10,
+        "requestedInput": "2",
+        "consumedInput": "2",
+        "output": "4",
+        "sqrtPriceX96": "118486783421133107069108599705",
+        "tick": 8049,
+        "liquidity": "1000",
+        "bitmapWords": 1,
+        "initializedTicksCrossed": 0,
+        "steps": 1
+      },
+      {
+        "status": 10,
+        "requestedInput": "3",
+        "consumedInput": "3",
+        "output": "6",
+        "sqrtPriceX96": "118309849448876561861937208068",
+        "tick": 8019,
+        "liquidity": "1000",
+        "bitmapWords": 1,
+        "initializedTicksCrossed": 0,
+        "steps": 1
+      },
+      {
+        "status": 10,
+        "requestedInput": "4",
+        "consumedInput": "4",
+        "output": "8",
+        "sqrtPriceX96": "118133443112720185278644061138",
+        "tick": 7990,
+        "liquidity": "1000",
+        "bitmapWords": 1,
+        "initializedTicksCrossed": 0,
+        "steps": 1
+      },
+      {
+        "status": 11,
+        "requestedInput": "5",
+        "consumedInput": "4",
+        "output": "8",
+        "sqrtPriceX96": "118133443112720185278644061138",
+        "tick": 7990,
+        "liquidity": "1000",
+        "bitmapWords": 1,
+        "initializedTicksCrossed": 0,
+        "steps": 1
+      }
+    ],
+    "limit": "118133443112720185278644061138"
+  },
+  "trueBudget": "4",
+  "asks": [
+    "62500000000000000",
+    "125000000000000000",
+    "187500000000000000"
+  ],
+  "rival": {
+    "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "ask": "125000000000000000",
+    "budget": "4"
+  },
+  "efficient": [
+    {
+      "fill": [
+        "4",
+        "0"
+      ],
+      "totalInput": "4",
+      "output": "8",
+      "welfareNumerator": "7750000000000000000",
+      "costNumerator": "250000000000000000",
+      "evaluated": 5
+    },
+    {
+      "fill": [
+        "0",
+        "4"
+      ],
+      "totalInput": "4",
+      "output": "8",
+      "welfareNumerator": "7500000000000000000",
+      "costNumerator": "500000000000000000",
+      "evaluated": 5
+    },
+    {
+      "fill": [
+        "0",
+        "4"
+      ],
+      "totalInput": "4",
+      "output": "8",
+      "welfareNumerator": "7500000000000000000",
+      "costNumerator": "500000000000000000",
+      "evaluated": 5
+    }
+  ],
+  "efficientTransferProblem": [
+    {
+      "ask": "62500000000000000",
+      "input": "4",
+      "lowerPayment": "0",
+      "upperPayment": "1329227995784915872903807060280344575"
+    },
+    {
+      "ask": "125000000000000000",
+      "input": "0",
+      "lowerPayment": "0",
+      "upperPayment": "1329227995784915872903807060280344575"
+    },
+    {
+      "ask": "187500000000000000",
+      "input": "0",
+      "lowerPayment": "0",
+      "upperPayment": "1329227995784915872903807060280344575"
+    }
+  ],
+  "efficientTransferAnalysis": {
+    "feasible": false,
+    "negativeCycle": [
+      {
+        "from": 0,
+        "to": 1,
+        "limit": "-1",
+        "kind": "truthfulness"
+      },
+      {
+        "from": 1,
+        "to": 0,
+        "limit": "0",
+        "kind": "truthfulness"
+      }
+    ],
+    "cycleWeight": "-1",
+    "relaxations": 16
+  },
+  "exhaustiveResponses": {
+    "examined": 125,
+    "infeasible": 120,
+    "nonconstantMonotone": 30,
+    "feasible": [
+      {
+        "fills": [
+          "0",
+          "0",
+          "0"
+        ],
+        "payments": [
+          "0",
+          "0",
+          "0"
+        ],
+        "regretNumerator": [
+          "250000000000000000",
+          "0",
+          "0"
+        ],
+        "worstRegretNumerator": "250000000000000000"
+      },
+      {
+        "fills": [
+          "1",
+          "1",
+          "1"
+        ],
+        "payments": [
+          "1",
+          "1",
+          "1"
+        ],
+        "regretNumerator": [
+          "187500000000000000",
+          "0",
+          "62500000000000000"
+        ],
+        "worstRegretNumerator": "187500000000000000"
+      },
+      {
+        "fills": [
+          "2",
+          "2",
+          "2"
+        ],
+        "payments": [
+          "1",
+          "1",
+          "1"
+        ],
+        "regretNumerator": [
+          "125000000000000000",
+          "0",
+          "125000000000000000"
+        ],
+        "worstRegretNumerator": "125000000000000000"
+      },
+      {
+        "fills": [
+          "3",
+          "3",
+          "3"
+        ],
+        "payments": [
+          "1",
+          "1",
+          "1"
+        ],
+        "regretNumerator": [
+          "62500000000000000",
+          "0",
+          "187500000000000000"
+        ],
+        "worstRegretNumerator": "187500000000000000"
+      },
+      {
+        "fills": [
+          "4",
+          "4",
+          "4"
+        ],
+        "payments": [
+          "1",
+          "1",
+          "1"
+        ],
+        "regretNumerator": [
+          "0",
+          "0",
+          "250000000000000000"
+        ],
+        "worstRegretNumerator": "250000000000000000"
+      }
+    ],
+    "minimumWorstRegretNumerator": "125000000000000000"
+  },
+  "unit": "Regret/welfare numerators are WAD-scaled underlying output, not token fractions payable by production."
+}

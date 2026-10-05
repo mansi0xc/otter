@@ -86,3 +86,15 @@ Reproduce to stdout from `solver/` with
 `npm run test:cost-grid` compares its bytes, allocations/counterfactuals,
 breakpoint integration and bounded net-flow strategies. BigInts are decimal
 strings. The tests do not regenerate previous fixtures or economic results.
+
+`research/transfer-research.json` records every raw quote choice in a capacity-four
+v4 case, exact truthful-payment constraints, a verifiable infeasibility cycle and
+all 125 partial-fill responses at three original WAD asks. See
+[checkpoint 4H](../reviews/CHECKPOINT_4H.md) for the necessary-condition proof and
+its limited scope. This is not a selected allocation policy or on-chain witness.
+
+Reproduce to stdout from `solver/` with
+`node --experimental-strip-types research/transfer-cli.ts`; append
+`> ../fixtures/research/transfer-research.json` only for deliberate regeneration.
+`npm run test:transfers` compares the artifact's bytes and independent allocation,
+payment-vector and certificate checks. BigInts are decimal strings.

@@ -3,7 +3,7 @@
 Prepared 2 October 2026. Baseline: user-created commit `63ec94e`.
 Sources: [grant readiness review](./GRANT_READINESS_REVIEW_2026-10-02.md), [remediation plan](./REMEDIATION_PLAN.md), the pinned v4 core, and [the paper](https://arxiv.org/html/2609.03474v1).
 
-**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. [3B](./CHECKPOINT_3B.md) implements queued exit priority and bounded donation accrual. [4A](./CHECKPOINT_4A.md) adds a bounded read-only exact execution quote; [4B](./CHECKPOINT_4B.md) adds an independent BigInt execution reference with matched domains and real-core comparisons. [4C](./CHECKPOINT_4C.md) records and revalidates opening pool state and LP ownership for the admitted full-range model. [4D](./CHECKPOINT_4D.md) adds bounded one-sided discrete allocation/payment research and counterexamples. [4E](./CHECKPOINT_4E.md) adds two-sided exact-lot candidate calculations and net-flow testing. [4F](./CHECKPOINT_4F.md) diagnoses compensation precision, fractional redemption/backing and actual-input gaps. [4G](./CHECKPOINT_4G.md) investigates exact integer cost grids, a finite one-sided argument and post-swap lot limits. None selects a production mechanism. Concentrated snapshot integration, reward weights/claims, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
+**Status: target implementation contract. Checkpoints [2A](./CHECKPOINT_2A.md) and [2B](./CHECKPOINT_2B.md) implement custody and asset handling; [3A](./CHECKPOINT_3A.md) implements bounded epochs and independent recovery locally. [3B](./CHECKPOINT_3B.md) implements queued exit priority and bounded donation accrual. [4A](./CHECKPOINT_4A.md) adds a bounded read-only exact execution quote; [4B](./CHECKPOINT_4B.md) adds an independent BigInt execution reference with matched domains and real-core comparisons. [4C](./CHECKPOINT_4C.md) records and revalidates opening pool state and LP ownership for the admitted full-range model. [4D](./CHECKPOINT_4D.md) adds bounded one-sided discrete allocation/payment research and counterexamples. [4E](./CHECKPOINT_4E.md) adds two-sided exact-lot candidate calculations and net-flow testing. [4F](./CHECKPOINT_4F.md) diagnoses compensation precision, fractional redemption/backing and actual-input gaps. [4G](./CHECKPOINT_4G.md) investigates exact integer cost grids, a finite one-sided argument and post-swap lot limits. [4H](./CHECKPOINT_4H.md) checks exact truthful whole-payment constraints and changed partial-fill limits. None selects a production mechanism. Concentrated snapshot integration, reward weights/claims, canonical settlement, and the discrete mechanism remain pending.** Safety and integration decisions below are selected. The discrete mechanism and its incentive guarantees have explicit research gates in section 7. Those gates must be resolved with evidence before canonical settlement is implemented or advertised as proven.
 
 The user has selected **native ETH and concentrated liquidity support now**. These belong to this remediation, including contracts, the integer solver, recovery, deployment, and wallet flows. Supporting WETH alone or removing the full-range check alone does not meet this scope.
 
@@ -362,9 +362,29 @@ original valuation/IR contract; G1/G2 require a broader-domain redesign covering
 finite capacity and changing v4 prices, not just valuation quantization or more
 passing restricted grids. No production cost field or lot policy is selected.
 
+Checkpoint 4H supplies exact original-WAD transfer constraints with independently
+verifiable negative-cycle certificates. With other reports and a true budget C
+fixed, deterministic whole-output payments force equal input fills and payments
+across any positive asks a<b with b*C<WAD. The necessary truthful-report
+inequalities put any positive fill change's integer payment difference strictly
+between zero and one. This constraint does not rely on Groves payments, zero
+loser compensation, IR or a funding deficit. Its underlying-token/net-input
+premises are explicit; it is not a universal impossibility theorem for redesigned
+asset/curve systems or the continuous paper.
+
+In the real-v4 capacity-four case, every raw partial fill is available, yet all
+125 response vectors at three original WAD asks reduce to five constant truthful
+responses. Even the best loses at least 1/8 output raw unit of allocation welfare
+in one profile, including when unused capacity is permitted. Conditional menus
+are not full mechanisms: rival, budget, false-name, opposite-side and builder
+incentives remain unproved. G1/G2 require a complete design escaping the stated
+premises with explicit efficiency/incentive and actual backing/redemption rules;
+extra whole reserves or more restricted passing grids are insufficient. No
+weaker efficiency, signature, allocation, asset or IR policy is selected.
+
 **G3 — Choose enforceable verification within measured resources.** Begin by benchmarking direct recomputation on bounded batches and traces, including counterfactuals. If it cannot fit, lower measured limits or specify a complete authenticated witness/proof design. The witness must bind G1's full computation and G2's real curve, not just feasibility or welfare. Do not introduce a TEE, bond, or optimistic dispute period and call it equivalent to immediate trustless verification. Any changed trust/delivery model requires a revised specification and disclosed funding scope.
 
-Custody, independent recovery, and the exact quote can proceed while these gates are researched. During their implementation, concentrated positions may be custodied, but admission and swaps must reject concentrated pools before escrow until their execution model is supported. Step 5 cannot be considered complete until G1–G3 have an implementation-ready rule and acceptance evidence. If the extension fails a claimed incentive property, report that result and adjust the claim; do not hide it with more randomized passing tests.
+Custody, independent recovery, the exact quote and historical-surplus accounting using the recorded admitted LP ownership can proceed while these gates are researched. Historical accounting does not make the legacy allocation/payment rule canonical or establish concentrated capital weights. During their implementation, concentrated positions may be custodied, but admission and swaps must reject concentrated pools before escrow until their execution model is supported. Step 5 cannot be considered complete until G1–G3 have an implementation-ready rule and acceptance evidence. If the extension fails a claimed incentive property, report that result and adjust the claim; do not hide it with more randomized passing tests.
 
 ## 8. Regression ownership and acceptance evidence
 
@@ -413,13 +433,19 @@ as `e156b91` and supplies bounded discrete allocation/payment/capacity research.
 Checkpoint 4E was committed as `5d6415e` and supplies two-sided exact-lot
 candidate and net-flow evidence. Checkpoint 4F was committed as `d37d48b` and
 supplies representation/backing, redemption and actual-input diagnostics.
-Checkpoint 4G supplies exact integer-cost research, the finite one-sided argument
-and post-swap lot failure; its report records the pending user-created commit.
-Step 4 remains incomplete. Next address the original valuation domain, whole
-payments, finite capacity and changing v4 prices together, with explicit
-efficiency and analytical incentive/backing arguments under G1/G2 before
-measuring the selected full algorithm for G3. The legacy auction reference
-remains separate and retains its known boundary/payment failures. Canonical results and
-historical rewards remain separate work. Canonical
-settlement and concentrated execution still require sections 5–7; a correct
-claim ledger and exit barrier do not resolve G1–G3.
+Checkpoint 4G was committed as `5841493` and supplies exact integer-cost
+research, the finite one-sided argument and post-swap lot failure. Checkpoint 4H
+supplies exact original-WAD truthful-payment constraints and changed partial-fill
+limits; its report records the pending user-created commit. Step 4 remains
+incomplete. A compatible design must address original valuations, whole-token
+IR, finite capacity and changing prices with explicit efficiency/incentive and
+backing/redemption arguments under G1/G2, then measured full verification for G3.
+The legacy auction retains its known boundary/payment failures.
+
+After the 4H commit, fix historical surplus capture independently using recorded
+opening full-range LP ownership. Retain prior-owner claims after exits and exclude
+later owners from past rewards without assuming that legacy payments are
+canonical. Concentrated capital weights/admission remain pending. This safety
+slice does not declare all of step 6 complete. Canonical settlement and expanded
+concentrated execution still require sections 5–7; correct historical accounting,
+claims and exits do not resolve G1–G3.

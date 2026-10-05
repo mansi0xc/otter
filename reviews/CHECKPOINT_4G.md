@@ -1,7 +1,7 @@
 # Checkpoint 4G — integer cost grids and repeat-batch lot failure
 
 Prepared 5 October 2026. Starting revision: user-created commit `d37d48b`.
-Status: implemented and validated locally, pending the user-created commit.
+Status: committed by the user as `5841493`; clean tree inspected before 4H.
 The user creates every commit. No deployment or live transaction is included.
 
 ## Outcome
@@ -302,4 +302,5 @@ Suggested explanation:
 
 > Add exact integer-per-lot pivots, independent finite welfare checks and net-flow deviation tests. Document the scoped one-sided argument, unsafe valuation rounding and real-v4 post-swap lot inadmissibility while retaining the original guarantee target.
 
-Create the commit and confirm completion before the next implementation slice.
+Committed by the user as `5841493`. The handoff above is retained as history;
+checkpoint 4H contains the current pending commit instructions.

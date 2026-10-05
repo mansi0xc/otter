@@ -341,10 +341,36 @@ spot 9/4 moves to a price where even the primitive lots exceed uint96. Thus the
 candidate can lose next-batch admissibility immediately after a valid trade.
 Larger value-preserving lots cannot repair generic or repeat-batch price support.
 
-**4G is pending the user's commit.** Continue a broader-domain redesign that
+**4G was committed by the user as `5841493`; clean tree inspected before 4H.** Continue a broader-domain redesign that
 addresses original WAD valuations, whole-token IR, finite capacity and changing
 v4 prices together. Require explicit efficiency and analytical incentive/backing
 arguments for changed allocations or a report-independent curve/asset adapter.
 Do not substitute the restricted grid for the user's original guarantee target.
 G1/G2 and independent review remain open; G3 must measure the selected full
 authenticated algorithm before canonical settlement or concentrated admission.
+
+## Checkpoint 4H: truthful whole payments and changed partial fills
+
+See [the transfer checkpoint report](./CHECKPOINT_4H.md) for exact original-WAD
+truthful-payment constraints, verifiable negative-cycle certificates and a
+necessary allocation-indifference argument under stated deterministic integer
+payment/fixed-budget assumptions. All 125 raw fill responses at three low-cost
+types in a real-v4 capacity-four case are checked. Only constant responses admit
+truthful integer payments; even the best incurs at least 1/8 output raw unit of
+allocation-welfare regret in one profile. This is scoped one-sided research,
+not a universal impossibility theorem for the paper or all redesigned assets.
+
+No weaker mechanism, signature, rounding or IR policy is selected. G1/G2 require
+a complete model that explicitly escapes the incompatible premises, plus its
+full incentive/efficiency and actual backing/redemption arguments. More passing
+restricted grids cannot settle that design choice; G3 and independent review
+remain prerequisites for canonical settlement.
+
+**4H is pending the user's commit.** After it, address R7 independently through
+bounded historical reward accounting using recorded opening LP ownership in the
+admitted full-range model. New liquidity must receive no past surplus; opening
+owners retain claims after exit. Preserve shared-currency backing, independent
+claims, callback guards and exit priority. Concentrated capital weights and
+auction admission remain pending; this safety slice does not complete step 6
+or authorize noncanonical legacy allocations. Keep the original mechanism
+guarantee priority while that separate design requires a compatible basis.
