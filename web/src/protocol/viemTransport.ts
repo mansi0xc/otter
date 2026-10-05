@@ -1,7 +1,8 @@
-import { encodeFunctionData, type PublicClient, type WalletClient, type Hash, type Address, type Hex, type Abi } from 'viem'
+import { encodeFunctionData, keccak256, type PublicClient, type WalletClient, type Hash, type Address, type Hex, type Abi } from 'viem'
 import type { Transport, Call } from './client.ts'
+import { BroadcastJournalError, parseIntent, type TransactionJournal } from './transactionJournal.ts'
 
-export function viemTransport(publicClient: PublicClient, wallet: () => Promise<WalletClient>, session: Transport['session']): Transport {
+export function viemTransport(publicClient: PublicClient, wallet: () => Promise<WalletClient>, session: Transport['session'], history?: { journal: TransactionJournal; scope: Hash }): Transport {
   const sent = new Map<Hash, { address: Address; account: Address; input: Hex; value: bigint }>()
   return {
     chainId: () => publicClient.getChainId(),
@@ -29,8 +30,17 @@ export function viemTransport(publicClient: PublicClient, wallet: () => Promise<
       }
       const call = request as { address: Address; abi: Abi; functionName: string; args?: readonly unknown[]; value?: bigint }
       const expected = { address: call.address, account, input: encodeFunctionData(call), value: call.value ?? 0n }
+      const inputHash = keccak256(expected.input)
+      const intent = history ? parseIntent({ hash: inputHash, scope: history.scope, chainId: 11155111, account, to: expected.address,
+        inputHash, value: expected.value.toString(), functionName: call.functionName, recordedAt: Date.now(), observedHash: null }) : null
+      // Fail before broadcasting if history is unreadable, unavailable or full.
+      history?.journal.prepare()
       const hash = await w.writeContract({ ...(request as Parameters<WalletClient['writeContract']>[0]), account: w.account, chain: w.chain })
       sent.set(hash, expected)
+      if (history && intent) {
+        try { history.journal.record({ ...intent, hash, recordedAt: Date.now() }) }
+        catch (e) { throw new BroadcastJournalError(hash, e) }
+      }
       return hash
     },
     wait: async hash => {
@@ -45,6 +55,10 @@ export function viemTransport(publicClient: PublicClient, wallet: () => Promise<
       if (actual.to?.toLowerCase() !== expected.address.toLowerCase() || actual.from.toLowerCase() !== expected.account.toLowerCase()
         || actual.input.toLowerCase() !== expected.input.toLowerCase() || actual.value !== expected.value) {
         throw new Error('Confirmed transaction differs from the requested wallet action. Inspect it before retrying.')
+      }
+      if (history) {
+        try { history.journal.observe(hash, receipt.transactionHash) }
+        catch (e) { throw new BroadcastJournalError(receipt.transactionHash, e) }
       }
       sent.delete(hash)
       return receipt

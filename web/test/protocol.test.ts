@@ -1,12 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { encodeAbiParameters, encodeEventTopics, encodeFunctionData, hashDomain, keccak256, stringToHex, zeroAddress, type Address, type Hash, type Hex, type PublicClient, type WalletClient } from 'viem'
-import { ORDER_BOOK_ABI, SETTLEMENT_ABI, REWARD_LEDGER_ABI, LIQUIDITY_VAULT_ABI } from '../src/protocol/abi.ts'
+import { encodeAbiParameters, encodeEventTopics, encodeFunctionData, hashDomain, keccak256, stringToHex, zeroAddress, TransactionReceiptNotFoundError, type Address, type Hash, type Hex, type PublicClient, type WalletClient } from 'viem'
+import { ORDER_BOOK_ABI, SETTLEMENT_ABI, REWARD_LEDGER_ABI, LIQUIDITY_VAULT_ABI, ERC20_ABI } from '../src/protocol/abi.ts'
 import { parseDeployment, uint, type Deployment } from '../src/protocol/deployment.ts'
 import { exactUnits, freeNonce, nonceMask, orderAmounts, orderDigest, orderHash, typedOrder, type Order } from '../src/protocol/orders.ts'
 import { approveBudget, checkDeployment, claim, expireEpoch, invalidateNonce, readClaims, readEpoch, recoverOrder, submitOrder, readVaultPosition, requestVaultExit, processVaultExit, type Call, type Receipt, type Transport } from '../src/protocol/client.ts'
 import { viemTransport } from '../src/protocol/viemTransport.ts'
+import { BroadcastJournalError, createTransactionJournal, deploymentScope, JOURNAL_LIMIT, JOURNAL_PREFIX, parseIntent, type JournalStorage, type TransactionIntent } from '../src/protocol/transactionJournal.ts'
+import { inspectTransaction, type InspectionClient } from '../src/protocol/inspectTransaction.ts'
 
 const addr = (n: number) => `0x${n.toString(16).padStart(40, '0')}` as Address
 const hash = (n: number) => `0x${n.toString(16).padStart(64, '0')}` as Hash
@@ -382,4 +384,235 @@ test('viem adapter rechecks account and chain inside the signing and broadcastin
     const d = deployment(), order = { trader: account } as Order
     await assert.rejects(f.io.sign(typedOrder(d, order)), /changed/)
   }
+})
+
+function memoryStorage() {
+  const data = new Map<string, string>()
+  const state = { blocked: false, failRecord: false, discard: false }
+  const storage: JournalStorage = {
+    get length() { if (state.blocked) throw new Error('storage disabled'); return data.size },
+    key: index => [...data.keys()][index] ?? null,
+    getItem: key => { if (state.blocked) throw new Error('storage disabled'); return data.get(key) ?? null },
+    setItem: (key, raw) => { if (state.blocked || (state.failRecord && key.startsWith(JOURNAL_PREFIX))) throw new Error('quota exhausted'); if (!state.discard) data.set(key, raw) },
+    removeItem: key => { if (state.blocked) throw new Error('storage disabled'); data.delete(key) },
+  }
+  return { storage, data, state, journal: createTransactionJournal(() => storage) }
+}
+function recorded(call: Call = { address: addr(1), abi: ORDER_BOOK_ABI, functionName: 'expire', args: [hash(50), 7n] }, d = deployment()): TransactionIntent {
+  return parseIntent({ hash: txHash, scope: deploymentScope(d), chainId: d.chainId, account, to: call.address,
+    inputHash: keccak256(encodeFunctionData(call)), value: (call.value ?? 0n).toString(), functionName: call.functionName, recordedAt: 1000, observedHash: null })
+}
+function inspectionFixture(call: Call = { address: addr(1), abi: ORDER_BOOK_ABI, functionName: 'expire', args: [hash(50), 7n] }, d = deployment()) {
+  const intent = recorded(call, d)
+  const state = { chain: d.chainId as number, receiptReads: 0, missing: false, rpcFailure: false, moveOnSecond: false, chainOnSecond: false,
+    canonicalHash: hash(400), receipt: { transactionHash: txHash, blockHash: hash(400), blockNumber: 9007199254740993n,
+      status: 'success', logs: [] as Receipt['logs'][number][] },
+    actual: { hash: txHash, to: call.address as Address | null, from: account, input: encodeFunctionData(call), value: call.value ?? 0n,
+      blockHash: hash(400), blockNumber: 9007199254740993n } }
+  const client = {
+    getChainId: async () => state.chain,
+    getTransactionReceipt: async () => {
+      state.receiptReads++
+      if (state.rpcFailure) throw new Error('RPC unavailable')
+      if (state.missing) throw new TransactionReceiptNotFoundError({ hash: txHash })
+      if (state.receiptReads > 1 && state.chainOnSecond) state.chain = 1
+      return state.receiptReads > 1 && state.moveOnSecond ? { ...state.receipt, blockHash: hash(401) } : state.receipt
+    },
+    getTransaction: async () => state.actual,
+    getBlock: async () => ({ hash: state.canonicalHash }),
+  } as unknown as InspectionClient
+  return { intent, state, client, d }
+}
+function admissionFixture(native = true) {
+  const d = deployment(native)
+  const order: Order = { trader: account, poolId: d.poolId, sellingCurrency0: true, ask: 0n, budget: 4n,
+    deadline: 1060n, nonce: (1n << 200n) + 257n, configVersion: d.configVersion, epoch: 7n, maxExecutionTime: 1420n }
+  const signature = `0x${'12'.repeat(65)}` as Hex
+  const call: Call = { address: d.contracts.orderBook.address, abi: ORDER_BOOK_ABI, functionName: 'submit', args: [[order], [signature]], value: native ? order.budget : 0n }
+  const f = inspectionFixture(call, d)
+  const event = ORDER_BOOK_ABI.find(a => a.type === 'event' && a.name === 'OrderSubmitted')!
+  const inputs = event.type === 'event' ? event.inputs.filter(a => !a.indexed) : []
+  const log = { address: d.contracts.orderBook.address,
+    topics: encodeEventTopics({ abi: ORDER_BOOK_ABI, eventName: 'OrderSubmitted', args: { poolId: d.poolId, batchId: order.epoch, trader: account } }),
+    data: encodeAbiParameters(inputs, [31, orderHash(order), order]) }
+  f.state.receipt.logs.push(log)
+  return { ...f, call, order, signature, log, inputs }
+}
+
+test('local history survives a new journal instance without storing calldata or a reusable signature', () => {
+  const f = memoryStorage(), a = admissionFixture()
+  f.journal.prepare(); f.journal.record(a.intent)
+  const raw = [...f.data.values()].join('')
+  assert.ok(!raw.includes(a.signature)); assert.ok(!raw.includes(encodeFunctionData(a.call)))
+  assert.deepEqual(createTransactionJournal(() => f.storage).snapshot().records, [a.intent])
+  assert.equal(f.journal.snapshot().warning, null)
+})
+test('history uses separate transaction keys, synchronizes notifications and never evicts old records', () => {
+  const f = memoryStorage(), second = createTransactionJournal(() => f.storage)
+  let updates = 0; const unsubscribe = f.journal.subscribe(() => updates++)
+  const one = recorded(), two = { ...one, hash: hash(998), account: other }
+  f.journal.record(one); second.record(two); assert.equal(f.journal.snapshot().records.length, 2)
+  f.journal.notify(); assert.equal(updates, 2); unsubscribe()
+  f.journal.forget(one.hash); assert.deepEqual(second.snapshot().records, [two]); assert.equal(updates, 2)
+  for (let i = 1; i < JOURNAL_LIMIT; i++) second.record({ ...one, hash: hash(2000 + i) })
+  assert.throws(() => second.prepare(), /full/)
+  assert.equal(second.snapshot().records.length, JOURNAL_LIMIT)
+  assert.ok(second.snapshot().records.some(r => r.hash === two.hash))
+})
+test('recording the same hash preserves its original intent and verified receipt alias', () => {
+  const f = memoryStorage(), r = recorded()
+  f.journal.record(r); f.journal.observe(r.hash, hash(1000))
+  f.journal.record({ ...r, recordedAt: 2000 })
+  assert.equal(f.journal.snapshot().records[0].observedHash, hash(1000))
+  assert.equal(f.journal.snapshot().records[0].recordedAt, 1000)
+  for (const patch of [{ scope: hash(88) }, { account: other }, { to: other }, { inputHash: hash(89) }, { value: '1' }, { functionName: 'claim' as const }]) {
+    assert.throws(() => f.journal.record({ ...r, ...patch }), /different local intent/)
+    assert.deepEqual(f.journal.snapshot().records[0], { ...r, observedHash: hash(1000) })
+  }
+})
+test('history filling while the wallet is open preserves its old records and exposes the new unsaved intent', () => {
+  const f = memoryStorage(), r = recorded(), second = createTransactionJournal(() => f.storage)
+  for (let i = 0; i < JOURNAL_LIMIT - 1; i++) f.journal.record({ ...r, hash: hash(2000 + i) })
+  f.journal.prepare(); second.record({ ...r, hash: hash(2999) })
+  assert.throws(() => f.journal.record(r), /filled while/)
+  assert.equal(second.snapshot().records.length, JOURNAL_LIMIT)
+  assert.equal(f.journal.snapshot().records.length, JOURNAL_LIMIT + 1)
+  assert.match(f.journal.snapshot().warning!, /only in this tab/)
+  assert.equal(f.journal.snapshot().records.find(e => e.hash === r.hash)?.inputHash, r.inputHash)
+})
+test('history rejects unknown fields, malformed domains, unsafe amounts and corrupt or mismatched storage', () => {
+  const r = recorded()
+  for (const patch of [{ input: '0x12' }, { chainId: 1 }, { hash: '0x0' }, { account: zeroAddress }, { to: 'javascript:alert(1)' },
+    { functionName: '<script>' }, { value: '-1' }, { value: (1n << 256n).toString() }, { recordedAt: 9e15 }, { observedHash: '0x12' }]) {
+    assert.throws(() => parseIntent({ ...r, ...patch }))
+  }
+  for (const raw of ['{', JSON.stringify({ ...r, inputHash: 'bad' }), ' '.repeat(1025)]) {
+    const f = memoryStorage(); f.data.set(JOURNAL_PREFIX + r.hash, raw)
+    assert.throws(() => f.journal.prepare()); assert.match(f.journal.snapshot().warning!, /unavailable/)
+  }
+  const mismatch = memoryStorage(); mismatch.data.set(JOURNAL_PREFIX + hash(998), JSON.stringify(r))
+  assert.throws(() => mismatch.journal.prepare(), /key/)
+})
+test('manifest changes segregate local history including pool, wiring, fingerprint, configuration and currencies', () => {
+  const d = deployment(), scope = deploymentScope(d)
+  for (const changed of [{ ...d, poolId: hash(52) }, { ...d, configVersion: 2n }, { ...d, rewardPolicyHash: hash(53) },
+    { ...d, contracts: { ...d.contracts, orderBook: { ...d.contracts.orderBook, address: addr(99) } } },
+    { ...d, contracts: { ...d.contracts, liquidityGuard: { ...d.contracts.liquidityGuard, runtimeHash: hash(55) } } }, deployment(true)]) {
+    assert.notEqual(deploymentScope(changed), scope)
+  }
+})
+test('unavailable, silently discarded or full storage blocks a wallet broadcast before sending', async () => {
+  for (const failure of ['blocked', 'discard', 'full'] as const) {
+    const f = memoryStorage(), a = adapterFixture()
+    if (failure === 'full') for (let i = 0; i < JOURNAL_LIMIT; i++) f.journal.record({ ...recorded(), hash: hash(2000 + i) })
+    else f.state[failure] = true
+    let sends = 0
+    const pub = { chain: { id: 11155111 } } as PublicClient
+    const wallet = { account: { address: account }, getChainId: async () => 11155111, writeContract: async () => { sends++; return txHash } } as unknown as WalletClient
+    const io = viemTransport(pub, async () => wallet, async () => ({ address: account, chainId: 11155111 }), { journal: f.journal, scope: deploymentScope(deployment()) })
+    await assert.rejects(io.send(a.call, account)); assert.equal(sends, 0)
+  }
+})
+test('a post-broadcast storage failure exposes the hash, retains the record in memory and never sends twice', async () => {
+  for (const fault of ['write', 'read'] as const) {
+    const f = memoryStorage(); f.state.failRecord = fault === 'write'
+    let sends = 0
+    const pub = { chain: { id: 11155111 } } as PublicClient
+    const wallet = { account: { address: account }, getChainId: async () => 11155111, writeContract: async () => { sends++; if (fault === 'read') f.state.blocked = true; return txHash } } as unknown as WalletClient
+    const io = viemTransport(pub, async () => wallet, async () => ({ address: account, chainId: 11155111 }), { journal: f.journal, scope: deploymentScope(deployment()) })
+    await assert.rejects(io.send(adapterFixture().call, account), e => e instanceof BroadcastJournalError && e.hash === txHash)
+    assert.equal(sends, 1); assert.equal(f.journal.snapshot().records[0].hash, txHash)
+    assert.match(f.journal.snapshot().warning!, fault === 'write' ? /only in this tab/ : /unavailable/)
+  }
+})
+test('a verified repricing receipt is saved for later read-only inspection; cancellation is never success', async () => {
+  for (const reason of ['repriced', 'cancelled'] as const) {
+    const f = memoryStorage(), call = adapterFixture().call
+    const pub = { chain: { id: 11155111 },
+      waitForTransactionReceipt: async (args: { onReplaced: (r: unknown) => void }) => { args.onReplaced({ reason }); return { status: 'success', transactionHash: hash(1000), logs: [] } },
+      getTransaction: async () => ({ to: call.address, from: account, input: encodeFunctionData(call), value: 0n }) } as unknown as PublicClient
+    const wallet = { account: { address: account }, getChainId: async () => 11155111, writeContract: async () => txHash } as unknown as WalletClient
+    const io = viemTransport(pub, async () => wallet, async () => ({ address: account, chainId: 11155111 }), { journal: f.journal, scope: deploymentScope(deployment()) })
+    const h = await io.send(call, account)
+    if (reason === 'cancelled') { await assert.rejects(io.wait(h), /cancelled/); assert.equal(f.journal.snapshot().records[0].observedHash, null) }
+    else { await io.wait(h); assert.equal(createTransactionJournal(() => f.storage).snapshot().records[0].observedHash, hash(1000)) }
+  }
+})
+test('read-only recovery checks a mined receipt after reload and preserves exact block numbers', async () => {
+  const f = memoryStorage(), a = inspectionFixture()
+  f.journal.record(a.intent)
+  const entry = createTransactionJournal(() => f.storage).snapshot().records[0]
+  assert.deepEqual(await inspectTransaction(a.client, a.d, entry), { state: 'mined', hash: txHash, block: 9007199254740993n })
+  assert.equal(a.state.receiptReads, 2)
+})
+test('missing receipts stay unresolved; network and RPC errors never become pending or success', async () => {
+  const missing = inspectionFixture(); missing.state.missing = true
+  assert.equal((await inspectTransaction(missing.client, missing.d, missing.intent)).state, 'unmined')
+  const broken = inspectionFixture(); broken.state.rpcFailure = true
+  await assert.rejects(inspectTransaction(broken.client, broken.d, broken.intent), /RPC unavailable/)
+  const wrong = inspectionFixture(); wrong.state.chain = 1
+  await assert.rejects(inspectTransaction(wrong.client, wrong.d, wrong.intent), /wrong chain/)
+})
+test('receipt inspection rejects reorg movement, disappearance and inconsistent transaction block metadata', async () => {
+  for (const mutate of [(f: ReturnType<typeof inspectionFixture>) => { f.state.canonicalHash = hash(401) },
+    (f: ReturnType<typeof inspectionFixture>) => { f.state.actual.blockHash = hash(402) },
+    (f: ReturnType<typeof inspectionFixture>) => { f.state.actual.blockNumber++ },
+    (f: ReturnType<typeof inspectionFixture>) => { f.state.actual.hash = hash(998) },
+    (f: ReturnType<typeof inspectionFixture>) => { f.state.moveOnSecond = true },
+    (f: ReturnType<typeof inspectionFixture>) => { f.state.chainOnSecond = true }]) {
+    const f = inspectionFixture(); mutate(f); await assert.rejects(inspectTransaction(f.client, f.d, f.intent), /block|changed/)
+  }
+  const gone = inspectionFixture(), read = gone.client.getTransactionReceipt
+  gone.client.getTransactionReceipt = (async args => { if (gone.state.receiptReads) throw new TransactionReceiptNotFoundError({ hash: txHash }); return read(args) }) as InspectionClient['getTransactionReceipt']
+  await assert.rejects(inspectTransaction(gone.client, gone.d, gone.intent), TransactionReceiptNotFoundError)
+})
+test('a mined sender, target, calldata or ETH mismatch and a revert cannot report a successful action', async () => {
+  for (const patch of [{ from: other }, { to: other }, { to: null }, { input: '0x' as Hex }, { value: 1n }]) {
+    const f = inspectionFixture(); Object.assign(f.state.actual, patch)
+    assert.equal((await inspectTransaction(f.client, f.d, f.intent)).state, 'different')
+  }
+  const reverted = inspectionFixture(); reverted.state.receipt.status = 'reverted'
+  assert.equal((await inspectTransaction(reverted.client, reverted.d, reverted.intent)).state, 'reverted')
+})
+test('read-only recovery reconstructs native and ERC20 admission IDs without re-signing or resending', async () => {
+  for (const native of [true, false]) {
+    const f = admissionFixture(native), storage = memoryStorage(); storage.journal.record(f.intent)
+    const r = await inspectTransaction(f.client, f.d, createTransactionJournal(() => storage.storage).snapshot().records[0])
+    assert.equal(r.state, 'mined'); assert.deepEqual(r.admission, { epoch: 7n, index: 31, orderHash: orderHash(f.order) })
+  }
+})
+test('admission recovery rejects missing, duplicate, wrong-emitter or mismatched admission IDs', async () => {
+  for (const mutate of [(f: ReturnType<typeof admissionFixture>) => { f.state.receipt.logs = [] },
+    (f: ReturnType<typeof admissionFixture>) => { f.state.receipt.logs.push(f.log) },
+    (f: ReturnType<typeof admissionFixture>) => { f.log.address = other },
+    (f: ReturnType<typeof admissionFixture>) => { f.log.data = encodeAbiParameters(f.inputs, [32, orderHash(f.order), f.order]) },
+    (f: ReturnType<typeof admissionFixture>) => { f.log.data = encodeAbiParameters(f.inputs, [0, hash(22), f.order]) },
+    (f: ReturnType<typeof admissionFixture>) => { f.log.topics = encodeEventTopics({ abi: ORDER_BOOK_ABI, eventName: 'OrderSubmitted', args: { poolId: hash(99), batchId: 7n, trader: account } }) },
+    (f: ReturnType<typeof admissionFixture>) => { f.log.topics = encodeEventTopics({ abi: ORDER_BOOK_ABI, eventName: 'OrderSubmitted', args: { poolId: f.d.poolId, batchId: 8n, trader: account } }) },
+    (f: ReturnType<typeof admissionFixture>) => { f.log.topics = encodeEventTopics({ abi: ORDER_BOOK_ABI, eventName: 'OrderSubmitted', args: { poolId: f.d.poolId, batchId: 7n, trader: other } }) }]) {
+    const f = admissionFixture(); mutate(f); await assert.rejects(inspectTransaction(f.client, f.d, f.intent), /matching admission/)
+  }
+})
+test('untrusted history cannot select another deployment, arbitrary contract or an unrecorded method', async () => {
+  const f = inspectionFixture()
+  await assert.rejects(inspectTransaction(f.client, f.d, { ...f.intent, scope: hash(49) }), /different deployment/)
+  await assert.rejects(inspectTransaction(f.client, f.d, { ...f.intent, to: other }), /supported action/)
+  await assert.rejects(inspectTransaction(f.client, f.d, { ...f.intent, functionName: 'claim' }), /recorded action/)
+  const badApproval = inspectionFixture({ address: addr(10), abi: ERC20_ABI, functionName: 'approve', args: [other, 4n] })
+  await assert.rejects(inspectTransaction(badApproval.client, badApproval.d, badApproval.intent), /configured order book/)
+})
+test('read-only inspection covers all existing wallet methods, ledgers and exact ETH values', async () => {
+  const d = deployment(true), b = d.contracts.orderBook.address, v = d.contracts.liquidityGuard.address
+  const calls: Call[] = [
+    { address: addr(11), abi: ERC20_ABI, functionName: 'approve', args: [b, 4n] },
+    { address: b, abi: ORDER_BOOK_ABI, functionName: 'expireUnsupportedFees', args: [d.poolId, 7n] },
+    { address: b, abi: ORDER_BOOK_ABI, functionName: 'refundOrder', args: [d.poolId, 7n, 1n] },
+    { address: b, abi: ORDER_BOOK_ABI, functionName: 'invalidateNonces', args: [1n << 200n, 8n] },
+    ...[b, d.contracts.rewardLedger.address, v].map(address => ({ address, abi: address === b ? ORDER_BOOK_ABI : address === v ? LIQUIDITY_VAULT_ABI : REWARD_LEDGER_ABI, functionName: 'claim', args: [zeroAddress, 3n, other] })),
+    { address: v, abi: LIQUIDITY_VAULT_ABI, functionName: 'requestExit', args: [1n << 200n, 1n << 87n] },
+    { address: v, abi: LIQUIDITY_VAULT_ABI, functionName: 'processExit', args: [1n << 200n] },
+  ]
+  for (const call of calls) { const f = inspectionFixture(call, d); assert.equal((await inspectTransaction(f.client, d, f.intent)).state, 'mined') }
+  const repriced = inspectionFixture(); repriced.intent.observedHash = hash(1000); repriced.state.receipt.transactionHash = hash(1000); repriced.state.actual.hash = hash(1000)
+  assert.equal((await inspectTransaction(repriced.client, repriced.d, repriced.intent)).hash, hash(1000))
 })

@@ -35,6 +35,11 @@ The source wallet also exposes owner-checked LP exit requests, idle-pool process
 and separate native/ERC20 vault-credit withdrawals. Requests are irrevocable and
 have no token-output minimum. This is a local recovery flow, not a deployment or
 concentrated-auction completion; see [checkpoint 7B](./reviews/CHECKPOINT_7B.md).
+The local wallet now records returned transaction hashes across reloads and
+offers read-only receipt inspection, including recovery of verified admission
+IDs. It stores calldata hashes, not reusable order signatures. This is browser
+history rather than an authenticated indexer or finality guarantee; see
+[checkpoint 7C](./reviews/CHECKPOINT_7C.md).
 
 The next mechanism decision is documented in
 [the independent review brief](./reviews/MECHANISM_REVIEW_BRIEF.md), with a hashed

@@ -615,7 +615,20 @@ also excludes all four configured custody addresses as vault-credit recipients,
 a conservative UI rule beyond the vault contract's nonzero-recipient requirement.
 This does not change custody or economic semantics. The default manifest stays
 null; no live wallet, deployment or transaction is supplied. LP deposits, discovery,
-cross-pool navigation, persistent transaction/indexer/reorg recovery and real
+cross-pool navigation, full transaction/indexer/reorg recovery and real
 contract-wallet/testnet demonstrations remain unfinished. G1–G4 and concentrated
 trading retain their gates; the legacy allocation, payments and reward rule are
 unchanged.
+
+Checkpoint 7B was committed by the user as `d76b12c`; the tree was clean before
+7C. [Checkpoint 7C](./CHECKPOINT_7C.md) adds bounded browser transaction history
+and read-only receipt inspection across reloads. It stores expected calldata
+hashes rather than signatures, segregates wallet/manifest records, fails before
+new broadcasts when storage is unavailable/corrupt/full, and exposes a returned
+hash if persistence fails after sending. Matching admission events reconstruct
+epoch/index IDs. Mined receipts are checked against the RPC's returned block hash
+and reread to detect changes during inspection; this is not finality. No stored
+record authorizes a signature, send, retry or claim. Cross-tab signing locks,
+replacement discovery after interruption, authenticated durable indexing and
+wallet/testnet end-to-end demonstrations remain unfinished. Production Solidity,
+mechanism rules, the null deployment manifest and G1–G4 are unchanged.

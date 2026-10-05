@@ -143,6 +143,48 @@ wallet account/chain/transaction-intent checks. A hash is pending; failed or
 unmatched confirmations must be inspected before retrying. Queueing does not
 promise when processing will occur or guarantee a token amount or economic return.
 
+## Local transaction history
+
+Each wallet broadcast records its returned hash, account, Sepolia chain, target,
+ETH value, method, calldata hash and local timestamp. A fingerprint of the entire
+configured deployment keeps old manifests separate. **Raw calldata and reusable
+order signatures are not stored.** Records use separate `localStorage` keys and
+are visible only for the selected wallet and manifest. The 100-record history
+does not silently evict older entries. Inspect and explicitly forget an old
+record to free space; forgetting does not cancel, reverse or refund a transaction.
+
+Storage must be readable and writable before starting a wallet flow and again
+before each broadcast. Corrupt, unavailable or
+full history prevents a new broadcast. If storage fails after the wallet returns
+a hash, report that hash and retain the new intent in this tab where possible;
+save it separately before closing. No action is automatically retried. This
+cannot recover a broadcast if the tab closes before the wallet returns its hash,
+nor compensate for erased/private browser storage or a different browser/origin.
+
+Use **Check mined receipt** after a reload. This only reads the configured Sepolia
+RPC. It checks sender, target, exact calldata hash and ETH value, transaction/
+receipt block metadata against the returned block hash, then rereads the receipt
+and chain to detect movement during inspection. It decodes only existing wallet
+methods at configured contracts/assets. A submission needs one matching
+`OrderSubmitted` event to recover its epoch and stored index. Those IDs identify
+admission, not settlement, refund eligibility or a current claim balance. Other
+actions show a matching mined receipt without reconstructing vault credit amounts
+or the current epoch/position state. Refresh those panels independently.
+
+Missing receipts remain unresolved: pending, dropped, cancelled or replaced
+transactions can look alike at this RPC. RPC errors are reported separately.
+Repricing discovered and verified during a live wait saves its observed receipt
+hash. Replacement discovery after interruption/reload is not implemented. An
+observed hash in editable local storage is not independently authenticated as a
+replacement of the original nonce. Local records are untrusted display metadata
+and never become a signing or sending request. Receipt responses still trust the
+RPC, and a later reorg remains possible. Results are not cached as finality.
+
+Storage events synchronize displayed history across tabs; separate keys prevent
+unrelated transaction records overwriting each other. This does not serialize
+other tabs' wallet actions, prevent duplicate manual sends or eliminate capacity
+races at the record limit. The existing action lock operates within one tab.
+
 ## Evidence and remaining work
 
 `npm test` runs offline mocked-RPC/wallet failure tests and checks the ABI subset
@@ -156,8 +198,9 @@ This cross-checks the actual browser hash/signature helper with Solidity, includ
 the reverse side and maximum fields. Its private key is a public test fixture.
 No real wallet, RPC transaction or deployment is used by these tests.
 
-One confirmation is a mined receipt, not reorg-proof finality. Pending transaction
-recovery across reloads, robust indexing/reorg handling, demonstrated contract
+One confirmation is a mined receipt, not reorg-proof finality. Local history now
+supports receipt inspection across reloads. Robust indexing/reorg handling,
+replacement discovery after interruption, demonstrated contract
 wallet/EIP-1271 connector flows, LP deposits/discovery and cross-pool navigation,
 automated exit processing, concentrated batch execution,
 public solver operation and testnet end-to-end evidence remain unfinished. Save
@@ -166,3 +209,5 @@ See [checkpoint 7A](../reviews/CHECKPOINT_7A.md).
 The local exit interface and fresh validation are recorded in
 [checkpoint 7B](../reviews/CHECKPOINT_7B.md). Its visual preview uses synthetic
 state and disabled writes; it is not a real wallet connection or live deployment.
+History, storage and receipt failure tests and the isolated synthetic browser
+preview are recorded in [checkpoint 7C](../reviews/CHECKPOINT_7C.md).

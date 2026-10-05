@@ -568,6 +568,27 @@ This completes a bounded local LP exit interface, not step 7. Deposits, automate
 position discovery/queue processing, persistent transaction recovery/indexing,
 reorg handling, actual contract-wallet flows, concentrated auction execution and
 end-to-end testnet evidence remain. G1–G4 and the guarantee priority are unchanged.
-**7B is pending the user's commit.** Its report gives the exact files, fresh tests,
+**7B was committed by the user as `d76b12c`; the tree was clean before 7C.** Its report gives the exact files, fresh tests,
 synthetic interface checks and handoff. The new evidence selection includes the
 wallet source/config/test closure; earlier manifests remain immutable.
+
+## Checkpoint 7C: local transaction history and read-only receipt recovery
+
+[The history checkpoint](./CHECKPOINT_7C.md) preserves returned broadcast hashes
+and expected intent hashes across browser reloads. History is bounded, separated
+by wallet/deployment, and never saves reusable signatures. Unavailable, corrupt
+or full storage blocks new broadcasts; a failure after sending exposes the hash
+without retrying. Receipt inspection has no wallet write methods. It distinguishes
+unresolved receipts, reverts and changed intents, checks current returned block
+metadata, and recovers admission IDs only from one matching event. Account or
+history changes invalidate outstanding displayed inspection results.
+
+This completes a bounded local recovery slice, not a durable indexer or step 7.
+RPC trust, later reorgs, replacement discovery after interruption, broadcasts
+interrupted before returning their hash, browser storage loss, cross-tab action
+coordination and actual connector/testnet evidence remain. LP deposits/discovery
+and concentrated auction execution remain open. G1–G4 and the priority to preserve
+the paper's guarantees are unchanged; no new rule, utility or asset is selected.
+**7C is pending the user's commit.** Its report contains fresh wallet/build/browser
+checks and the handoff. A new selected snapshot covers the history code; earlier
+manifests retain their recorded bytes.

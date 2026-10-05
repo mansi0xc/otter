@@ -21,6 +21,13 @@ fee claims, with its manifest still null. It changes no mechanism or contract
 policy. The latest snapshot additionally selects the wallet source/config/test
 closure; [7B](./CHECKPOINT_7B.md) records local mock-wallet and real-core evidence.
 
+Local 7C update starts from the user-created `d76b12c` commit. It adds bounded
+browser history and read-only receipt recovery, including admission IDs after
+reloads, without storing reusable signatures. Receipt/block consistency checks
+do not establish finality or an authenticated indexer. The wallet remains disabled
+by its null manifest. [7C](./CHECKPOINT_7C.md) records fresh local wallet/build and
+synthetic interface checks; no new contract or mechanism evidence is claimed.
+
 ## Decision the review must support
 
 Determine whether a useful v4 mechanism can meet the requested incentive targets
@@ -178,7 +185,7 @@ scope and compensation; do not label internal tests as independent review.
 
 Use the full repository with submodules populated. The selected evidence files
 and their Solidity import closure are hashed in
-[EVIDENCE_MANIFEST_7B.json](./EVIDENCE_MANIFEST_7B.json). That manifest records the
+[EVIDENCE_MANIFEST_7C.json](./EVIDENCE_MANIFEST_7C.json). That manifest records the
 pre-patch baseline, local checkpoint, dependency commits and observed tools.
 It identifies the post-patch selected bytes and does not hash this brief or later
 status edits, authenticate an author, inspect unlisted files, or certify safety.
@@ -188,7 +195,7 @@ relying on submodule HEAD alone. Review the verifier before running it.
 From the repository root, with the already available tools:
 
 ```sh
-python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_7B.json
+python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_7C.json
 ```
 
 From `solver/`:
@@ -236,6 +243,14 @@ artifacts, mocked-RPC/session/receipt failures and exact vault claim routing;
 the contract suites exercise real custody and execution. These are separate
 layers, not a connected-wallet testnet demonstration. The default wallet remains
 unconfigured, and no public transaction is required by the runbook.
+To reproduce the local history slice, run `npm test` and
+`npm run build -- --outDir /tmp/otter-7c-web-dist` from `web/`.
+Checkpoint 7C records 47 passing mocked wallet/history/receipt groups and a
+synthetic browser preview, including persisted records, stale account reads,
+explicit forgetting and admission-ID recovery. No contract suite is claimed as
+fresh in 7C because contracts and their ABI are unchanged. History is untrusted,
+read-only display data; finality, durable indexing, post-interruption replacement
+discovery and actual connector/testnet evidence remain open.
 Review `foundry.toml`: FFI is enabled for local reference comparisons and the
 test-only gas ceiling is artificially large. That ceiling is not deployment
 capacity evidence. Avoid `GasCurveTest` and `SandwichHarness` when preserving the
@@ -256,6 +271,10 @@ The frozen 4J selection is unchanged by the wallet slice: it selected only the
 dashboard from `web/`, so a passing older hash check does not cover the new wallet
 changes. The separate 7B snapshot includes wallet files, build configuration,
 the existing lockfile and tests, excluding installed packages and generated builds.
+The 7B manifest remains frozen at its checkpoint bytes; five selected wallet
+files now differ from it. The separate 7C snapshot covers those changes plus the
+four new journal/inspection/interface files. A passing content check supplies
+identity only, not authenticated history, receipt correctness or grant readiness.
 A reviewer should retain their own tool versions,
 logs and content identifiers, and explain any reproduction difference. No
 external transfer or publication is authorized by this local packet.

@@ -8,6 +8,8 @@ import { viemTransport } from '@/protocol/viemTransport'
 import { type Progress, type Transport } from '@/protocol/client'
 import { type Order } from '@/protocol/orders'
 import { type Deployment } from '@/protocol/deployment'
+import { BroadcastJournalError, deploymentScope } from '@/protocol/transactionJournal'
+import { walletJournal } from '@/protocol/walletJournal'
 
 // Serializes wallet writes across submission, liquidity and recovery in this tab.
 let actionInFlight = false
@@ -18,7 +20,7 @@ export function getTransport(): Transport {
     const current = getAccount(wagmiConfig)
     if (!current.address || !current.isConnected || current.chainId === undefined) throw new Error('Connect the intended Sepolia wallet.')
     return { address: current.address, chainId: current.chainId }
-  })
+  }, deployment ? { journal: walletJournal, scope: deploymentScope(deployment) } : undefined)
 }
 export function useWalletActions() {
   const currentWallet = useAccount()
@@ -36,6 +38,7 @@ export function useWalletActions() {
     setActionKey(`${current.address.toLowerCase()}:${current.chainId}`)
     setBusy(true); setError(null); setHash(null); setOrder(null); setStage('Checking deployment and wallet')
     try {
+      walletJournal.prepare()
       const result = await action(getTransport(), deployment, current.address, (next, tx, signed) => {
         setStage(next); if (tx) setHash(tx); if (signed) setOrder(signed)
       })
@@ -44,6 +47,7 @@ export function useWalletActions() {
       setStage('Confirmed on Sepolia')
       return result
     } catch (e) {
+      if (e instanceof BroadcastJournalError) setHash(e.hash)
       setError(e instanceof Error ? e.message : 'Wallet action failed.')
       setStage('Action not confirmed; inspect any transaction link before retrying')
     } finally { actionInFlight = false; setBusy(false) }

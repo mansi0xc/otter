@@ -2,7 +2,7 @@
 
 Prepared 5 October 2026. Starting commit:
 `2404cce1ee766aa62d695b02acd8907615991874`. The working tree was clean.
-Status: **local wallet exit flow verified; waiting for the user's commit**.
+Status: **committed by the user as `d76b12c`; clean tree verified before 7C**.
 
 ## Outcome
 

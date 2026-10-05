@@ -173,3 +173,5 @@
   gap: 0.2rem;
 }
 .txLink:hover { text-decoration: underline; }
+.historyRecord { display: flex; flex-direction: column; gap: 0.625rem; padding: 0.875rem; border: 1px solid var(--rule); border-radius: var(--r2); min-width: 0; }
+.historyHash { font-size: 0.7rem; overflow-wrap: anywhere; }
