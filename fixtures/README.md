@@ -115,3 +115,24 @@ allocations/counterfactuals, original WAD asks, 1,024 composition examples and
 `OtterRewardCompositionTest` checks actual v4 swaps and cash-ledger delivery,
 using an explicitly synthetic opening book. Earlier fixtures and saved economic
 results remain unchanged.
+
+
+`research/redistribution-research.json` records the pre-funded fixed-calendar
+candidate, exact reservations/releases/claims, delayed and capped incentive
+examples, hypothetical per-start epoch farming, earlier-surplus funding effects
+and additive-versus-wallet-flow utility boundaries. See
+[checkpoint 6C](../reviews/CHECKPOINT_6C.md) and
+[the design proposal](../reviews/REDISTRIBUTION_DESIGN.md). The calendar is an
+**offline arithmetic model**, not deployed custody, token delivery, authenticated
+ownership or a selected redistribution mechanism. Cap tables are synthetic
+concave domains; the new opposite-direction example uses the prior core-matched
+9-input/3-output quote. No full repeated-epoch or LP guarantee is established.
+
+Reproduce to stdout from `solver/` with
+`node --experimental-strip-types research/redistribution-cli.ts`; append
+`> ../fixtures/research/redistribution-research.json` only for deliberate
+regeneration. `npm run test:redistribution` checks byte equality, the utility
+boundaries, reservation/cutoff/replay/claim bounds and 1,024 seeded accounting
+histories with an independent entitlement calculation. BigInts are decimal
+strings and Maps are serialized as entry arrays. Previous fixtures and saved
+economic benchmarks are preserved.

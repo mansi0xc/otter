@@ -1,0 +1,1192 @@
+{
+  "schema": "otter/redistribution-research/v1",
+  "qualification": "Offline fixed-calendar candidate and rejected alternatives; no adopted reward rule, real token delivery or full multi-epoch/LP incentive proof.",
+  "plateau": {
+    "input": "4",
+    "ownPayment": "6",
+    "trueCost": "4",
+    "falseCost": "2",
+    "currentPot": [
+      "3",
+      "5"
+    ],
+    "openingReward": [
+      "1",
+      "2"
+    ],
+    "combinedUtility": [
+      {
+        "numerator": "3",
+        "denominator": "1"
+      },
+      {
+        "numerator": "4",
+        "denominator": "1"
+      }
+    ]
+  },
+  "vesting": {
+    "discount": {
+      "numerator": "1",
+      "denominator": "2"
+    },
+    "delay": 8,
+    "vestedTruth": {
+      "numerator": "513",
+      "denominator": "256"
+    },
+    "vestedFake": {
+      "numerator": "257",
+      "denominator": "128"
+    },
+    "gain": {
+      "numerator": "1",
+      "denominator": "256"
+    }
+  },
+  "cappedShares": {
+    "qualification": "Synthetic certified finite domains, not additional real-v4 fixtures.",
+    "cases": [
+      {
+        "cap": "1",
+        "domain": {
+          "lotSize": "4",
+          "output": [
+            "0",
+            "5",
+            "10",
+            null
+          ]
+        },
+        "truth": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "4"
+          ],
+          "output": "10",
+          "minimumPayment": [
+            "4",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "6",
+          "withoutWelfare": [
+            "5",
+            "2"
+          ],
+          "deficit": "-1",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "fake": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "2"
+          ],
+          "output": "10",
+          "minimumPayment": [
+            "2",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "8",
+          "withoutWelfare": [
+            "5",
+            "6"
+          ],
+          "deficit": "-3",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "uncapped": [
+          "0",
+          "1"
+        ],
+        "capped": [
+          "0",
+          "1"
+        ],
+        "gain": "1"
+      },
+      {
+        "cap": "2",
+        "domain": {
+          "lotSize": "4",
+          "output": [
+            "0",
+            "7",
+            "12",
+            null
+          ]
+        },
+        "truth": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "4"
+          ],
+          "output": "12",
+          "minimumPayment": [
+            "4",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "8",
+          "withoutWelfare": [
+            "7",
+            "4"
+          ],
+          "deficit": "-3",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "fake": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "2"
+          ],
+          "output": "12",
+          "minimumPayment": [
+            "2",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "10",
+          "withoutWelfare": [
+            "7",
+            "8"
+          ],
+          "deficit": "-5",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "uncapped": [
+          "1",
+          "2"
+        ],
+        "capped": [
+          "1",
+          "2"
+        ],
+        "gain": "1"
+      },
+      {
+        "cap": "3",
+        "domain": {
+          "lotSize": "4",
+          "output": [
+            "0",
+            "9",
+            "14",
+            null
+          ]
+        },
+        "truth": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "4"
+          ],
+          "output": "14",
+          "minimumPayment": [
+            "4",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "10",
+          "withoutWelfare": [
+            "9",
+            "6"
+          ],
+          "deficit": "-5",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "fake": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "2"
+          ],
+          "output": "14",
+          "minimumPayment": [
+            "2",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "12",
+          "withoutWelfare": [
+            "9",
+            "10"
+          ],
+          "deficit": "-7",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "uncapped": [
+          "2",
+          "3"
+        ],
+        "capped": [
+          "2",
+          "3"
+        ],
+        "gain": "1"
+      },
+      {
+        "cap": "4",
+        "domain": {
+          "lotSize": "4",
+          "output": [
+            "0",
+            "11",
+            "16",
+            null
+          ]
+        },
+        "truth": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "4"
+          ],
+          "output": "16",
+          "minimumPayment": [
+            "4",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "12",
+          "withoutWelfare": [
+            "11",
+            "8"
+          ],
+          "deficit": "-7",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "fake": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "2"
+          ],
+          "output": "16",
+          "minimumPayment": [
+            "2",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "14",
+          "withoutWelfare": [
+            "11",
+            "12"
+          ],
+          "deficit": "-9",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "uncapped": [
+          "3",
+          "4"
+        ],
+        "capped": [
+          "3",
+          "4"
+        ],
+        "gain": "1"
+      },
+      {
+        "cap": "5",
+        "domain": {
+          "lotSize": "4",
+          "output": [
+            "0",
+            "13",
+            "18",
+            null
+          ]
+        },
+        "truth": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "4"
+          ],
+          "output": "18",
+          "minimumPayment": [
+            "4",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "14",
+          "withoutWelfare": [
+            "13",
+            "10"
+          ],
+          "deficit": "-9",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "fake": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "2"
+          ],
+          "output": "18",
+          "minimumPayment": [
+            "2",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "16",
+          "withoutWelfare": [
+            "13",
+            "14"
+          ],
+          "deficit": "-11",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "uncapped": [
+          "4",
+          "5"
+        ],
+        "capped": [
+          "4",
+          "5"
+        ],
+        "gain": "1"
+      },
+      {
+        "cap": "6",
+        "domain": {
+          "lotSize": "4",
+          "output": [
+            "0",
+            "15",
+            "20",
+            null
+          ]
+        },
+        "truth": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "4"
+          ],
+          "output": "20",
+          "minimumPayment": [
+            "4",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "16",
+          "withoutWelfare": [
+            "15",
+            "12"
+          ],
+          "deficit": "-11",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "fake": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "2"
+          ],
+          "output": "20",
+          "minimumPayment": [
+            "2",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "18",
+          "withoutWelfare": [
+            "15",
+            "16"
+          ],
+          "deficit": "-13",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "uncapped": [
+          "5",
+          "6"
+        ],
+        "capped": [
+          "5",
+          "6"
+        ],
+        "gain": "1"
+      },
+      {
+        "cap": "7",
+        "domain": {
+          "lotSize": "4",
+          "output": [
+            "0",
+            "17",
+            "22",
+            null
+          ]
+        },
+        "truth": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "4"
+          ],
+          "output": "22",
+          "minimumPayment": [
+            "4",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "18",
+          "withoutWelfare": [
+            "17",
+            "14"
+          ],
+          "deficit": "-13",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "fake": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "2"
+          ],
+          "output": "22",
+          "minimumPayment": [
+            "2",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "20",
+          "withoutWelfare": [
+            "17",
+            "18"
+          ],
+          "deficit": "-15",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "uncapped": [
+          "6",
+          "7"
+        ],
+        "capped": [
+          "6",
+          "7"
+        ],
+        "gain": "1"
+      },
+      {
+        "cap": "8",
+        "domain": {
+          "lotSize": "4",
+          "output": [
+            "0",
+            "19",
+            "24",
+            null
+          ]
+        },
+        "truth": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "4"
+          ],
+          "output": "24",
+          "minimumPayment": [
+            "4",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "20",
+          "withoutWelfare": [
+            "19",
+            "16"
+          ],
+          "deficit": "-15",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "fake": {
+          "fillLots": [
+            "1",
+            "1"
+          ],
+          "spend": [
+            "4",
+            "4"
+          ],
+          "payment": [
+            "5",
+            "2"
+          ],
+          "output": "24",
+          "minimumPayment": [
+            "2",
+            "0"
+          ],
+          "unspent": [
+            "4",
+            "0"
+          ],
+          "welfare": "22",
+          "withoutWelfare": [
+            "19",
+            "20"
+          ],
+          "deficit": "-17",
+          "certified": true,
+          "quantityEvaluations": 8
+        },
+        "uncapped": [
+          "7",
+          "8"
+        ],
+        "capped": [
+          "7",
+          "8"
+        ],
+        "gain": "1"
+      }
+    ]
+  },
+  "fixedCalendar": {
+    "initial": {
+      "currency": "0x0000000000000000000000000000000000c0ffee",
+      "ledger": {
+        "scale": "1",
+        "cash": "7",
+        "claims": [],
+        "escrow": [],
+        "community": "0"
+      },
+      "grants": []
+    },
+    "committed": {
+      "currency": "0x0000000000000000000000000000000000c0ffee",
+      "ledger": {
+        "scale": "1",
+        "cash": "7",
+        "claims": [],
+        "escrow": [
+          [
+            "schedule:0x0000000000000000000000000000000000000000000000000000000000000001",
+            "7"
+          ]
+        ],
+        "community": "0"
+      },
+      "grants": [
+        {
+          "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "amount": "7",
+          "committedAt": "0",
+          "cutoffAt": "100",
+          "releaseAt": "200",
+          "released": false,
+          "allocation": [
+            [
+              "0x00000000000000000000000000000000000000a1",
+              "3"
+            ],
+            [
+              "0x00000000000000000000000000000000000000b1",
+              "3"
+            ],
+            [
+              "0x000000000000000000000000000000000000d057",
+              "1"
+            ]
+          ]
+        }
+      ]
+    },
+    "released": {
+      "currency": "0x0000000000000000000000000000000000c0ffee",
+      "ledger": {
+        "scale": "1",
+        "cash": "7",
+        "claims": [
+          [
+            "0x00000000000000000000000000000000000000a1",
+            "3"
+          ],
+          [
+            "0x00000000000000000000000000000000000000b1",
+            "3"
+          ],
+          [
+            "0x000000000000000000000000000000000000d057",
+            "1"
+          ]
+        ],
+        "escrow": [],
+        "community": "0"
+      },
+      "grants": [
+        {
+          "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "amount": "7",
+          "committedAt": "0",
+          "cutoffAt": "100",
+          "releaseAt": "200",
+          "released": true,
+          "allocation": [
+            [
+              "0x00000000000000000000000000000000000000a1",
+              "3"
+            ],
+            [
+              "0x00000000000000000000000000000000000000b1",
+              "3"
+            ],
+            [
+              "0x000000000000000000000000000000000000d057",
+              "1"
+            ]
+          ]
+        }
+      ]
+    },
+    "delivered": {
+      "currency": "0x0000000000000000000000000000000000c0ffee",
+      "ledger": {
+        "scale": "1",
+        "cash": "4",
+        "claims": [
+          [
+            "0x00000000000000000000000000000000000000b1",
+            "3"
+          ],
+          [
+            "0x000000000000000000000000000000000000d057",
+            "1"
+          ]
+        ],
+        "escrow": [],
+        "community": "0"
+      },
+      "grants": [
+        {
+          "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "amount": "7",
+          "committedAt": "0",
+          "cutoffAt": "100",
+          "releaseAt": "200",
+          "released": true,
+          "allocation": [
+            [
+              "0x00000000000000000000000000000000000000a1",
+              "3"
+            ],
+            [
+              "0x00000000000000000000000000000000000000b1",
+              "3"
+            ],
+            [
+              "0x000000000000000000000000000000000000d057",
+              "1"
+            ]
+          ]
+        }
+      ]
+    },
+    "accounting": {
+      "cash": "4",
+      "escrow": "0",
+      "claims": "4",
+      "community": "0",
+      "unassigned": "0",
+      "backed": true
+    },
+    "outcomeVariants": [
+      {
+        "variant": "settled with fills",
+        "fixedClaim": "3",
+        "allocation": [
+          [
+            "0x00000000000000000000000000000000000000a1",
+            "3"
+          ],
+          [
+            "0x00000000000000000000000000000000000000b1",
+            "3"
+          ],
+          [
+            "0x000000000000000000000000000000000000d057",
+            "1"
+          ]
+        ]
+      },
+      {
+        "variant": "settled with zero fills",
+        "fixedClaim": "3",
+        "allocation": [
+          [
+            "0x00000000000000000000000000000000000000a1",
+            "3"
+          ],
+          [
+            "0x00000000000000000000000000000000000000b1",
+            "3"
+          ],
+          [
+            "0x000000000000000000000000000000000000d057",
+            "1"
+          ]
+        ]
+      },
+      {
+        "variant": "expired",
+        "fixedClaim": "3",
+        "allocation": [
+          [
+            "0x00000000000000000000000000000000000000a1",
+            "3"
+          ],
+          [
+            "0x00000000000000000000000000000000000000b1",
+            "3"
+          ],
+          [
+            "0x000000000000000000000000000000000000d057",
+            "1"
+          ]
+        ]
+      },
+      {
+        "variant": "never admitted",
+        "fixedClaim": "3",
+        "allocation": [
+          [
+            "0x00000000000000000000000000000000000000a1",
+            "3"
+          ],
+          [
+            "0x00000000000000000000000000000000000000b1",
+            "3"
+          ],
+          [
+            "0x000000000000000000000000000000000000d057",
+            "1"
+          ]
+        ]
+      }
+    ],
+    "fixedTruth": {
+      "numerator": "515",
+      "denominator": "256"
+    },
+    "fixedFake": {
+      "numerator": "515",
+      "denominator": "256"
+    },
+    "gain": {
+      "numerator": "0",
+      "denominator": "1"
+    }
+  },
+  "priorSurplusFunding": {
+    "attemptedFixedAmount": "5",
+    "variants": [
+      {
+        "priorCash": "3",
+        "funded": false,
+        "failure": "nominal liabilities exceed backing"
+      },
+      {
+        "priorCash": "5",
+        "funded": true,
+        "nextClaim": "2"
+      }
+    ],
+    "qualification": "Fixing a promise after history is known does not remove an earlier trader's influence on that history or funding availability."
+  },
+  "netFlowInterpretation": {
+    "qualification": "Alternate all-wallet-flow utility, not the paper's additive fixed-fee convention or a selected mechanism.",
+    "trueAsk": {
+      "numerator": "4",
+      "denominator": "1"
+    },
+    "trueBudget": "4",
+    "ineligible": [
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "sellingCurrency0": true,
+        "costPerLot": "16",
+        "budget": "4"
+      }
+    ],
+    "opposite": [
+      {
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "sellingCurrency0": false,
+        "costPerLot": "0",
+        "budget": "9"
+      }
+    ],
+    "original": {
+      "orderIds": [
+        "0x0000000000000000000000000000000000000000000000000000000000000001"
+      ],
+      "sides": [
+        true
+      ],
+      "inputLots": [
+        "4",
+        "9"
+      ],
+      "dominantSellsCurrency0": true,
+      "eligible": [
+        false
+      ],
+      "eligibleLots": [
+        0,
+        0
+      ],
+      "spend": [
+        "0"
+      ],
+      "payment": [
+        "0"
+      ],
+      "minimumPayment": [
+        "0"
+      ],
+      "unspent": [
+        "4"
+      ],
+      "withoutWelfare": [
+        "0"
+      ],
+      "welfare": "0",
+      "augmented": {
+        "lotSize": "4",
+        "output": [
+          "0",
+          "7",
+          "13",
+          null
+        ]
+      },
+      "swapInput": "0",
+      "swapOutput": "0",
+      "residual": [
+        "0",
+        "0"
+      ],
+      "certified": true,
+      "funded": true,
+      "quantityEvaluations": 1
+    },
+    "oppositeResult": {
+      "orderIds": [
+        "0x0000000000000000000000000000000000000000000000000000000000000001"
+      ],
+      "sides": [
+        false
+      ],
+      "inputLots": [
+        "4",
+        "9"
+      ],
+      "dominantSellsCurrency0": false,
+      "eligible": [
+        true
+      ],
+      "eligibleLots": [
+        0,
+        1
+      ],
+      "spend": [
+        "9"
+      ],
+      "payment": [
+        "3"
+      ],
+      "minimumPayment": [
+        "0"
+      ],
+      "unspent": [
+        "0"
+      ],
+      "withoutWelfare": [
+        "0"
+      ],
+      "welfare": "3",
+      "augmented": {
+        "lotSize": "9",
+        "output": [
+          "0",
+          "3",
+          "6",
+          null
+        ]
+      },
+      "swapInput": "9",
+      "swapOutput": "3",
+      "residual": [
+        "0",
+        "0"
+      ],
+      "certified": true,
+      "funded": true,
+      "quantityEvaluations": 3
+    },
+    "originalTradeUtility": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "oppositeTradeUtility": null,
+    "trueDelta": [
+      "0",
+      "0"
+    ],
+    "oppositeDelta": [
+      "3",
+      "-9"
+    ],
+    "fixedGift": [
+      "0",
+      "9"
+    ],
+    "additiveTruth": {
+      "numerator": "9",
+      "denominator": "1"
+    },
+    "additiveOpposite": null,
+    "walletTruth": {
+      "numerator": "9",
+      "denominator": "1"
+    },
+    "walletOpposite": {
+      "numerator": "12",
+      "denominator": "1"
+    }
+  },
+  "emptyEpochFarming": {
+    "emptyCandidate": {
+      "orderIds": [
+        "0x0000000000000000000000000000000000000000000000000000000000000001"
+      ],
+      "sides": [
+        true
+      ],
+      "inputLots": [
+        "4",
+        "9"
+      ],
+      "dominantSellsCurrency0": true,
+      "eligible": [
+        false
+      ],
+      "eligibleLots": [
+        0,
+        0
+      ],
+      "spend": [
+        "0"
+      ],
+      "payment": [
+        "0"
+      ],
+      "minimumPayment": [
+        "0"
+      ],
+      "unspent": [
+        "4"
+      ],
+      "withoutWelfare": [
+        "0"
+      ],
+      "welfare": "0",
+      "augmented": {
+        "lotSize": "4",
+        "output": [
+          "0",
+          "7",
+          "13",
+          null
+        ]
+      },
+      "swapInput": "0",
+      "swapOutput": "0",
+      "residual": [
+        "0",
+        "0"
+      ],
+      "certified": true,
+      "funded": true,
+      "quantityEvaluations": 1
+    },
+    "perStartedEpochBonus": "3",
+    "starts": 3,
+    "noStartedEpochsReward": "0",
+    "admissionTriggeredReward": "9",
+    "fixedCalendarReward": "3",
+    "qualification": "Hypothetical per-start external subsidy; net principal is refunded, before gas/latency. Precommitted calendar pays the same amount without a start."
+  }
+}

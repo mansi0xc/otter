@@ -412,10 +412,39 @@ owner cash, including owner plus controlled community dust. It does not cover
 range changes, principal/fee/gas flows, entry timing or sequential epochs.
 The first-order cutoff still admits LPs added just before opening.
 
-**6B is pending the user's commit.** Include the files and suggested title/body
-in its report. No production rule, order ABI or selected guarantee changes.
+**6B was committed by the user as `2f12631`; the tree was clean before 6C.**
+Its report records the files and suggested title/body. No production rule, order ABI or selected guarantee changes.
 After the commit, continue a complete redistribution/asset/curve design with
 explicit joint utility, backing and repeated-epoch requirements. Earlier cutoff,
 address exclusion, vesting and a capped current-pot fraction do not alone repair
 the existing-stake counterexample. Preserve the user's guarantee priority;
 G1–G4, independent mechanism review and concentrated integration remain open.
+
+
+## Checkpoint 6C: concrete redistribution candidate and required assumptions
+
+See [the checkpoint report](./CHECKPOINT_6C.md) and
+[redistribution design proposal](./REDISTRIBUTION_DESIGN.md). The offline
+pre-funded calendar commits fixed whole entitlements before a cutoff, reserves
+shared-currency cash and future account capacity, releases at the clock boundary
+without a batch-result condition and supports independent modeled claims.
+A constant auxiliary benefit preserves a truthful base rule only with fixed
+history, unchanged feasible utility and deviation-independent benefits across
+controlled identities. This does not establish the base integer/two-sided rule.
+
+The proposal rejects interpreting vesting, cap plateaus, earlier ownership or
+fixed bonuses per caller-started batch as a complete fix. Earlier surplus can
+alter later funding; gifts included inside net-wallet gates can change admissible
+opposite-side strategies. These are explicit limits, not a selected weaker
+utility, budget, allocation or IR policy. Current-pot destination, full utility,
+authentication, repeated epochs and LP principal/range behavior need the complete
+mechanism proposal. Fixed external rewards added alongside variable LP surplus
+would leave 6B's incentive failure intact.
+
+**6C is pending the user's commit.** The report lists the twelve files and short
+commit title/body. After confirmation, use this proposal to define the complete
+asset/curve/utility and redistribution contract, and narrow adoption decisions
+with the user when they change support or funding scope. Keep the original
+paper-guarantee priority, G1–G4, measured verification, independent review and
+concentrated integration requirements. Do not deploy a calendar or mark step 6
+complete from its conditional arithmetic evidence.

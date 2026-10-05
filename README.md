@@ -147,6 +147,14 @@ The current hook enforces the following integration rules:
   arithmetic assumptions, but this does not prove general LP incentives.
   [Checkpoint 6B](reviews/CHECKPOINT_6B.md) records the reproduction and G4
   requirements; no replacement redistribution rule is selected.
+- **Redistribution design research.** An offline pre-funded calendar freezes
+  auxiliary claims before a cutoff and releases them independently of trading.
+  Its preservation argument requires fixed history and unchanged feasible utility.
+  Delays, cap thresholds, caller-started epochs, later funding and alternate
+  wallet-flow gates have explicit limits. The current-pot destination and full
+  multi-epoch/LP guarantee remain unresolved; no calendar is deployed or selected.
+  See [the design proposal](reviews/REDISTRIBUTION_DESIGN.md) and
+  [checkpoint 6C](reviews/CHECKPOINT_6C.md).
 - **Batch-active guards.** LP changes and fee collection are frozen from the
   first accepted order through complete settlement or explicit expiry.
   Anyone can expire an epoch at its fixed execution deadline without token

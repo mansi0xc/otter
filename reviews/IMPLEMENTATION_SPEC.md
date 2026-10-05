@@ -436,6 +436,25 @@ clock/inclusion assumptions separately. An independent mechanism review must
 assess the full policy. Historical cash accounting can proceed, but canonical
 settlement cannot be called guarantee-preserving before G4 is satisfied.
 
+[Checkpoint 6C](./CHECKPOINT_6C.md) supplies a concrete
+[redistribution design proposal](./REDISTRIBUTION_DESIGN.md) and an offline
+whole-cash calendar candidate. Its constant-benefit preservation lemma requires
+fixed prior history and unchanged feasible utility. Commit known beneficiaries,
+dust, cash amount, cutoff and release time before relevant reports, reserve
+funds and future claimant capacity, and release independently of admission,
+settlement success or expiry. These are candidate requirements, not a selected
+on-chain funding source, clock or reward rule.
+
+Do not use the caller-started batch ID as the subsidy clock. Do not treat a later
+promise funded by today's surplus as exogenous to today's strategic choice.
+Current-pot routing still requires its own rule; retaining the old variable LP
+claim alongside a fixed bonus preserves 6B's failure. Define whether auxiliary
+rewards add outside the paper's order-flow utility or enter its net-budget and
+opposite-direction gates: the latter can change admissible strategies, as the
+6C example demonstrates. It is a diagnostic alternate interpretation, not an
+adopted replacement for the paper's utility. Review both-direction, LP-principal
+and repeated-epoch incentives before considering G4 complete.
+
 Custody, independent recovery, the exact quote and historical-surplus accounting using the recorded admitted LP ownership can proceed while these gates are researched. Historical accounting does not make the legacy allocation/payment rule canonical or establish concentrated capital weights. During their implementation, concentrated positions may be custodied, but admission and swaps must reject concentrated pools before escrow until their execution model is supported. Step 5 cannot be considered complete until G1–G4 have an implementation-ready rule and acceptance evidence. If the extension fails a claimed incentive property, report that result and adjust the claim; do not hide it with more randomized passing tests.
 
 ## 8. Regression ownership and acceptance evidence
@@ -503,9 +522,16 @@ is checked, but
 concentrated ownership/execution integration and LP economic guarantees remain
 unfinished. The complete step 6 scope is not closed, and R2/R6 remain active.
 Checkpoint 6B proves a conditional same-range split bound and identifies an
-exact-pivot profitable deviation for an opening LP trader. Its report records
-the evidence, limits and pending user-created commit. Resolve the resulting
+exact-pivot profitable deviation for an opening LP trader. The user committed it as `2f12631`; the tree was clean before 6C. Its report
+records the evidence and limits. Resolve the resulting
 joint redistribution gate G4 together with G1–G3 before claiming the selected
 policy preserves the paper's guarantees. Canonical settlement and expanded
 concentrated execution still require sections 5–7; historical accounting,
 claims and exits do not resolve the discrete mechanism's incompatibilities.
+
+
+Checkpoint 6C supplies the redistribution design proposal, conditional
+preservation/plateau arguments and an offline funded-calendar state model.
+Its report records the pending user-created commit. Native/ERC20 delivery,
+real ownership/clock authentication, selected current-pot routing and complete
+multi-epoch/LP guarantees are not implemented by that model. G1–G4 remain open.
