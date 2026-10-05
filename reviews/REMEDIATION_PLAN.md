@@ -36,8 +36,8 @@ Each numbered step ends in a user-created commit. If a step grows too large to r
 | 2 | Replace unsafe deployment custody with an authenticated range-position vault and native/ERC20 escrow | An outsider cannot remove or collect another user's position; full-range and concentrated deposits enforce ownership/slippage; ETH value and received ERC20 escrow match credited amounts; optional-return tokens work |
 | 3 | Bound admission and deliver independent recovery with explicit expiry and queued LP exits | An oversized batch cannot be admitted; blocked ERC20/ETH recipients do not veto finalization or unrelated claims; no double claim or settlement/refund overlap; exits precede next admission after settlement or expiry |
 | 4 | Implement the exact tick-aware execution oracle and correct arithmetic in Solidity/BigInt; resolve the discrete rule | Match real PoolManager input/output and final state through ticks, empty words, gaps, and price limits; domain boundaries agree; both-side integer IR, empty intervals, ties, and finite capacity have a complete tested rule |
-| 5 | Enforce canonical allocation and payments after specification gates G1–G3 pass | Reject incorrect feasible vectors, noncanonical zero fills, and solver underpayment; settle both directions and native pairs with actual deltas; callers have identical checks; fee drift retains recovery |
-| 6 | Replace captureable donations with snapshot ownership and capital-weighted historical rewards | New liquidity gets no past surplus; prior owners retain claims after exit; different ranges use specified weights; same-transaction claims cannot bypass eligibility; strategic LP overlap and rounding are evaluated |
+| 5 | Enforce canonical allocation and payments after specification gates G1–G4 pass | Reject incorrect feasible vectors, noncanonical zero fills, and solver underpayment; settle both directions and native pairs with actual deltas; callers have identical checks; fee drift retains recovery |
+| 6 | Replace captureable donations with snapshot ownership and capital-weighted historical rewards | New liquidity gets no past surplus; prior owners retain claims after exit; different ranges use specified weights; same-transaction claims cannot bypass eligibility; strategic LP overlap and rounding are evaluated; G4 requires joint incentive compatibility |
 | 7 | Make expanded testnet and wallet flows usable | Live native/ERC20 and concentrated batches, independent recovery, and LP exit processing are demonstrated; receipt-based wallet state, EIP-1271, multiword nonces, epoch/claim display, outages, and reorgs work |
 | 8 | Produce reproducible economic evidence and a grant application package | Compare all-in costs, execution, fills, latency, and LP returns across ranges; accurately distinguish proof/test assumptions and demo data; estimate expanded engineering/review costs rather than reuse the original timing guess |
 
@@ -45,7 +45,7 @@ Each numbered step ends in a user-created commit. If a step grows too large to r
 
 Step 1 should resolve implementation choices using the codebase and documented tradeoffs. Ask the user only for decisions that change the intended product, asset support, or funding scope; routine engineering choices can be made within the authorized scope.
 
-That product-scope decision is now recorded: native ETH and concentrated liquidity are included. The implementation specification selects a dedicated vault compatible with the pinned core, stored independent claims, a fixed execution window, permissionless canonical settlement, and capital-weighted historical LP rewards. Its engineering limits are provisional until measured. Its G1–G3 gates distinguish the unresolved discrete mechanism, concentrated-curve assumptions, and affordable verification. Safety work may proceed while those are researched; canonical settlement cannot be declared finished without resolving them.
+That product-scope decision is now recorded: native ETH and concentrated liquidity are included. The implementation specification selects a dedicated vault compatible with the pinned core, stored independent claims, a fixed execution window, permissionless canonical settlement, and capital-weighted historical LP rewards. Its engineering limits are provisional until measured. Its G1–G3 gates distinguish the unresolved discrete mechanism, concentrated-curve assumptions, and affordable verification. Checkpoint 6B adds G4 for joint trader/builder/LP redistribution incentives. Safety work may proceed while those are researched; canonical settlement cannot be declared finished without resolving them.
 
 ### Canonical settlement and the discrete mechanism
 
@@ -388,11 +388,34 @@ position fees remain separate. Owner-only initial pool registration prevents a
 caller from front-running the immutable treasury choice. Owners still claim
 independently, and settlement remains permissionless after exclusivity.
 
-**6A is pending the user's commit.** This fixes post-settlement historical capture
-locally, not the complete LP incentive problem, canonical allocations or expanded
+**6A was committed by the user as `ebfea3e`; the tree was clean before 6B.**
+This fixes post-settlement historical capture locally, not the complete LP incentive problem, canonical allocations or expanded
 concentrated auctions. R2 and R6 remain active findings. Keep the mechanism's
 G1–G3 gates and independent review. Next validate capital rounding, owner splitting,
 LP/bidder overlap and opening timing as an economic policy, including the boundary
 for concentrated integration; do not enable concentrated auctions merely because
 range-value arithmetic passes. Wallet/ABI migration, resource limits, testnet
 execution and grant evidence remain unfinished.
+
+## Checkpoint 6B: joint LP and trader incentive gap
+
+See [the reward-composition checkpoint report](./CHECKPOINT_6B.md) for exact
+pivots, unchanged real v4 swaps and a funded LP-claim gain from an ask misreport.
+A fixed opening stake in a variable current-epoch surplus is not a fixed payment.
+This differs from R2's arbitrary solver outcomes and R7's corrected later-LP
+capture. The current historical cash ledger remains implemented, but canonical
+trader payments alone do not make the redistribution policy truthful for an LP
+trader or builder. Gate G4 now requires the complete combined-role design.
+
+The same-range fixed-state arithmetic proof shows splitting cannot inflate
+owner cash, including owner plus controlled community dust. It does not cover
+range changes, principal/fee/gas flows, entry timing or sequential epochs.
+The first-order cutoff still admits LPs added just before opening.
+
+**6B is pending the user's commit.** Include the files and suggested title/body
+in its report. No production rule, order ABI or selected guarantee changes.
+After the commit, continue a complete redistribution/asset/curve design with
+explicit joint utility, backing and repeated-epoch requirements. Earlier cutoff,
+address exclusion, vesting and a capped current-pot fraction do not alone repair
+the existing-stake counterexample. Preserve the user's guarantee priority;
+G1–G4, independent mechanism review and concentrated integration remain open.

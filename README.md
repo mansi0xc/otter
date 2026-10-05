@@ -31,11 +31,12 @@ Sepolia addresses still target the earlier prototype.
 
 The current settlement verifier accepts feasible allocations without enforcing
 the paper's canonical allocation/payments. Integer incentive guarantees
-remain unresolved. Historical rewards are implemented for admitted full-range
-pools; concentrated reward/auction integration remains unfinished. Concentrated positions can be
-custodied, but concentrated
-batch execution is blocked pending concentrated snapshot/execution integration and mechanism
-gates. The quote/reference alone do not implement canonical payments or
+remain unresolved. Opening LP rewards can also make an ask misreport profitable
+when the trader owns LP capital, even under exact candidate pivots. Historical
+rewards are implemented for admitted full-range pools; concentrated reward/auction
+integration remains unfinished. Concentrated positions can be custodied, but
+concentrated batch execution is blocked pending concentrated snapshot/execution
+integration and mechanism gates. The quote/reference alone do not implement canonical payments or
 enable concentrated auctions. This checkout does not establish optimal trading
 or truthfulness.
 
@@ -73,6 +74,11 @@ Stated up front rather than buried:
   individual rationality. Minority dust payments can still violate IR.
   **Canonical welfare-optimal allocations and payments are not enforced
   on-chain.**
+- Opening ownership prevents later LPs from taking historical rewards. It does
+  not preserve combined trader/LP truthfulness: an exact-pivot counterexample
+  increases an existing LP trader's funded reward with the same trade and pool
+  state. G4 requires a joint redistribution design; see
+  [checkpoint 6B](reviews/CHECKPOINT_6B.md).
 - The `O(n log n)` pivot algorithm is extracted from the proof of the paper's
   Lemma 16. It is not original to this work.
 
@@ -135,6 +141,12 @@ The current hook enforces the following integration rules:
   whole payments. Verifiable negative cycles prove scoped infeasibility; this
   is necessary single-user research, not a full mechanism impossibility claim.
   See [checkpoint 4H](reviews/CHECKPOINT_4H.md) for the assumptions and limits.
+- **Reward composition research.** An exact-pivot case with real v4 swaps and
+  funded reward claims gives an existing LP trader a profitable ask deviation.
+  Same-range splitting cannot increase controlled cash under the fixed-state
+  arithmetic assumptions, but this does not prove general LP incentives.
+  [Checkpoint 6B](reviews/CHECKPOINT_6B.md) records the reproduction and G4
+  requirements; no replacement redistribution rule is selected.
 - **Batch-active guards.** LP changes and fee collection are frozen from the
   first accepted order through complete settlement or explicit expiry.
   Anyone can expire an epoch at its fixed execution deadline without token

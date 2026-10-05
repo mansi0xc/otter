@@ -98,3 +98,20 @@ Reproduce to stdout from `solver/` with
 `> ../fixtures/research/transfer-research.json` only for deliberate regeneration.
 `npm run test:transfers` compares the artifact's bytes and independent allocation,
 payment-vector and certificate checks. BigInts are decimal strings.
+
+`research/reward-composition.json` records an exact-pivot ask deviation whose
+combined trader/LP utility increases through a funded reward claim, with identical
+input, pool execution, own trader payment and community dust. It also records a
+conditional same-range partition comparison. See
+[checkpoint 6B](../reviews/CHECKPOINT_6B.md) for the joint role gate G4 and proof
+limits. This is research evidence, not a canonical production settlement witness.
+
+Reproduce to stdout from `solver/` with
+`node --experimental-strip-types research/reward-composition-cli.ts`; append
+`> ../fixtures/research/reward-composition.json` only for deliberate regeneration.
+`npm run test:reward-composition` compares saved bytes, independent candidate
+allocations/counterfactuals, original WAD asks, 1,024 composition examples and
+4,096 fixed-state partitions. BigInts are decimal strings. The separate
+`OtterRewardCompositionTest` checks actual v4 swaps and cash-ledger delivery,
+using an explicitly synthetic opening book. Earlier fixtures and saved economic
+results remain unchanged.

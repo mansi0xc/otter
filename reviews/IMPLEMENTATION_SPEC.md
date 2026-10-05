@@ -259,6 +259,15 @@ For this expanded prototype, choose an explicit **capital-weighted policy**, not
 
 Zero active liquidity at opening is unsupported. Reject opening before escrow if there is no eligible positive weight. Under this policy, inactive ranges with capital also receive weight; raw liquidity alone is inappropriate because range width changes the capital backing it. This is a selected prototype distribution policy, **not a proof of risk-fair LP compensation or an inheritance of the paper's incentive result**. Evaluate out-of-range capital, narrow ranges, bidder-as-LP, first-order timing, and repeated epochs. An LP arriving before the snapshot remains eligible; this specification fixes post-trade historical capture, not every possible pre-batch JIT strategy.
 
+**Checkpoint 6B identifies a failed composition property of this selected prototype policy.**
+A trader with opening LP weight can lower its ask and increase its funded LP
+reward while its own pivotal payment, input and the AMM end state stay identical.
+This holds in the exact, funded, one-sided candidate case; canonical trader
+payments alone do not resolve it. Fixed weights do not imply a fixed reward
+amount. See [the 6B counterexample and conditional split proof](./CHECKPOINT_6B.md).
+The policy remains implemented for historical accounting, but G4 below blocks
+representing it as a guarantee-preserving redistribution design.
+
 External donations and ordinary position fee growth must be accounted separately. Their collection requires vault ownership and cannot reassign a prior Otter reward. The reward policy is versioned and immutable for each registered pool in this
 prototype; a new policy requires a new deployment/configuration and economic
 analysis. `OtterRewardLedger` is deployed by settlement and accepts funding only
@@ -413,7 +422,21 @@ weaker efficiency, signature, allocation, asset or IR policy is selected.
 
 **G3 — Choose enforceable verification within measured resources.** Begin by benchmarking direct recomputation on bounded batches and traces, including counterfactuals. If it cannot fit, lower measured limits or specify a complete authenticated witness/proof design. The witness must bind G1's full computation and G2's real curve, not just feasibility or welfare. Do not introduce a TEE, bond, or optimistic dispute period and call it equivalent to immediate trustless verification. Any changed trust/delivery model requires a revised specification and disclosed funding scope.
 
-Custody, independent recovery, the exact quote and historical-surplus accounting using the recorded admitted LP ownership can proceed while these gates are researched. Historical accounting does not make the legacy allocation/payment rule canonical or establish concentrated capital weights. During their implementation, concentrated positions may be custodied, but admission and swaps must reject concentrated pools before escrow until their execution model is supported. Step 5 cannot be considered complete until G1–G3 have an implementation-ready rule and acceptance evidence. If the extension fails a claimed incentive property, report that result and adjust the claim; do not hide it with more randomized passing tests.
+**G4 — Preserve incentives across trader, builder and LP roles.** Include all
+economically controlled identities, opening LP claims and community benefits in
+combined utility. The 6B unchanged-swap deviation must fail under the final rule.
+A current-pot share remains report-dependent even if ownership predates admission.
+Address exclusions, vesting and an earlier cutoff alone do not fix that dependency.
+For unchanged allocation and trader payments, require the appropriate report
+independence of supplemental benefits; otherwise provide a complete revised
+mechanism with joint incentive, funding and repeated-epoch arguments. Research
+pre-fixed exogenous benefits or another rigorously defined redistribution model
+without selecting a weaker guarantee. Specify entry-history authentication and
+clock/inclusion assumptions separately. An independent mechanism review must
+assess the full policy. Historical cash accounting can proceed, but canonical
+settlement cannot be called guarantee-preserving before G4 is satisfied.
+
+Custody, independent recovery, the exact quote and historical-surplus accounting using the recorded admitted LP ownership can proceed while these gates are researched. Historical accounting does not make the legacy allocation/payment rule canonical or establish concentrated capital weights. During their implementation, concentrated positions may be custodied, but admission and swaps must reject concentrated pools before escrow until their execution model is supported. Step 5 cannot be considered complete until G1–G4 have an implementation-ready rule and acceptance evidence. If the extension fails a claimed incentive property, report that result and adjust the claim; do not hide it with more randomized passing tests.
 
 ## 8. Regression ownership and acceptance evidence
 
@@ -435,6 +458,7 @@ Each original unsafe-behavior reproduction stays in Git history. When its fix la
 | Native ETH | Book, vault, settlement, UI | Correct zero currency registration, mixed ETH/ERC20 submit, exact value, native sync/settle, reverting receiver, unauthorized redirection, forced ETH, ETH versus WETH |
 | Concentrated liquidity | Vault, hook, quote, G2 | Overlapping/disjoint ranges; both crossing directions; tick/word boundaries; zero-L gaps; capacity/price limits; unequal decimals; exact real-PoolManager differential execution |
 | Data availability/nonces/wallets | Book, indexer, wallet | Stored independent claims after relayed submission/reorg; EIP-1271; used and unused nonce words; receipts, failed txs, account/chain changes, correct epoch display |
+| Joint trader/builder/LP incentives | G4, mechanism, reward policy | Exact-pivot unchanged-AMM deviation cannot gain combined utility; beneficial control, entry timing, rounding, community benefits and repeated epochs are modeled |
 | Production/grant evidence | Deployment, operations, benchmark docs | Pinned artifacts and bytecode/config manifest; real testnet solving/recovery/exit demonstration; complete costs and revised limited claims |
 
 Contract invariants must cover many users, pools sharing currencies, failed claims, repeated epochs, and LP entry/exit. Quote differential tests must compare actual consumed input/output and final pool state; comparing two copies of the same shortcut is insufficient. Measure first admission with its LP snapshot, worst-case settlement/counterfactual work, cold claims, native/ERC20 paths, and exits separately. Include transaction/calldata costs and specify the target chain/transaction budget when setting deployable caps.
@@ -473,11 +497,15 @@ The legacy auction retains its known boundary/payment failures.
 
 Checkpoint 4H was committed as `ed69b3e`. Checkpoint 6A implements the admitted
 full-range historical reward path, frozen opening capital weights, exact funded
-claims/dust and a local R7 prevention regression. Its report records the pending
-user-created commit. Different-width/inactive-range arithmetic is checked, but
+claims/dust and a local R7 prevention regression. The user committed it as
+`ebfea3e`; the tree was clean before 6B. Different-width/inactive-range arithmetic
+is checked, but
 concentrated ownership/execution integration and LP economic guarantees remain
 unfinished. The complete step 6 scope is not closed, and R2/R6 remain active.
-Next evaluate rounding/splitting, LP/bidder overlap and opening timing under the
-selected policy while preserving G1–G3. Canonical settlement and expanded
+Checkpoint 6B proves a conditional same-range split bound and identifies an
+exact-pivot profitable deviation for an opening LP trader. Its report records
+the evidence, limits and pending user-created commit. Resolve the resulting
+joint redistribution gate G4 together with G1–G3 before claiming the selected
+policy preserves the paper's guarantees. Canonical settlement and expanded
 concentrated execution still require sections 5–7; historical accounting,
 claims and exits do not resolve the discrete mechanism's incompatibilities.

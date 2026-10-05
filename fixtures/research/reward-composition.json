@@ -1,0 +1,652 @@
+{
+  "schema": "otter/reward-composition/v1",
+  "qualification": "Local bounded candidate plus current reward policy; no canonical production settlement or full incentive proof.",
+  "snapshot": {
+    "price": "118842243771396506390315925504",
+    "tick": 8109,
+    "liquidity": "40",
+    "spacing": 60,
+    "lower": -887220,
+    "upper": 887220
+  },
+  "frame": {
+    "price": "118842243771396506390315925504",
+    "sell0": {
+      "lotSize": "4",
+      "output": [
+        "0",
+        "7",
+        "13",
+        null
+      ],
+      "quotes": [
+        {
+          "status": 10,
+          "requestedInput": "0",
+          "consumedInput": "0",
+          "output": "0",
+          "sqrtPriceX96": "118842243771396506390315925504",
+          "tick": 8109,
+          "liquidity": "40",
+          "bitmapWords": 0,
+          "initializedTicksCrossed": 0,
+          "steps": 0
+        },
+        {
+          "status": 10,
+          "requestedInput": "4",
+          "consumedInput": "4",
+          "output": "7",
+          "sqrtPriceX96": "103341081540344788165492109134",
+          "tick": 5314,
+          "liquidity": "40",
+          "bitmapWords": 1,
+          "initializedTicksCrossed": 0,
+          "steps": 1
+        },
+        {
+          "status": 10,
+          "requestedInput": "8",
+          "consumedInput": "8",
+          "output": "13",
+          "sqrtPriceX96": "91417110593381927992550711927",
+          "tick": 2862,
+          "liquidity": "40",
+          "bitmapWords": 1,
+          "initializedTicksCrossed": 0,
+          "steps": 1
+        },
+        {
+          "status": 11,
+          "requestedInput": "12",
+          "consumedInput": "8",
+          "output": "13",
+          "sqrtPriceX96": "91417110593381927992550711927",
+          "tick": 2862,
+          "liquidity": "40",
+          "bitmapWords": 1,
+          "initializedTicksCrossed": 0,
+          "steps": 1
+        }
+      ],
+      "down": true,
+      "limit": "91417110593381927992550711927"
+    },
+    "sell1": {
+      "lotSize": "9",
+      "output": [
+        "0",
+        "3",
+        "6",
+        null
+      ],
+      "quotes": [
+        {
+          "status": 10,
+          "requestedInput": "0",
+          "consumedInput": "0",
+          "output": "0",
+          "sqrtPriceX96": "118842243771396506390315925504",
+          "tick": 8109,
+          "liquidity": "40",
+          "bitmapWords": 0,
+          "initializedTicksCrossed": 0,
+          "steps": 0
+        },
+        {
+          "status": 10,
+          "requestedInput": "9",
+          "consumedInput": "9",
+          "output": "3",
+          "sqrtPriceX96": "136668580337105982348863314329",
+          "tick": 10905,
+          "liquidity": "40",
+          "bitmapWords": 1,
+          "initializedTicksCrossed": 0,
+          "steps": 1
+        },
+        {
+          "status": 10,
+          "requestedInput": "18",
+          "consumedInput": "18",
+          "output": "6",
+          "sqrtPriceX96": "154494916902815458307410703155",
+          "tick": 13357,
+          "liquidity": "40",
+          "bitmapWords": 1,
+          "initializedTicksCrossed": 0,
+          "steps": 1
+        },
+        {
+          "status": 11,
+          "requestedInput": "27",
+          "consumedInput": "18",
+          "output": "6",
+          "sqrtPriceX96": "154494916902815458307410703155",
+          "tick": 13357,
+          "liquidity": "40",
+          "bitmapWords": 1,
+          "initializedTicksCrossed": 0,
+          "steps": 1
+        }
+      ],
+      "down": false,
+      "limit": "154494916902815458307410703155"
+    }
+  },
+  "down": {
+    "status": 10,
+    "requestedInput": "8",
+    "consumedInput": "8",
+    "output": "13",
+    "sqrtPriceX96": "91417110593381927992550711927",
+    "tick": 2862,
+    "liquidity": "40",
+    "bitmapWords": 1,
+    "initializedTicksCrossed": 0,
+    "steps": 1
+  },
+  "up": {
+    "status": 10,
+    "requestedInput": "18",
+    "consumedInput": "18",
+    "output": "6",
+    "sqrtPriceX96": "154494916902815458307410703155",
+    "tick": 13357,
+    "liquidity": "40",
+    "bitmapWords": 1,
+    "initializedTicksCrossed": 0,
+    "steps": 1
+  },
+  "honest": [
+    {
+      "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "sellingCurrency0": true,
+      "costPerLot": "4",
+      "budget": "8"
+    },
+    {
+      "id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "sellingCurrency0": true,
+      "costPerLot": "1",
+      "budget": "4"
+    }
+  ],
+  "fake": [
+    {
+      "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "sellingCurrency0": true,
+      "costPerLot": "2",
+      "budget": "8"
+    },
+    {
+      "id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "sellingCurrency0": true,
+      "costPerLot": "1",
+      "budget": "4"
+    }
+  ],
+  "rawHonest": [
+    {
+      "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "sellingCurrency0": true,
+      "ask": "1000000000000000000",
+      "budget": "8"
+    },
+    {
+      "id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "sellingCurrency0": true,
+      "ask": "250000000000000000",
+      "budget": "4"
+    }
+  ],
+  "rawFake": [
+    {
+      "id": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "sellingCurrency0": true,
+      "ask": "500000000000000000",
+      "budget": "8"
+    },
+    {
+      "id": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "sellingCurrency0": true,
+      "ask": "250000000000000000",
+      "budget": "4"
+    }
+  ],
+  "truth": {
+    "orderIds": [
+      "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "0x0000000000000000000000000000000000000000000000000000000000000002"
+    ],
+    "sides": [
+      true,
+      true
+    ],
+    "inputLots": [
+      "4",
+      "9"
+    ],
+    "dominantSellsCurrency0": true,
+    "eligible": [
+      true,
+      true
+    ],
+    "eligibleLots": [
+      3,
+      0
+    ],
+    "spend": [
+      "4",
+      "4"
+    ],
+    "payment": [
+      "6",
+      "4"
+    ],
+    "minimumPayment": [
+      "4",
+      "1"
+    ],
+    "unspent": [
+      "4",
+      "0"
+    ],
+    "withoutWelfare": [
+      "6",
+      "5"
+    ],
+    "welfare": "8",
+    "augmented": {
+      "lotSize": "4",
+      "output": [
+        "0",
+        "7",
+        "13",
+        null
+      ]
+    },
+    "swapInput": "8",
+    "swapOutput": "13",
+    "residual": [
+      "0",
+      "3"
+    ],
+    "certified": true,
+    "funded": true,
+    "quantityEvaluations": 8
+  },
+  "deviation": {
+    "orderIds": [
+      "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "0x0000000000000000000000000000000000000000000000000000000000000002"
+    ],
+    "sides": [
+      true,
+      true
+    ],
+    "inputLots": [
+      "4",
+      "9"
+    ],
+    "dominantSellsCurrency0": true,
+    "eligible": [
+      true,
+      true
+    ],
+    "eligibleLots": [
+      3,
+      0
+    ],
+    "spend": [
+      "4",
+      "4"
+    ],
+    "payment": [
+      "6",
+      "2"
+    ],
+    "minimumPayment": [
+      "2",
+      "1"
+    ],
+    "unspent": [
+      "4",
+      "0"
+    ],
+    "withoutWelfare": [
+      "6",
+      "9"
+    ],
+    "welfare": "10",
+    "augmented": {
+      "lotSize": "4",
+      "output": [
+        "0",
+        "7",
+        "13",
+        null
+      ]
+    },
+    "swapInput": "8",
+    "swapOutput": "13",
+    "residual": [
+      "0",
+      "5"
+    ],
+    "certified": true,
+    "funded": true,
+    "quantityEvaluations": 8
+  },
+  "rawTruth": {
+    "orderIds": [
+      "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "0x0000000000000000000000000000000000000000000000000000000000000002"
+    ],
+    "sides": [
+      true,
+      true
+    ],
+    "dominantSellsCurrency0": true,
+    "eligible": [
+      true,
+      true
+    ],
+    "eligibleLots": [
+      3,
+      0
+    ],
+    "spend": [
+      "4",
+      "4"
+    ],
+    "paymentNumerator": [
+      "6000000000000000000",
+      "4000000000000000000"
+    ],
+    "ceilPayment": [
+      "6",
+      "4"
+    ],
+    "floorPayment": [
+      "6",
+      "4"
+    ],
+    "unspent": [
+      "4",
+      "0"
+    ],
+    "minimumPayment": [
+      "4",
+      "1"
+    ],
+    "withoutWelfareNumerator": [
+      "6000000000000000000",
+      "5000000000000000000"
+    ],
+    "welfareNumerator": "8000000000000000000",
+    "augmented": {
+      "lotSize": "4",
+      "output": [
+        "0",
+        "7",
+        "13",
+        null
+      ]
+    },
+    "minorityInput": "0",
+    "minorityPayment": "0",
+    "swapInput": "8",
+    "swapOutput": "13",
+    "claimResidualNumerator": [
+      "0",
+      "3000000000000000000"
+    ],
+    "ceilResidual": [
+      "0",
+      "3"
+    ],
+    "floorIRFailures": [],
+    "certified": true,
+    "claimsFunded": true,
+    "ceilFunded": true,
+    "quantityEvaluations": 8
+  },
+  "rawDeviation": {
+    "orderIds": [
+      "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "0x0000000000000000000000000000000000000000000000000000000000000002"
+    ],
+    "sides": [
+      true,
+      true
+    ],
+    "dominantSellsCurrency0": true,
+    "eligible": [
+      true,
+      true
+    ],
+    "eligibleLots": [
+      3,
+      0
+    ],
+    "spend": [
+      "4",
+      "4"
+    ],
+    "paymentNumerator": [
+      "6000000000000000000",
+      "2000000000000000000"
+    ],
+    "ceilPayment": [
+      "6",
+      "2"
+    ],
+    "floorPayment": [
+      "6",
+      "2"
+    ],
+    "unspent": [
+      "4",
+      "0"
+    ],
+    "minimumPayment": [
+      "2",
+      "1"
+    ],
+    "withoutWelfareNumerator": [
+      "6000000000000000000",
+      "9000000000000000000"
+    ],
+    "welfareNumerator": "10000000000000000000",
+    "augmented": {
+      "lotSize": "4",
+      "output": [
+        "0",
+        "7",
+        "13",
+        null
+      ]
+    },
+    "minorityInput": "0",
+    "minorityPayment": "0",
+    "swapInput": "8",
+    "swapOutput": "13",
+    "claimResidualNumerator": [
+      "0",
+      "5000000000000000000"
+    ],
+    "ceilResidual": [
+      "0",
+      "5"
+    ],
+    "floorIRFailures": [],
+    "certified": true,
+    "claimsFunded": true,
+    "ceilFunded": true,
+    "quantityEvaluations": 8
+  },
+  "capital": {
+    "principal0": "13",
+    "principal1": "29",
+    "weight": "58"
+  },
+  "weights": [
+    "58",
+    "58"
+  ],
+  "tradingTruth": {
+    "numerator": "2",
+    "denominator": "1"
+  },
+  "tradingDeviation": {
+    "numerator": "2",
+    "denominator": "1"
+  },
+  "composedTruth": {
+    "distribution": {
+      "rewards": [
+        "1",
+        "1"
+      ],
+      "dust": "1"
+    },
+    "lpReward": "1",
+    "communityReward": "0",
+    "fixedOutputSubsidy": "0",
+    "utility": {
+      "numerator": "3",
+      "denominator": "1"
+    }
+  },
+  "composedDeviation": {
+    "distribution": {
+      "rewards": [
+        "2",
+        "2"
+      ],
+      "dust": "1"
+    },
+    "lpReward": "2",
+    "communityReward": "0",
+    "fixedOutputSubsidy": "0",
+    "utility": {
+      "numerator": "4",
+      "denominator": "1"
+    }
+  },
+  "noStakeTruth": {
+    "distribution": {
+      "rewards": [
+        "1",
+        "1"
+      ],
+      "dust": "1"
+    },
+    "lpReward": "0",
+    "communityReward": "0",
+    "fixedOutputSubsidy": "0",
+    "utility": {
+      "numerator": "2",
+      "denominator": "1"
+    }
+  },
+  "noStakeDeviation": {
+    "distribution": {
+      "rewards": [
+        "2",
+        "2"
+      ],
+      "dust": "1"
+    },
+    "lpReward": "0",
+    "communityReward": "0",
+    "fixedOutputSubsidy": "0",
+    "utility": {
+      "numerator": "2",
+      "denominator": "1"
+    }
+  },
+  "fixedSubsidyTruth": {
+    "distribution": {
+      "rewards": [
+        "1",
+        "1"
+      ],
+      "dust": "1"
+    },
+    "lpReward": "0",
+    "communityReward": "0",
+    "fixedOutputSubsidy": "7",
+    "utility": {
+      "numerator": "9",
+      "denominator": "1"
+    }
+  },
+  "fixedSubsidyDeviation": {
+    "distribution": {
+      "rewards": [
+        "2",
+        "2"
+      ],
+      "dust": "1"
+    },
+    "lpReward": "0",
+    "communityReward": "0",
+    "fixedOutputSubsidy": "7",
+    "utility": {
+      "numerator": "9",
+      "denominator": "1"
+    }
+  },
+  "splitting": {
+    "liquidity": "20",
+    "mergedWeight": "58",
+    "splitWeights": [
+      "27",
+      "27"
+    ],
+    "splitWeight": "54",
+    "merged": {
+      "distribution": {
+        "rewards": [
+          "50",
+          "50"
+        ],
+        "dust": "0"
+      },
+      "lpReward": "50",
+      "communityReward": "0",
+      "fixedOutputSubsidy": "0",
+      "utility": {
+        "numerator": "50",
+        "denominator": "1"
+      }
+    },
+    "split": {
+      "distribution": {
+        "rewards": [
+          "24",
+          "24",
+          "51"
+        ],
+        "dust": "1"
+      },
+      "lpReward": "48",
+      "communityReward": "0",
+      "fixedOutputSubsidy": "0",
+      "utility": {
+        "numerator": "48",
+        "denominator": "1"
+      }
+    },
+    "mergedOthers": [
+      "50"
+    ],
+    "splitOthers": [
+      "51"
+    ]
+  },
+  "utilityUnit": "currency1 raw units; same input spend, swap, LP principal and ownership between reports; before transaction gas",
+  "wad": "1000000000000000000"
+}
