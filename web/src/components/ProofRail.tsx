@@ -1,6 +1,5 @@
 import React from 'react'
 import { ETHERSCAN } from '@/config/contracts'
-import { MAX_ORDERS_PER_BLOCK } from '@/data/gasCurve'
 import type { StoryStep } from '@/hooks/useDemoStory'
 import styles from './ProofRail.module.css'
 
@@ -11,7 +10,7 @@ interface ProofRailProps {
 
 const CONTRACTS = [
   { name: 'OtterOrderBook', url: ETHERSCAN.orderBook, desc: 'Verified source — batch commitment, escrow' },
-  { name: 'OtterSettlement', url: ETHERSCAN.settlement, desc: 'Verified source — VCG outcome verification' },
+  { name: 'OtterSettlement', url: ETHERSCAN.settlement, desc: 'Historical feasibility verifier — canonical payments not enforced' },
   { name: 'OtterHook', url: ETHERSCAN.hook, desc: 'Verified source — Uniswap v4 hook' },
 ]
 
@@ -33,7 +32,7 @@ export function ProofRail({ step, onRestart }: ProofRailProps) {
           Direct swap: rejected&nbsp;·&nbsp;LP surplus: redistributed
         </span>
         <a href={ETHERSCAN.orderBook} target="_blank" rel="noopener noreferrer" className={styles.footerLink}>
-          Contracts on Sepolia <ExternalIcon />
+          Historical Sepolia contracts <ExternalIcon />
         </a>
       </div>
     )
@@ -49,7 +48,7 @@ export function ProofRail({ step, onRestart }: ProofRailProps) {
             <path d="M7 4v4M7 9.5v.5" stroke="var(--flow-dark)" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
           <span>
-            Orders are submitted on Sepolia; settlement is currently demonstrated through the guided fixture.
+            This story uses a historical fixture. It does not establish canonical payments or the paper’s incentive guarantees.
             No public solver/relayer is running yet.
           </span>
         </div>
@@ -78,19 +77,19 @@ export function ProofRail({ step, onRestart }: ProofRailProps) {
         {/* Gas stats */}
         <div className={`${styles.gasRow} proof-appear`} style={{ animationDelay: '0.4s' }}>
           <span className={styles.gasItem}>
-            <span className={styles.gasN}>{MAX_ORDERS_PER_BLOCK}</span>
-            <span className={styles.gasL}>orders per block, measured</span>
+            <span className={styles.gasN}>32</span>
+            <span className={styles.gasL}>current orders per epoch cap</span>
           </span>
           <span className={styles.gasDivider} aria-hidden="true">·</span>
           <span className={styles.gasItem}>
             <span className={styles.gasN}>40,906</span>
-            <span className={styles.gasL}>gas per order at n=200</span>
+            <span className={styles.gasL}>historical gas per order at n=200; exceeds current cap</span>
           </span>
           <span className={styles.gasDivider} aria-hidden="true">·</span>
           <span className={styles.gasItem}>
             <span className={styles.gasN}>
               <a href={ETHERSCAN.orderBook} target="_blank" rel="noopener noreferrer">
-                Proof ↗
+                Historical source ↗
               </a>
             </span>
           </span>

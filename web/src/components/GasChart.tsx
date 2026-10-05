@@ -21,12 +21,13 @@ export function GasChart() {
 
   return (
     <div className={styles.wrap}>
-      <h3 className={styles.title}>Gas per batch size</h3>
+      <h3 className={styles.title}>Historical gas benchmark</h3>
+      <p>Legacy harness data. The hardened book admits at most 32 orders per epoch; this chart does not measure the current stack.</p>
       <svg
         className={styles.svg}
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label="Settlement gas cost vs orders in the batch. Block limit is 30M gas. Maximum is 630 orders."
+        aria-label="Historical legacy settlement benchmark using a 30M gas reference limit. Its 630-order result exceeds the hardened book's 32-order cap."
       >
         {/* Grid lines */}
         {gridGs.map(g => (

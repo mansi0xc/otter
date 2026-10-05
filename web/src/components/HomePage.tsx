@@ -29,21 +29,21 @@ function WaveLogo() {
 
 const INVARIANTS = [
   { label: 'Feasibility', desc: 'Pool conservation holds — net swap matches the curve.' },
-  { label: 'Individual rationality', desc: 'No seller paid less than its stated reservation price.' },
+  { label: 'Individual rationality', desc: 'Dominant-side check; minority rounding still has known failures.' },
   { label: 'Budget bounds', desc: 'No order filled beyond its own budget.' },
   { label: 'Curve conservation', desc: 'Virtual reserves after settlement satisfy the invariant.' },
 ]
 
 const STATS = [
-  { n: '40,906', label: 'gas per order', sub: 'at n = 200' },
-  { n: '630', label: 'orders per block', sub: 'measured ceiling' },
-  { n: '27×', label: 'solver speedup', sub: 'layer-cake vs naïve at n=1,000' },
-  { n: '3.8e-10', label: 'max relative error', sub: 'pivot vs naïve over 4,000 batches' },
+  { n: '32', label: 'orders per epoch', sub: 'current admission cap' },
+  { n: '32', label: 'opening LP positions', sub: 'current roster cap' },
+  { n: '27×', label: 'historical solver speedup', sub: 'legacy float benchmark at n=1,000' },
+  { n: '3.8e-10', label: 'historical relative error', sub: 'legacy float comparison; not an integer proof' },
 ]
 
 const CONTRACTS = [
   { name: 'OtterOrderBook', url: ETHERSCAN.orderBook, desc: 'Batch commitment & escrow', detail: '60-second window · EIP-712 signed orders' },
-  { name: 'OtterSettlement', url: ETHERSCAN.settlement, desc: 'VCG outcome verification', detail: 'Feasibility · IR · budget · curve checks' },
+  { name: 'OtterSettlement', url: ETHERSCAN.settlement, desc: 'Legacy feasibility verifier', detail: 'Canonical allocation and payments are not enforced' },
   { name: 'OtterHook', url: ETHERSCAN.hook, desc: 'Uniswap v4 hook', detail: 'beforeSwap · beforeAddLiquidity · beforeRemoveLiquidity' },
 ]
 
@@ -59,24 +59,24 @@ export function HomePage({ onEnterDemo, onEnterSepolia }: HomePageProps) {
             <span className={styles.heroWordmark}>OTTER</span>
           </div>
           <h1 id="hero-title" className={styles.heroTitle}>
-            The first provably MEV-resilient<br />Automated Market Maker
+            Researching MEV resilience<br />with Uniswap v4 batches
           </h1>
           <p className={styles.heroSub}>
             A Uniswap v4 hook implementation of{' '}
             <em>Otter: A Provably MEV-Resilient Automated Market Maker via Surplus Redistribution</em>{' '}
             — Shi, Zhang, Chung &amp; Li (ePrint 2026/1877).{' '}
-            Dominant-strategy truthful for users and builder alike, via off-chain VCG settlement.
+            The paper’s incentive guarantees are research targets; this prototype has unresolved integer-payment and combined trader/LP gaps.
           </p>
           <div className={styles.heroCta}>
             <button className="btn btn-primary" onClick={onEnterDemo}>
-              Walk through a live batch →
+              Walk through a recorded batch →
             </button>
             <button className="btn btn-ghost" onClick={onEnterSepolia}>
               Sepolia sandbox
             </button>
           </div>
           <p className={styles.heroNote}>
-            Deployed &amp; source-verified on Ethereum Sepolia · 13 September 2026
+            September Sepolia deployment is historical · hardened wallet writes disabled until configured
           </p>
         </div>
 
@@ -140,8 +140,8 @@ export function HomePage({ onEnterDemo, onEnterSepolia }: HomePageProps) {
               </div>
               <h3 className={styles.mechanismCardTitle}>Batch window</h3>
               <p className={styles.mechanismCardBody}>
-                Orders are collected into a sealed 60-second window. There is no first, no second —
-                no sequence position to purchase. The commitment digest is fixed on-chain when the window closes.
+                Signed orders enter a public collection window. The on-chain digest commits
+                to admitted membership and submission order; it does not prevent censorship or strategic admission timing.
               </p>
             </div>
 
@@ -154,9 +154,8 @@ export function HomePage({ onEnterDemo, onEnterSepolia }: HomePageProps) {
               </div>
               <h3 className={styles.mechanismCardTitle}>VCG allocation</h3>
               <p className={styles.mechanismCardBody}>
-                The off-chain solver computes the welfare-maximising allocation via the VCG mechanism.
-                Dominant-strategy truthful: your best move is to report your real reservation price,
-                regardless of what anyone else does.
+                The paper defines welfare-maximising allocations and pivot payments. The legacy
+                contract accepts feasible solver outcomes without enforcing that rule. Integer settlement and joint LP incentives remain open.
               </p>
             </div>
 
@@ -169,9 +168,8 @@ export function HomePage({ onEnterDemo, onEnterSepolia }: HomePageProps) {
               </div>
               <h3 className={styles.mechanismCardTitle}>Surplus redistribution</h3>
               <p className={styles.mechanismCardBody}>
-                The Clarke pivot redistributes any surplus that a searcher might have captured back
-                to the LP. A searcher who joins the batch clears at the same price as everyone else
-                and gains nothing from being fast.
+                Historical rewards in the hardened contracts belong to opening LP owners.
+                This prevents later LPs taking past pots, but variable rewards can still benefit an LP trader’s false report.
               </p>
             </div>
 
@@ -183,8 +181,8 @@ export function HomePage({ onEnterDemo, onEnterSepolia }: HomePageProps) {
               </div>
               <h3 className={styles.mechanismCardTitle}>On-chain verification</h3>
               <p className={styles.mechanismCardBody}>
-                The contract verifies feasibility, individual rationality, budget bounds, and curve
-                conservation for every proposed outcome. The solver proposes. The contract refuses bad outcomes.
+                The legacy verifier checks feasibility and budget/curve bounds. It still permits
+                noncanonical payments, and minority-side rounding can violate individual rationality.
               </p>
             </div>
           </div>
@@ -194,11 +192,11 @@ export function HomePage({ onEnterDemo, onEnterSepolia }: HomePageProps) {
       {/* ── Invariants ── */}
       <section className={styles.section} aria-labelledby="invariants-title">
         <div className={styles.sectionInner}>
-          <span className={styles.sectionLabel}>On-chain guarantees</span>
-          <h2 id="invariants-title" className={styles.sectionTitle}>Four checks. Every batch.</h2>
+          <span className={styles.sectionLabel}>Prototype checks</span>
+          <h2 id="invariants-title" className={styles.sectionTitle}>Checks with known limits</h2>
           <p className={styles.sectionLead}>
-            Every settlement proposal is verified on-chain before a single token moves.
-            A dishonest solver cannot steal funds or pay a user less than their reported reservation value.
+            These describe the legacy verifier’s checks. They do not enforce canonical payouts,
+            establish integer IR for all orders, or resolve the combined trader/LP incentive gap.
           </p>
           <div className={styles.invariantList}>
             {INVARIANTS.map((inv, i) => (
@@ -280,10 +278,10 @@ export function HomePage({ onEnterDemo, onEnterSepolia }: HomePageProps) {
       <section className={`${styles.section} ${styles.sectionDark}`} aria-labelledby="contracts-title">
         <div className={styles.sectionInner}>
           <span className={styles.sectionLabelLight}>Deployed contracts</span>
-          <h2 id="contracts-title" className={styles.sectionTitleLight}>Live on Ethereum Sepolia</h2>
+          <h2 id="contracts-title" className={styles.sectionTitleLight}>Historical Sepolia prototype</h2>
           <p className={styles.sectionLeadLight}>
-            All three core contracts are source-verified on Etherscan. The OTA/OTB demo tokens and
-            a seeded full-range v4 pool are live. Deployment date: 13 September 2026.
+            These links identify the September 2026 prototype. They do not identify a deployment
+            of the hardened version 2 stack, and are never used by the new wallet transaction path.
           </p>
           <div className={styles.contractsGrid}>
             {CONTRACTS.map((c, i) => (
@@ -296,7 +294,7 @@ export function HomePage({ onEnterDemo, onEnterSepolia }: HomePageProps) {
               >
                 <div className={styles.contractCardTop}>
                   <span className={styles.contractName}>{c.name}</span>
-                  <span className="tag tag-live">Verified</span>
+                  <span className="tag">Historical</span>
                 </div>
                 <span className={styles.contractDesc}>{c.desc}</span>
                 <span className={styles.contractDetail}>{c.detail}</span>
@@ -326,9 +324,8 @@ export function HomePage({ onEnterDemo, onEnterSepolia }: HomePageProps) {
             <div className={styles.limitRow}>
               <span className={styles.limitIcon} aria-hidden="true">△</span>
               <p className={styles.limitText}>
-                <strong>Welfare-optimality.</strong> The contract verifies feasibility, IR, budget bounds,
-                and curve conservation. Welfare-optimality is asserted by the solver, not proven on-chain.
-                Grid-searched for n ≤ 4; evidence, not proof for arbitrary n.
+                <strong>Economic guarantees.</strong> Canonical allocation and pivot payments are not
+                enforced. Integer rounding can violate IR, and an LP trader can benefit from a false ask through surplus rewards.
               </p>
             </div>
             <div className={styles.limitRow}>
@@ -342,8 +339,8 @@ export function HomePage({ onEnterDemo, onEnterSepolia }: HomePageProps) {
             <div className={styles.limitRow}>
               <span className={styles.limitIcon} aria-hidden="true">△</span>
               <p className={styles.limitText}>
-                <strong>No public solver.</strong> Orders are collected in live Sepolia batches.
-                Settlement is demonstrated through the guided fixture. No relayer is running yet.
+                <strong>No public solver.</strong> The guided story uses historical fixtures. Wallet writes
+                require a reviewed version 2 deployment, which is not configured in this repository.
               </p>
             </div>
           </div>

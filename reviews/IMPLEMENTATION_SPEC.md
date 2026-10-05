@@ -532,6 +532,24 @@ claims and exits do not resolve the discrete mechanism's incompatibilities.
 
 Checkpoint 6C supplies the redistribution design proposal, conditional
 preservation/plateau arguments and an offline funded-calendar state model.
-Its report records the pending user-created commit. Native/ERC20 delivery,
+The user committed it as `8517538`; the tree was clean before 7A. Native/ERC20 delivery,
 real ownership/clock authentication, selected current-pot routing and complete
 multi-epoch/LP guarantees are not implemented by that model. G1–G4 remain open.
+
+Checkpoint 7A migrates the source wallet to the actual v2 tuple/domain, checked
+deployment manifest, bounded multiword nonce reads, exact human/raw-unit price
+conversion and successful-receipt admission. The manifest defaults to null;
+historical Sepolia addresses are never transaction targets. Recovery distinguishes
+stored states and exposes individual older-order refunds, timeout/fee expiry,
+signature invalidation and partial native/ERC20 trader/reward claims. Full stack
+fingerprints and wiring are checked before actions; wallet account/chain and
+transaction intent are rechecked. These are local wallet integration controls,
+not canonical settlement or independent verification of the mechanism.
+
+The wallet signs `deadline` as admission validity and `maxExecutionTime` as the
+absolute execution boundary cap. It admits a displayed 60-second opening tolerance
+above preview execution time and never extends that signed cap after signing.
+The current UI supports token decimals 0–36; the contract remains raw-unit based.
+One confirmation does not establish reorg-proof finality. No new deployment,
+contract-wallet connector demo, persistent indexer, LP exit UI or concentrated
+auction is supplied. Step 7 and G1–G4 remain open; see its checkpoint report.

@@ -32,8 +32,8 @@ export default function App() {
                 <div className={styles.sandboxBanner}>
                   <span className="tag tag-live">Sepolia sandbox</span>
                   <p>
-                    Connect a Sepolia wallet to submit a real order to the deployed
-                    OtterOrderBook. The batch countdown is live from the contract.
+                    Inspect the hardened wallet flow. Signing and recovery require
+                    a reviewed version 2 deployment; the historical September addresses are references.
                   </p>
                 </div>
                 <SepoliaStatus />
@@ -43,17 +43,18 @@ export default function App() {
                   <h2 className={styles.sandboxInfoTitle}>How it works</h2>
                   <ol className={styles.sandboxSteps}>
                     <li>Connect a Sepolia wallet via the header.</li>
-                    <li>Mint demo OTA or OTB tokens — no cost beyond gas.</li>
+                    <li>Check the configured pool and asset addresses.</li>
                     <li>Choose a side, budget, and minimum acceptable price.</li>
                     <li>Approve the token spend and sign the EIP-712 Order payload.</li>
-                    <li>Your order is submitted to the live OtterOrderBook batch window.</li>
+                    <li>Wait for confirmed admission and save its epoch and order index.</li>
+                    <li>If execution times out, recover the stored order and withdraw your funded claim.</li>
                   </ol>
                   <div className={styles.sandboxNote}>
                     <strong>Settlement note:</strong> No public solver is running.
-                    Orders are collected in Sepolia batches but settlement is currently
-                    demonstrated through the guided fixture in the Demo story.
+                    The current contracts do not enforce canonical payments or establish
+                    the paper’s full incentive guarantees. The Demo story uses a historical fixture.
                     Switch to <button className={styles.inlineLink} onClick={() => setMode('demo')}>Demo story</button> to
-                    see what a real settled batch looks like.
+                    inspect that recorded batch.
                   </div>
                   <GasChart />
                 </div>
@@ -66,7 +67,7 @@ export default function App() {
 
       <footer className={styles.footer} role="contentinfo">
         <span>
-          Otter — Implementation of Shi, Zhang, Chung &amp; Li,{' '}
+          Otter — Research prototype based on Shi, Zhang, Chung &amp; Li,{' '}
           <em>Otter: A Provably MEV-Resilient Automated Market Maker via Surplus Redistribution</em>{' '}
           (ePrint 2026/1877).{' '}
           <a href="https://github.com/mansi0xc/otter" target="_blank" rel="noopener noreferrer">

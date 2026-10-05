@@ -9,7 +9,7 @@ interface OutcomePanelProps {
 
 const INVARIANTS = [
   { label: 'Feasibility', desc: 'Pool conservation holds — net swap matches the curve.' },
-  { label: 'Individual rationality', desc: 'No seller paid less than its stated reservation value.' },
+  { label: 'Individual rationality', desc: 'Legacy dominant-side check; minority rounding is not generally safe.' },
   { label: 'Budget bounds', desc: 'No order filled beyond its own budget.' },
   { label: 'Curve conservation', desc: 'Virtual reserves after settlement satisfy the invariant.' },
 ]
@@ -28,9 +28,9 @@ export function OutcomePanel({ step }: OutcomePanelProps) {
 
   return (
     <div className={styles.panel}>
-      <h3 className={styles.title}>Outcome &amp; proof</h3>
+      <h3 className={styles.title}>Recorded outcome</h3>
       <p className={styles.motto}>
-        The solver proposes. The contract refuses bad outcomes.
+        Historical fixture only. Canonical payments and full incentive guarantees remain unresolved.
       </p>
 
       <div className={styles.rows}>

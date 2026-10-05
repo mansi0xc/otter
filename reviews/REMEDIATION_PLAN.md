@@ -441,10 +441,29 @@ authentication, repeated epochs and LP principal/range behavior need the complet
 mechanism proposal. Fixed external rewards added alongside variable LP surplus
 would leave 6B's incentive failure intact.
 
-**6C is pending the user's commit.** The report lists the twelve files and short
+**6C was committed by the user as `8517538`; the tree was clean before 7A.** The report lists the twelve files and short
 commit title/body. After confirmation, use this proposal to define the complete
 asset/curve/utility and redistribution contract, and narrow adoption decisions
 with the user when they change support or funding scope. Keep the original
 paper-guarantee priority, G1–G4, measured verification, independent review and
 concentrated integration requirements. Do not deploy a calendar or mark step 6
 complete from its conditional arithmetic evidence.
+
+## Checkpoint 7A: safe wallet binding, signing and individual recovery
+
+See [the wallet checkpoint report](./CHECKPOINT_7A.md). This independent safety
+slice proceeds while G1–G4 remain unresolved. It replaces stale v1 signing with
+the actual v2 schema, checks deployment fingerprints/wiring/domain/asset metadata,
+reads real nonce words, confirms receipts and admission events, and exposes stored
+epoch recovery and separate funded claims. Historical deployment references and
+fixtures are labeled accordingly; overclaimed truthfulness/IR and legacy capacity
+figures are corrected in the source dashboard.
+
+**7A is pending the user's commit.** The report lists its files and suggested
+title/body. No new mechanism, treasury, calendar, fractional asset, deployment or
+contract policy was selected. The default manifest is null, so the wallet cannot
+write to the old stack. Step 7 still requires real contract-wallet flows, persistent
+transaction/indexer/reorg handling, LP exit UX and end-to-end testnet execution
+after the relevant mechanism/concentrated gates. Continue guarantee-preserving
+asset/curve/utility design and independent review; do not treat UI migration as
+evidence that G1–G4 or concentrated trading are resolved.

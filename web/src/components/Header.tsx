@@ -27,7 +27,7 @@ export function Header({ mode, onModeChange }: HeaderProps) {
               <circle cx="23" cy="14" r="1.5" fill="var(--flow)" />
             </svg>
             <span className={styles.name}>OTTER</span>
-            <span className={styles.tagline}>Batch AMM · Sepolia live</span>
+            <span className={styles.tagline}>Batch AMM · research prototype</span>
           </div>
         </button>
       </div>

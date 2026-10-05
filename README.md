@@ -26,8 +26,11 @@ tests, [checkpoint 4D](./reviews/CHECKPOINT_4D.md) for the original discrete cou
 [checkpoint 3B](./reviews/CHECKPOINT_3B.md)
 for exit processing and donation limits, [checkpoint 3A](./reviews/CHECKPOINT_3A.md)
 for order recovery, and [checkpoint 2B](./reviews/CHECKPOINT_2B.md) for assets. These
-changes have not been deployed, and the existing wallet dashboard and published
-Sepolia addresses still target the earlier prototype.
+changes have not been deployed. The hardened wallet now checks a separate v2
+deployment manifest and uses receipt-based signing/recovery flows; it is disabled
+by default because no reviewed deployment is configured. Published Sepolia
+addresses and the tracked legacy web build still identify the earlier prototype.
+See [checkpoint 7A](./reviews/CHECKPOINT_7A.md) and [wallet setup](./web/README.md).
 
 The current settlement verifier accepts feasible allocations without enforcing
 the paper's canonical allocation/payments. Integer incentive guarantees
@@ -62,7 +65,7 @@ from.
 | `contracts/` | `OtterOrderBook`, `OtterSettlement`, `OtterHook`, and fixed-point invariant checks. |
 | `harness/` | Sandwich-attack comparison (vanilla Uniswap v4 vs. Otter) and settlement-cost benchmarks. |
 | `fixtures/` | Saved legacy verifier vectors, demo data and separately labeled discrete research counterexamples. |
-| `web/` | React/Vite dashboard with two modes: a guided **Demo story** that walks through a real settled batch (order ledger, sandwich-comparison chart, batch clock, proof rail, and outcome panel), and a **Sepolia sandbox** where you connect a wallet (RainbowKit/wagmi), mint demo tokens, and submit a real EIP-712-signed order to the deployed `OtterOrderBook`, with the batch countdown read live from the contract. No public solver runs against the sandbox yet, so settlement itself is shown through the Demo story's fixture rather than live. See [`deployment.md`](./deployment.md) for the exact contract addresses it talks to. |
+| `web/` | Research dashboard and guided historical fixtures, plus a v2 wallet for checked native/ERC20 submission, stored-order recovery and independent trader/reward claims. Wallet writes are disabled until a reviewed deployment is configured. The September explorer links and tracked `dist/` are historical; no public solver is running. |
 
 ## Limitations
 
