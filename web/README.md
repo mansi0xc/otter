@@ -233,6 +233,34 @@ The FFI bridge uses existing Node/viem and an in-memory RPC with synthetic block
 metadata. It uses no real provider, wallet or chain transaction. See
 [checkpoint 4K](../reviews/CHECKPOINT_4K.md) for fresh results and limits.
 
+`captureExecutionCurves(rpc, source, request)` reuses this pipeline to collect one
+or two exhaustive research prefixes at the same block. `request.domains` contains
+distinct directions, each with `down`, `maxInput` (BigInt 0–64) and one fixed raw
+`limit`; `request.blockNumber` remains optional. Domains are cloned before awaits.
+Each `curves[i].points[j]` is the exact quote for requested input `BigInt(j)` from
+the shared opening state. Domain order is retained. Queries never advance the
+pool or chain the previous point's terminal state into the next one.
+
+There are at most 130 points, with a shared union of 32 bitmap words and 128
+reached initialized ticks: at most 162 storage calls including the two header/
+liquidity slots. Each quote retains its own 16-word, 64-crossing and 80-step
+bounds even when the union already contains opposite-direction state. Code and
+chain/block checks occur once per collection. Any failed state read or detected
+block/chain change aborts the entire collection, without returning a first-side
+partial table. At most 290 collection attempts add missing records or finish a
+point, after the bounded representation checks before RPC work.
+
+An exhaustive prefix is not a fully supported curve: inspect **each status and
+actual consumed input**. `PriceLimit` rows can consume less than the requested
+index, and unsupported rows remain unusable diagnostic prefixes. No row is
+silently removed, extrapolated, interpolated or assigned a different status.
+This 64-unit bound limits research work; it changes no production budget, minimum
+trade size, asset, valuation or mechanism. Larger original budgets, complete
+auction counterfactual domains and book/vault ownership authentication remain
+open under G1–G4. All raw-RPC, finality, hook/token and epoch limits above still
+apply. [Checkpoint 4L](../reviews/CHECKPOINT_4L.md) records fresh mocked and local
+real-core checks, including the existing whole-payment witness's exact fills.
+
 ## Evidence and remaining work
 
 `npm test` runs offline mocked-RPC/wallet failure tests and checks the ABI subset

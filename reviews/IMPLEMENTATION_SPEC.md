@@ -663,3 +663,32 @@ Concentrated auction admission and swaps stay gated. Production Solidity, the
 legacy allocator/payment rule, assets/utility, wallet configuration and G1–G4
 are unchanged. Complete finite curve/epoch authentication and the mechanism design
 before activating those integrations.
+
+Checkpoint 4K was committed by the user as `71504c7`; the tree was clean before
+4L. [Checkpoint 4L](./CHECKPOINT_4L.md) adds bounded exhaustive prefix collection
+to the same hash-pinned raw-core reader. One or two distinct directional domains
+specify a fixed price limit and maximum input 0–64 raw units. Every integer input
+from zero through that cap is quoted from the same opening state. This is a
+research work bound, not a selected production lot, budget or valuation domain.
+Both directions reuse one header, block identity and sparse storage cache, with
+at most 130 points, 32 words, 128 reached initialized ticks and 162 storage reads.
+Numerical quote math and per-quote limits remain unchanged. Opposite-direction
+cached data cannot bypass a quote's own unsupported traversal status.
+
+Every row retains requested and actual consumed input, output, final state,
+status and traversal usage. A partial price-limit result cannot be treated as
+execution of its requested index; unsupported prefixes remain diagnostics. No
+interpolation, concavification or silent deletion fills a hole. Missing state or
+a detected block/chain change aborts the entire collection. Local tests compare
+every row with the oracle and supported real core swaps, restoring the opening
+state between alternatives; the provider and block metadata remain synthetic.
+
+These tables are exhaustive only over the declared small prefixes. They do not
+cover every original uint96 budget/counterfactual, authenticate opening ownership,
+provide an accepted on-chain witness or fix the whole-payment/combined-role
+counterexamples. The captured maps remain caller-mutable. Production Solidity,
+allocation/payments, asset/utility, null wallet config and concentrated auction
+gates are unchanged. G1–G4 remain open; complete finite-domain and opening-epoch
+binding and the mechanism's proof obligations before integrating canonical
+settlement. Test fixture gas combines many alternative swaps and is not a
+production verifier/capacity benchmark.

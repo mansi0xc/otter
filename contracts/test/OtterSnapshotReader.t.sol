@@ -162,4 +162,133 @@ contract OtterSnapshotReaderTest is OtterExecutionFixture {
         _add(k, down ? int24(-900) : int24(600), down ? int24(-600) : int24(900), l / 2 + 1, 3);
         _againstReader(k, down, bound(inputSeed, 1, 1e8), TickMath.getSqrtPriceAtTick(down ? int24(-1200) : int24(1200)));
     }
+
+    function _curveFixture(PoolKey memory k, uint256 cap, uint160 downLimit, uint160 upLimit)
+        private view returns (RpcFixture memory f)
+    {
+        f = _fixture(k, true, cap, downLimit);
+        RpcFixture memory up = _fixture(k, false, cap, upLimit);
+        bytes32[] memory slots = new bytes32[](f.slots.length + up.slots.length);
+        bytes32[] memory values = new bytes32[](slots.length);
+        uint256 count = f.slots.length;
+        for (uint256 i; i < count; ++i) { slots[i] = f.slots[i]; values[i] = f.values[i]; }
+        for (uint256 i; i < up.slots.length; ++i) {
+            bool found;
+            for (uint256 j; j < count; ++j) {
+                if (slots[j] == up.slots[i]) {
+                    assertEq(values[j], up.values[i], "conflicting directional exports");
+                    found = true; break;
+                }
+            }
+            if (!found) { slots[count] = up.slots[i]; values[count] = up.values[i]; ++count; }
+        }
+        f.slots = new bytes32[](count); f.values = new bytes32[](count);
+        for (uint256 i; i < count; ++i) { f.slots[i] = slots[i]; f.values[i] = values[i]; }
+    }
+
+    function _againstCurves(PoolKey memory k, uint256 cap, uint160 downLimit, uint160 upLimit)
+        private returns (OtterExecutionOracle.Quote[] memory down, OtterExecutionOracle.Quote[] memory up)
+    {
+        string[] memory args = new string[](5);
+        args[0] = "node"; args[1] = "--experimental-strip-types";
+        args[2] = "../web/test/snapshot-reader-cli.ts";
+        args[3] = vm.toString(abi.encode(_curveFixture(k, cap, downLimit, upLimit), upLimit));
+        args[4] = "--curves";
+        uint256 reads; uint256 words; uint256 ticks;
+        (down, up, reads, words, ticks) = abi.decode(vm.ffi(args),
+            (OtterExecutionOracle.Quote[], OtterExecutionOracle.Quote[], uint256, uint256, uint256));
+        assertEq(down.length, cap + 1); assertEq(up.length, cap + 1);
+        assertLe(down.length + up.length, 130);
+        assertEq(reads, 2 + words + ticks); assertLe(reads, 162); assertLe(words, 32); assertLe(ticks, 128);
+        uint256 opening = vm.snapshotState();
+        for (uint256 side; side < 2; ++side) {
+            bool direction = side == 0;
+            uint160 limit = direction ? downLimit : upLimit;
+            for (uint256 amount; amount <= cap; ++amount) {
+                OtterExecutionOracle.Quote memory q = direction ? down[amount] : up[amount];
+                assertEq(abi.encode(q), abi.encode(oracle.quoteExactInput(k, direction, amount, limit)), "curve/oracle mismatch");
+                if (q.status == OtterExecutionOracle.Status.Complete || q.status == OtterExecutionOracle.Status.PriceLimit) {
+                    assertEq(abi.encode(q), abi.encode(_quoteAndSwap(k, direction, amount, limit)), "curve/real swap mismatch");
+                }
+                // Every alternative starts from the opening pool; no sequential curve.
+                assertTrue(vm.revertToState(opening));
+            }
+        }
+        assertTrue(vm.revertToStateAndDelete(opening));
+    }
+
+    function test_curvesMatchNativeBothDirectionsEveryRawInput() public {
+        (PoolKey memory k,) = initPool(Currency.wrap(address(0)), currency1, IHooks(address(0)), 0, 60, SQRT_PRICE_1_1);
+        _add(k, -120, 120, 1000, 1); _add(k, -480, -360, 700, 2); _add(k, 360, 480, 800, 3);
+        _againstCurves(k, 8, TickMath.getSqrtPriceAtTick(-600), TickMath.getSqrtPriceAtTick(600));
+    }
+
+    function test_curvesMatchConcentratedGapsAndPartialConsumption() public {
+        PoolKey memory k = _pool(60, SQRT_PRICE_1_1);
+        _add(k, -120, 120, 10, 1); _add(k, -480, -360, 20, 2); _add(k, 360, 480, 30, 3);
+        (OtterExecutionOracle.Quote[] memory down, OtterExecutionOracle.Quote[] memory up) =
+            _againstCurves(k, 8, TickMath.getSqrtPriceAtTick(-600), TickMath.getSqrtPriceAtTick(600));
+        assertEq(uint8(down[8].status), uint8(OtterExecutionOracle.Status.PriceLimit));
+        assertEq(uint8(up[8].status), uint8(OtterExecutionOracle.Status.PriceLimit));
+        assertLt(down[8].consumedInput, down[8].requestedInput); assertLt(up[8].consumedInput, up[8].requestedInput);
+    }
+
+    function test_curvesRetainEveryTransferWitnessFillAndActualCapacity() public {
+        uint160 price = SQRT_PRICE_1_1 * 3 / 2;
+        PoolKey memory k = _pool(60, price); _fullRange(k, 1000);
+        int24 tick = TickMath.getTickAtSqrtPrice(price);
+        uint160 end = oracle.quoteExactInput(k, true, 4, TickMath.getSqrtPriceAtTick(tick - 1000)).sqrtPriceX96;
+        (OtterExecutionOracle.Quote[] memory down,) = _againstCurves(k, 5, end, TickMath.getSqrtPriceAtTick(tick + 1000));
+        for (uint256 amount; amount <= 4; ++amount) {
+            assertEq(uint8(down[amount].status), uint8(OtterExecutionOracle.Status.Complete));
+            assertEq(down[amount].consumedInput, amount); assertEq(down[amount].output, 2 * amount);
+        }
+        assertEq(uint8(down[5].status), uint8(OtterExecutionOracle.Status.PriceLimit));
+        assertEq(down[5].consumedInput, 4); assertEq(down[5].output, 8);
+    }
+
+    function test_curvesRetainDownwardBoundaryForBothAlternatives() public {
+        PoolKey memory k = _pool(60, SQRT_PRICE_1_1); _add(k, -120, 120, 1000, 1);
+        _quoteAndSwap(k, true, 1e15, TickMath.getSqrtPriceAtTick(-120));
+        (, int24 tick,,) = manager.getSlot0(k.toId()); assertEq(tick, -121);
+        (OtterExecutionOracle.Quote[] memory down, OtterExecutionOracle.Quote[] memory up) =
+            _againstCurves(k, 8, TickMath.getSqrtPriceAtTick(-600), TickMath.getSqrtPriceAtTick(600));
+        assertEq(down[0].tick, -121); assertEq(up[0].tick, -121);
+        assertGt(up[1].initializedTicksCrossed, 0);
+    }
+
+    function test_curvesKeepWordLimitIndependentlyInBothDirections() public {
+        PoolKey memory k = _pool(1, TickMath.getSqrtPriceAtTick(255));
+        (OtterExecutionOracle.Quote[] memory down, OtterExecutionOracle.Quote[] memory up) =
+            _againstCurves(k, 1, TickMath.getSqrtPriceAtTick(-10000), TickMath.getSqrtPriceAtTick(10000));
+        assertEq(uint8(down[1].status), uint8(OtterExecutionOracle.Status.WordLimit));
+        assertEq(uint8(up[1].status), uint8(OtterExecutionOracle.Status.WordLimit));
+        assertEq(down[1].bitmapWords, 16); assertEq(up[1].bitmapWords, 16);
+    }
+
+    function test_curvesKeepCrossingLimitWhenOppositeTicksAreCached() public {
+        PoolKey memory k = _pool(1, SQRT_PRICE_1_1);
+        for (uint256 i; i < 70; ++i) {
+            _add(k, -int24(int256(i + 1)), 0, 1, i + 1);
+            _add(k, 0, int24(int256(i + 1)), 1, i + 71);
+        }
+        (OtterExecutionOracle.Quote[] memory down,) =
+            _againstCurves(k, 64, TickMath.getSqrtPriceAtTick(-100), TickMath.getSqrtPriceAtTick(100));
+        assertEq(uint8(down[64].status), uint8(OtterExecutionOracle.Status.TickLimit));
+        assertEq(down[64].initializedTicksCrossed, 64);
+    }
+
+    function test_curvesZeroOnlyDoesNotTurnIntoPublicZeroSwaps() public {
+        PoolKey memory k = _pool(60, SQRT_PRICE_1_1); _add(k, -120, 120, 1000, 1);
+        _againstCurves(k, 0, 0, 0);
+    }
+
+    function testFuzz_curvesEveryInputMatchesConcentratedCore(uint64 liquiditySeed, uint32 priceSeed, uint8 capSeed) public {
+        uint128 l = uint128(bound(liquiditySeed, 1, 10000));
+        int24 tick = -180 + int24(int256(uint256(priceSeed) % 7)) * 60;
+        PoolKey memory k = _pool(60, TickMath.getSqrtPriceAtTick(tick));
+        _add(k, -240, 0, l, 1); _add(k, 0, 240, l + 1, 2);
+        _add(k, -900, -600, l / 2 + 1, 3); _add(k, 600, 900, l / 2 + 1, 4);
+        _againstCurves(k, bound(capSeed, 0, 8), TickMath.getSqrtPriceAtTick(-1200), TickMath.getSqrtPriceAtTick(1200));
+    }
 }

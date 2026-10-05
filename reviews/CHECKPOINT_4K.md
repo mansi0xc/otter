@@ -2,7 +2,7 @@
 
 Prepared 6 October 2026. Starting commit:
 `0e5b727263df5ebc75ff1605049f6d05b035654d`. The working tree was clean.
-Status: **local reader slice verified; waiting for the user's commit**.
+Status: **committed by the user as `71504c7`; the tree was clean before 4L**.
 
 ## Outcome
 
@@ -175,8 +175,8 @@ Suggested explanation:
 > state. Cross-check native/concentrated quotes against real local v4 swaps while
 > preserving quote math, guarantee targets and the concentrated auction gate.
 
-The assistant has not staged or committed anything. Commit these **15 files**
-and confirm before work continues:
+The assistant did not stage or commit anything. The user committed these
+**15 files** as `71504c7`, confirming before checkpoint 4L began:
 
 ```text
 README.md

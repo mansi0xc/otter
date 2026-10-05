@@ -147,6 +147,12 @@ The current hook enforces the following integration rules:
   storage calls. Its local tests compare exported real core storage, exact quotes
   and native/concentrated swaps. It is not an authenticated epoch or live provider
   integration; concentrated auctions remain gated.
+- **Bounded exhaustive execution curves.** The same reader can collect every raw
+  input 0–64 in one or both declared directions from one shared opening block.
+  Storage is reused, while each quote keeps its own traversal limits and actual
+  consumption. Partial/unsupported points remain explicit. These small research
+  tables neither interpolate the curve nor set a production trade-size rule;
+  see [checkpoint 4L](./reviews/CHECKPOINT_4L.md).
 - **Discrete mechanism research.** `solver/src/discrete-research.ts` maximizes
   exact linear welfare on fixed small one-sided domains and computes raw pivots,
   with independent exhaustive checks. It preserves partial-capacity diagnostics

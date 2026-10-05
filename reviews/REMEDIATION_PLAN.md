@@ -612,9 +612,35 @@ provider and testnet evidence remain; concentrated auction gates remain closed.
 The legacy allocation/payment rule, G1–G4 and the priority to preserve the paper's
 guarantees are unchanged. No new asset, utility, subsidy or weaker rule is selected.
 
-**4K is pending the user's commit.** Its report lists fresh checks and the exact
+**4K was committed by the user as `71504c7`; the tree was clean before 4L.** Its report lists fresh checks and the exact
 handoff. A new selected-content snapshot adds reader/test sources; old manifests
 remain frozen and identify their earlier bytes. Next, bind a complete supported
 finite execution domain to the opening ownership/epoch records under G2/G3,
 together with a compatible mechanism under G1/G4; do not infer auction correctness
 from a correct isolated quote.
+
+## Checkpoint 4L: exhaustive small execution prefixes from one shared state
+
+[The curve checkpoint](./CHECKPOINT_4L.md) collects every integer raw input in
+one or both declared 0–64 prefixes, retaining the opening state for every
+alternative. Both directions share one block/code check and demand-driven
+storage cache. Up to 130 points and 162 storage reads are allowed; per-quote
+word/crossing/step bounds and statuses remain unchanged. Partial consumption and
+unsupported rows stay explicit rather than becoming interpolated output budgets.
+A missing record or detected block change aborts the whole collection.
+
+Fresh mocked-RPC and actual local-core tests compare every point, including native
+ETH, concentrated gaps, exact boundaries, opposite-direction cache limits and
+the existing transfer witness's full raw fill menu. Foundry restores opening
+state before each alternative. This supplies bounded research data, not a
+production trade-size policy or a canonical outcome. Larger original budgets,
+complete counterfactual/ownership/epoch binding and the mechanism remain open.
+The current allocation/payment rule, asset/utility, concentrated gate and G1–G4
+are unchanged. No weaker guarantee or replacement rule is selected.
+
+**4L is pending the user's commit.** Its report contains the exact handoff and
+fresh tests. A new 278-file snapshot records the changed reader/test closure;
+older manifests stay frozen. Next specify complete original-domain/epoch
+authentication and verifier obligations under G2/G3 together with a compatible
+G1/G4 mechanism, rather than using these small tables to declare the auction
+or grant qualification complete.

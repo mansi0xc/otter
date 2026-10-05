@@ -37,6 +37,16 @@ Block metadata is synthetic; this does not test a real provider, canonical-chain
 authentication or an auction. Run the targeted Forge command in the checkpoint
 report; it changes no saved fixture or benchmark.
 
+[Checkpoint 4L](../reviews/CHECKPOINT_4L.md) extends that bridge with `--curves`
+mode. It exports the union of both directional storage paths once and checks
+every input in a declared small raw prefix against the oracle and supported real
+swaps. Foundry restores the opening state after each alternative; the table is
+not sequential trading. It reproduces all 0–4 fills of the existing transfer
+witness and the five-input request that consumes four, without modifying that
+artifact or changing its incentive conclusions. Partial/unsupported rows remain
+explicit; no interpolation or lot policy is applied. Block metadata/RPC are still
+synthetic and this is still test infrastructure.
+
 `research/discrete-counterexamples.json` is a separate negative-control artifact
 from the bounded one-sided discrete laboratory. It records exact allocations,
 counterfactual payments, funding/IR failures, rounding deviations and partial

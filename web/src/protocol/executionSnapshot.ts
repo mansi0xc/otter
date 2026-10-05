@@ -5,6 +5,10 @@ import { CORE_MIN_PRICE, CORE_MAX_PRICE, IncompleteSnapshot, MAX_WORDS, MAX_CROS
 
 export const CORE_LAYOUT = 'v4-core/e50237c43811bd9b526eff40f26772152a42daba' as const
 export const MAX_STATE_READS = 2 + MAX_WORDS + MAX_CROSSINGS
+// Exhaustive research prefixes, not a production trade-size or valuation rule.
+export const MAX_CURVE_INPUT = 64n
+export const MAX_CURVE_POINTS = 2 * (Number(MAX_CURVE_INPUT) + 1)
+export const MAX_CURVE_STATE_READS = 2 + 2 * (MAX_WORDS + MAX_CROSSINGS)
 export const EXTSLOAD_ABI = [{ type: 'function', name: 'extsload', stateMutability: 'view', inputs: [{ name: 'slot', type: 'bytes32' }], outputs: [{ name: 'value', type: 'bytes32' }] }] as const
 export const POOL_KEY_COMPONENTS = [{ name: 'currency0', type: 'address' }, { name: 'currency1', type: 'address' },
   { name: 'fee', type: 'uint24' }, { name: 'tickSpacing', type: 'int24' }, { name: 'hooks', type: 'address' }] as const
@@ -16,6 +20,11 @@ export interface CapturedExecution {
   layout: typeof CORE_LAYOUT; source: ExecutionSource; poolId: Hash
   blockNumber: bigint; blockHash: Hash; snapshot: PoolSnapshot; quote: Quote; stateReads: number
 }
+export interface ExecutionCurveDomain { down: boolean; maxInput: bigint; limit: bigint }
+export interface ExecutionCurvesRequest { domains: readonly ExecutionCurveDomain[]; blockNumber?: bigint }
+export interface ExecutionCurve { domain: ExecutionCurveDomain; points: readonly Quote[] }
+export interface CapturedExecutionCurves extends Omit<CapturedExecution, 'quote'> { curves: readonly ExecutionCurve[] }
+interface CapturedFrame extends Omit<CapturedExecution, 'quote'> { quotes: Quote[] }
 const U256 = 1n << 256n, MASK128 = (1n << 128n) - 1n, MASK24 = (1n << 24n) - 1n
 function unsigned(n: bigint, bits: number, name: string) {
   if (typeof n !== 'bigint' || n < 0n || n >= 1n << BigInt(bits)) throw new Error(`${name} must fit uint${bits}.`)
@@ -68,13 +77,44 @@ export function executionSlots(poolId: Hash) {
  * Only the state needed by this request is captured, not a whole-pool export.
  */
 export async function captureExecution(rpc: SnapshotRpc, input: ExecutionSource, request: ExecutionRequest): Promise<CapturedExecution> {
-  const s = source(input), down = request.down, amount = request.amount, limit = request.limit, at = request.blockNumber
+  const { quotes, ...frame } = await captureFrame(rpc, input, [{ down: request.down, amount: request.amount, limit: request.limit }], request.blockNumber, 1)
+  return { ...frame, quote: quotes[0] }
+}
+
+/** Exhaust every raw input 0..maxInput in one or both declared directions.
+ * Every point starts from the same opening state; these are alternative swaps,
+ * never sequential execution. Partial/unsupported quotes stay in the table.
+ * No interpolation, convexification, lot conversion or mechanism is selected.
+ */
+export async function captureExecutionCurves(rpc: SnapshotRpc, input: ExecutionSource, request: ExecutionCurvesRequest): Promise<CapturedExecutionCurves> {
+  if (!Array.isArray(request.domains) || request.domains.length < 1 || request.domains.length > 2) throw new Error('Expected one or two bounded curve domains.')
+  const domains = request.domains.map(d => ({ down: d.down, maxInput: d.maxInput, limit: d.limit }))
+  if (new Set(domains.map(d => d.down)).size !== domains.length) throw new Error('Curve directions must be distinct.')
+  const queries: Omit<ExecutionRequest, 'blockNumber'>[] = []
+  for (const d of domains) {
+    unsigned(d.maxInput, 256, 'Curve maximum input')
+    if (d.maxInput > MAX_CURVE_INPUT) throw new Error('Curve maximum input exceeds the exhaustive research bound.')
+    for (let amount = 0n; amount <= d.maxInput; amount++) queries.push({ down: d.down, amount, limit: d.limit })
+  }
+  const { quotes, ...frame } = await captureFrame(rpc, input, queries, request.blockNumber, domains.length)
+  let cursor = 0
+  const curves = domains.map(domain => {
+    const points = quotes.slice(cursor, cursor + Number(domain.maxInput) + 1)
+    cursor += points.length
+    return { domain, points }
+  })
+  return { ...frame, curves }
+}
+
+async function captureFrame(rpc: SnapshotRpc, input: ExecutionSource, queries: readonly Omit<ExecutionRequest, 'blockNumber'>[], at: bigint | undefined,
+  directions: number): Promise<CapturedFrame> {
+  const s = source(input)
   if (at !== undefined) unsigned(at, 256, 'Block number')
   const bitmap = new Map<number, bigint>(), ticks = new Map<number, TickLiquidity>()
   const snapshot: PoolSnapshot = { keyFee: s.key.fee, tickSpacing: s.key.tickSpacing, sqrtPriceX96: 0n, tick: 0,
     liquidity: 0n, protocolFee: 0, lpFee: 0, bitmap, ticks }
   // Validate request representations before doing any RPC work.
-  quoteExactInput(snapshot, down, amount, limit)
+  for (const q of queries) quoteExactInput(snapshot, q.down, q.amount, q.limit)
   if (quantity(await rpc('eth_chainId', [])) !== s.chainId) throw new Error('Snapshot RPC is on the wrong chain.')
   const anchor = block(await rpc('eth_getBlockByNumber', [at === undefined ? 'latest' : `0x${at.toString(16)}`, false]))
   if (at !== undefined && anchor.number !== at) throw new Error('RPC returned the wrong requested block number.')
@@ -85,7 +125,7 @@ export async function captureExecution(rpc: SnapshotRpc, input: ExecutionSource,
   const poolId = executionPoolId(s.key), slots = executionSlots(poolId)
   let stateReads = 0
   const read = async (slot: Hash) => {
-    if (++stateReads > MAX_STATE_READS) throw new Error('Snapshot exceeds its bounded storage-read budget.')
+    if (++stateReads > 2 + directions * (MAX_WORDS + MAX_CROSSINGS)) throw new Error('Snapshot exceeds its bounded storage-read budget.')
     const data = encodeFunctionData({ abi: EXTSLOAD_ABI, functionName: 'extsload', args: [slot] })
     return BigInt(hexWord(await rpc('eth_call', [{ to: s.manager, data }, selector])))
   }
@@ -105,27 +145,31 @@ export async function captureExecution(rpc: SnapshotRpc, input: ExecutionSource,
       }
     } else if (liquidity !== 0n) throw new Error('Uninitialized pool has nonzero liquidity.')
   }
-  let quote: Quote | undefined
-  // Each replay either adds one missing record or finishes. Numerical math is unchanged.
-  for (let attempt = 0; attempt <= MAX_WORDS + MAX_CROSSINGS; attempt++) {
-    try { quote = quoteExactInput(snapshot, down, amount, limit); break }
-    catch (e) {
-      if (!(e instanceof IncompleteSnapshot) || !Number.isInteger(e.position)) throw e
-      const position = e.position!
-      if (e.kind === 'bitmap' && bitmap.size < MAX_WORDS && !bitmap.has(position)) {
-        bitmap.set(position, await read(slots.bitmap(position)))
-      } else if (e.kind === 'tick' && ticks.size < MAX_CROSSINGS && !ticks.has(position)
-        && position >= MIN_TICK && position <= MAX_TICK && position % s.key.tickSpacing === 0) {
-        const packed = await read(slots.tick(position)), gross = packed & MASK128, unsignedNet = packed >> 128n
-        const net = unsignedNet >= 1n << 127n ? unsignedNet - (1n << 128n) : unsignedNet
-        if (gross === 0n || net < -gross || net > gross) throw new Error('Initialized tick has inconsistent gross/net liquidity.')
-        ticks.set(position, { gross, net })
-      } else throw new Error('Missing-state request is repeated or outside the supported capture bounds.')
+  const quotes: Quote[] = []
+  for (const { down, amount, limit } of queries) {
+    let quote: Quote | undefined
+    // Each replay adds one missing record or finishes. Math and per-quote bounds are unchanged.
+    for (let attempt = 0; attempt <= MAX_WORDS + MAX_CROSSINGS; attempt++) {
+      try { quote = quoteExactInput(snapshot, down, amount, limit); break }
+      catch (e) {
+        if (!(e instanceof IncompleteSnapshot) || !Number.isInteger(e.position)) throw e
+        const position = e.position!
+        if (e.kind === 'bitmap' && bitmap.size < directions * MAX_WORDS && !bitmap.has(position)) {
+          bitmap.set(position, await read(slots.bitmap(position)))
+        } else if (e.kind === 'tick' && ticks.size < directions * MAX_CROSSINGS && !ticks.has(position)
+          && position >= MIN_TICK && position <= MAX_TICK && position % s.key.tickSpacing === 0) {
+          const packed = await read(slots.tick(position)), gross = packed & MASK128, unsignedNet = packed >> 128n
+          const net = unsignedNet >= 1n << 127n ? unsignedNet - (1n << 128n) : unsignedNet
+          if (gross === 0n || net < -gross || net > gross) throw new Error('Initialized tick has inconsistent gross/net liquidity.')
+          ticks.set(position, { gross, net })
+        } else throw new Error('Missing-state request is repeated or outside the supported capture bounds.')
+      }
     }
+    if (!quote) throw new Error('Bounded snapshot did not produce a quote.')
+    quotes.push(quote)
   }
-  if (!quote) throw new Error('Bounded snapshot did not produce a quote.')
   const canonical = block(await rpc('eth_getBlockByNumber', [`0x${anchor.number.toString(16)}`, false]))
   if (canonical.number !== anchor.number || canonical.hash !== anchor.hash
     || quantity(await rpc('eth_chainId', [])) !== s.chainId) throw new Error('Snapshot block or chain changed during collection. No result retained.')
-  return { layout: CORE_LAYOUT, source: s, poolId, blockNumber: anchor.number, blockHash: anchor.hash, snapshot, quote, stateReads }
+  return { layout: CORE_LAYOUT, source: s, poolId, blockNumber: anchor.number, blockHash: anchor.hash, snapshot, quotes, stateReads }
 }

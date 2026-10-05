@@ -36,6 +36,15 @@ and real-swap comparisons include native ETH and concentrated liquidity, with
 synthetic RPC/block metadata. It does not authenticate a complete epoch/curve,
 activate concentrated auctions or resolve G1–G4. See [4K](./CHECKPOINT_4K.md).
 
+Local 4L update starts from the user-created `71504c7` commit. It collects every
+raw input in one or both declared 0–64 research prefixes from the same block,
+reusing storage without changing per-quote bounds/statuses. Partial consumption
+and unsupported points remain explicit. Every alternative is checked against
+the local oracle and supported real swaps after restoring the opening state.
+This preserves the transfer witness below; the 64-unit research work bound is
+not a production minimum/maximum trade size or a replacement mechanism. Complete
+original-domain/epoch authentication and G1–G4 remain open. See [4L](./CHECKPOINT_4L.md).
+
 ## Decision the review must support
 
 Determine whether a useful v4 mechanism can meet the requested incentive targets
@@ -193,7 +202,7 @@ scope and compensation; do not label internal tests as independent review.
 
 Use the full repository with submodules populated. The selected evidence files
 and their Solidity import closure are hashed in
-[EVIDENCE_MANIFEST_4K.json](./EVIDENCE_MANIFEST_4K.json). That manifest records the
+[EVIDENCE_MANIFEST_4L.json](./EVIDENCE_MANIFEST_4L.json). That manifest records the
 pre-patch baseline, local checkpoint, dependency commits and observed tools.
 It identifies the post-patch selected bytes and does not hash this brief or later
 status edits, authenticate an author, inspect unlisted files, or certify safety.
@@ -203,7 +212,7 @@ relying on submodule HEAD alone. Review the verifier before running it.
 From the repository root, with the already available tools:
 
 ```sh
-python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4K.json
+python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4L.json
 ```
 
 From `solver/`:
@@ -278,6 +287,26 @@ No numerical quote rule, production Solidity or economic fixture changed. The
 reader does not close G2/G3; ownership/epoch authentication and complete finite
 counterfactual coverage remain open. Detailed provenance is in the 4K report.
 
+To reproduce 4L's exhaustive-prefix slice, run `npm test` and
+`npm run build -- --outDir /tmp/otter-4l-web-dist` from `web/`, then from `contracts/`:
+
+```sh
+forge test --offline --match-contract '^OtterSnapshotReaderTest$' --fuzz-runs 64
+```
+
+Fresh 4L results: 75 mocked wallet/reader/curve groups, a successful TypeScript/
+production build, and 16 local-core reader tests with 64 new exhaustive-curve
+fuzz cases and 64 existing single-quote fuzz cases. The Node curve tests also
+compare 1,152 exact points over 64 seeded synthetic concentrated frames. Real-core
+tests restore opening state between alternative swaps and preserve all quoted
+fields/statuses, including the full E1 raw-fill menu and over-capacity request.
+The traversal stress fixture includes 140 raw core positions, beyond the
+authenticated vault's 32-position admission policy; it tests reader limits, not
+admission of that pool. Its gas includes many alternative swaps and is not an
+on-chain verifier benchmark. No fresh full solver, broad contract, economic
+benchmark, live provider or browser-to-wallet run is claimed in 4L. Numerical
+solver/production Solidity and the seven saved research artifacts are unchanged.
+
 Review `foundry.toml`: FFI is enabled for local reference comparisons and the
 test-only gas ceiling is artificially large. That ceiling is not deployment
 capacity evidence. Avoid `GasCurveTest` and `SandwichHarness` when preserving the
@@ -306,7 +335,10 @@ files differed from it. The separate 7C snapshot covers those changes plus the
 four new journal/inspection/interface files. Its selected `solver/src/execution.ts`,
 `web/package.json` and `fixtures/README.md` now differ in 4K. The separate 4K snapshot selects 278 files,
 adding the reader, mocked tests, local FFI bridge and real-core test. All earlier
-manifests retain their bytes. A passing content check supplies
+manifests retain their bytes. The 4K snapshot is now also frozen: five selected
+files differ in 4L (the reader, Node test/bridge, Solidity reader test and fixture
+README). The new 4L snapshot retains the same 278-file selection and records
+those changed bytes, without altering earlier hashes. A passing content check supplies
 identity only, not authenticated history, receipt correctness or grant readiness.
 A reviewer should retain their own tool versions,
 logs and content identifiers, and explain any reproduction difference. No

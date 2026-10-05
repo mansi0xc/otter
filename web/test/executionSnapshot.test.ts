@@ -1,7 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { decodeFunctionData, keccak256, zeroAddress, type Address, type Hash } from 'viem'
-import { captureExecution, executionPoolId, executionSlots, EXTSLOAD_ABI, MAX_STATE_READS, type ExecutionSource, type ExecutionRequest, type SnapshotRpc } from '../src/protocol/executionSnapshot.ts'
+import { captureExecution, captureExecutionCurves, executionPoolId, executionSlots, EXTSLOAD_ABI, MAX_STATE_READS,
+  MAX_CURVE_INPUT, MAX_CURVE_POINTS, MAX_CURVE_STATE_READS, type ExecutionSource, type ExecutionRequest, type SnapshotRpc } from '../src/protocol/executionSnapshot.ts'
 import { Q96, MIN_PRICE, MAX_INPUT, MAX_LIQUIDITY, Status, IncompleteSnapshot, bitmapPosition, quoteExactInput, sqrtPriceAtTick, tickAtSqrtPrice, type PoolSnapshot } from '../../solver/src/execution.ts'
 
 const addr = (n: number) => `0x${n.toString(16).padStart(40, '0')}` as Address
@@ -215,4 +216,107 @@ test('structured missing-state diagnostics identify the required record without 
     e => e instanceof IncompleteSnapshot && e.kind === 'bitmap' && e.position === 0)
   assert.throws(() => quoteExactInput({ ...f.snapshot, ticks: new Map() }, true, 1n, MIN_PRICE),
     e => e instanceof IncompleteSnapshot && e.kind === 'tick' && e.position === 0)
+})
+
+const domains = (maxInput = 8n) => [
+  { down: true, maxInput, limit: sqrtPriceAtTick(-1200) },
+  { down: false, maxInput, limit: sqrtPriceAtTick(1200) },
+]
+test('exhaustive curves retain every raw input in both directions from one opening state', async () => {
+  const f = fixture([{ lower: -120, upper: 120, liquidity: 1000n }, { lower: -480, upper: -360, liquidity: 700n }, { lower: 360, upper: 480, liquidity: 800n }])
+  const ds = domains(MAX_CURVE_INPUT), result = await captureExecutionCurves(f.rpc, f.source, { domains: ds })
+  assert.equal(result.curves.reduce((n, c) => n + c.points.length, 0), MAX_CURVE_POINTS)
+  for (const [i, curve] of result.curves.entries()) {
+    assert.deepEqual(curve.domain, ds[i])
+    for (const [amount, q] of curve.points.entries()) assert.deepEqual(q, quoteExactInput(f.snapshot, curve.domain.down, BigInt(amount), curve.domain.limit))
+  }
+  assert.equal(f.state.calls.filter(c => c.method === 'eth_getCode').length, 1)
+  assert.equal(f.state.calls.filter(c => c.method === 'eth_getBlockByNumber').length, 2)
+  assert.equal(f.state.calls.filter(c => c.method === 'eth_chainId').length, 2)
+  const reads = f.state.calls.filter(c => c.method === 'eth_call').map(c => decodeFunctionData({ abi: EXTSLOAD_ABI, data: (c.params[0] as { data: Hash }).data }).args[0])
+  assert.equal(reads.length, new Set(reads).size); assert.equal(result.stateReads, reads.length)
+  assert.ok(result.stateReads <= MAX_CURVE_STATE_READS)
+  assert.equal(result.snapshot.sqrtPriceX96, f.snapshot.sqrtPriceX96); assert.equal(result.snapshot.tick, f.snapshot.tick)
+})
+test('reversing curve order preserves independent results, opening metadata and storage coverage', async () => {
+  const forward = fixture(), reverse = fixture(), ds = domains(16n)
+  const a = await captureExecutionCurves(forward.rpc, forward.source, { domains: ds, blockNumber: forward.state.number })
+  const b = await captureExecutionCurves(reverse.rpc, reverse.source, { domains: [...ds].reverse(), blockNumber: reverse.state.number })
+  assert.deepEqual(a.curves, [...b.curves].reverse()); assert.equal(a.blockHash, b.blockHash)
+  assert.deepEqual(a.snapshot, b.snapshot); assert.equal(a.stateReads, b.stateReads)
+})
+test('partial consumption and unsupported positive inputs remain explicit, with no interpolation', async () => {
+  const f = fixture(), ds = domains(8n).map(d => ({ ...d, limit: sqrtPriceAtTick(d.down ? -60 : 60) }))
+  const result = await captureExecutionCurves(f.rpc, f.source, { domains: ds })
+  for (const curve of result.curves) {
+    assert.equal(curve.points.length, 9); assert.equal(curve.points[0].status, Status.Complete)
+    assert.ok(curve.points.some(q => q.status === Status.PriceLimit && q.consumedInput < q.requestedInput))
+    for (const [amount, q] of curve.points.entries()) assert.deepEqual(q, quoteExactInput(f.snapshot, curve.domain.down, BigInt(amount), curve.domain.limit))
+  }
+  const invalid = fixture(), capture = await captureExecutionCurves(invalid.rpc, invalid.source, { domains: [{ down: true, maxInput: 3n, limit: Q96 }] })
+  assert.deepEqual(capture.curves[0].points.map(q => q.status), [Status.Complete, Status.InvalidPriceLimit, Status.InvalidPriceLimit, Status.InvalidPriceLimit])
+  assert.equal(capture.stateReads, 2)
+})
+test('zero-only curves ignore the limit without loading any bitmap or tick state', async () => {
+  const f = fixture(), result = await captureExecutionCurves(f.rpc, f.source, { domains: [{ down: true, maxInput: 0n, limit: 0n }, { down: false, maxInput: 0n, limit: 0n }] })
+  assert.equal(result.stateReads, 2); assert.equal(result.snapshot.bitmap.size, 0); assert.equal(result.snapshot.ticks.size, 0)
+  for (const c of result.curves) assert.deepEqual(c.points, [quoteExactInput(f.snapshot, c.domain.down, 0n, 0n)])
+})
+test('per-quote word limits apply independently while the two directions share a bounded union', async () => {
+  const f = fixture([], 1, sqrtPriceAtTick(255)), ds = [{ down: true, maxInput: 1n, limit: sqrtPriceAtTick(-10000) }, { down: false, maxInput: 1n, limit: sqrtPriceAtTick(10000) }]
+  const result = await captureExecutionCurves(f.rpc, f.source, { domains: ds })
+  assert.equal(result.snapshot.bitmap.size, 32); assert.equal(result.stateReads, 34)
+  for (const c of result.curves) {
+    assert.equal(c.points[1].status, Status.WordLimit); assert.equal(c.points[1].bitmapWords, 16)
+    assert.deepEqual(c.points[1], quoteExactInput(f.snapshot, c.domain.down, 1n, c.domain.limit))
+  }
+})
+test('cached opposite-direction ticks cannot bypass a quote crossing limit or broaden its status', async () => {
+  const ps = Array.from({ length: 70 }, (_, i) => [
+    { lower: -(i + 1), upper: 0, liquidity: 1n }, { lower: 0, upper: i + 1, liquidity: 1n },
+  ]).flat()
+  const f = fixture(ps, 1), ds = [{ down: false, maxInput: 64n, limit: sqrtPriceAtTick(100) }, { down: true, maxInput: 64n, limit: sqrtPriceAtTick(-100) }]
+  const result = await captureExecutionCurves(f.rpc, f.source, { domains: ds })
+  assert.equal(result.snapshot.ticks.size, 128); assert.ok(result.stateReads <= MAX_CURVE_STATE_READS)
+  assert.equal(result.curves[1].points[64].status, Status.TickLimit)
+  for (const c of result.curves) for (const [amount, q] of c.points.entries()) assert.deepEqual(q, quoteExactInput(f.snapshot, c.domain.down, BigInt(amount), c.domain.limit))
+})
+test('a missing record in the second direction aborts the entire curve collection', async () => {
+  const f = fixture([], 1, sqrtPriceAtTick(255)), ds = [{ down: true, maxInput: 1n, limit: sqrtPriceAtTick(-1200) }, { down: false, maxInput: 1n, limit: sqrtPriceAtTick(1200) }]
+  f.state.missingWord = f.slots.bitmap(1)
+  await assert.rejects(captureExecutionCurves(f.rpc, f.source, { domains: ds }), /State unavailable/)
+  assert.ok(f.state.calls.filter(c => c.method === 'eth_call').length > 2)
+})
+test('curve collection rejects final block or chain changes and clones domains before awaiting RPC', async () => {
+  for (const changed of ['block', 'chain'] as const) {
+    const f = fixture(); if (changed === 'block') f.state.reorg = true; else f.state.changedChain = true
+    await assert.rejects(captureExecutionCurves(f.rpc, f.source, { domains: domains() }), /changed/)
+  }
+  const f = fixture(), ds = domains(), expected = structuredClone(ds)
+  f.state.onRpc = () => { ds.reverse(); ds[0].maxInput = 64n; ds[1].limit = 0n; f.source.key.tickSpacing = 1 }
+  const result = await captureExecutionCurves(f.rpc, f.source, { domains: ds, blockNumber: f.state.number })
+  assert.deepEqual(result.curves.map(c => c.domain), expected); assert.equal(result.source.key.tickSpacing, 60)
+  assert.equal(result.blockNumber, 9007199254740993n)
+})
+test('curve bounds, duplicate directions and malformed domains fail before any RPC work', async () => {
+  const f = fixture()
+  for (const ds of [[], [...domains(), ...domains()], [domains()[0], domains()[0]],
+    [{ down: true, maxInput: 65n, limit: 0n }], [{ down: true, maxInput: -1n, limit: 0n }],
+    [{ down: true, maxInput: 1 as unknown as bigint, limit: 0n }],
+    [{ down: 1 as unknown as boolean, maxInput: 0n, limit: 0n }],
+    [{ down: true, maxInput: 0n, limit: 1n << 160n }]]) {
+    await assert.rejects(captureExecutionCurves(f.rpc, f.source, { domains: ds }))
+  }
+  await assert.rejects(captureExecutionCurves(f.rpc, f.source, { domains: domains(), blockNumber: -1n }))
+  assert.equal(f.state.calls.length, 0)
+})
+test('bounded seeded concentrated curves agree point-for-point with the independent offline reference', async () => {
+  let seed = 0x4c617261
+  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed }
+  for (let i = 0; i < 64; i++) {
+    const price = sqrtPriceAtTick((random() % 7 - 3) * 60), l = BigInt(random() % 10000 + 1)
+    const f = fixture([{ lower: -240, upper: 0, liquidity: l }, { lower: 0, upper: 240, liquidity: l + 1n }, { lower: -900, upper: -600, liquidity: l / 2n + 1n }, { lower: 600, upper: 900, liquidity: l / 2n + 1n }], 60, price)
+    const result = await captureExecutionCurves(f.rpc, f.source, { domains: domains(8n) })
+    for (const c of result.curves) for (const [amount, q] of c.points.entries()) assert.deepEqual(q, quoteExactInput(f.snapshot, c.domain.down, BigInt(amount), c.domain.limit))
+  }
 })
