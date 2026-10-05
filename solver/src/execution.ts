@@ -58,7 +58,13 @@ export interface Quote {
   steps: number;
 }
 
-export class IncompleteSnapshot extends Error {}
+export class IncompleteSnapshot extends Error {
+  kind: 'bitmap' | 'tick' | undefined;
+  position: number | undefined;
+  constructor(message: string, kind?: 'bitmap' | 'tick', position?: number) {
+    super(message); this.kind = kind; this.position = position;
+  }
+}
 export const usableQuote = (q: Quote): boolean => q.status === Status.Complete || q.status === Status.PriceLimit;
 
 function uint(value: bigint, bits: number, name: string): void {
@@ -213,7 +219,7 @@ export function quoteExactInput(s: PoolSnapshot, down: boolean, amount: bigint, 
     if (cachedPosition !== word) {
       if (q.bitmapWords === MAX_WORDS) return fail(Status.WordLimit);
       const read = s.bitmap.get(word);
-      if (read === undefined) throw new IncompleteSnapshot(`missing bitmap word ${word}`);
+      if (read === undefined) throw new IncompleteSnapshot(`missing bitmap word ${word}`, 'bitmap', word);
       uint(read, 256, 'bitmap word');
       cachedWord = read;
       cachedPosition = word;
@@ -231,7 +237,7 @@ export function quoteExactInput(s: PoolSnapshot, down: boolean, amount: bigint, 
       if (found.initialized) {
         if (q.initializedTicksCrossed === MAX_CROSSINGS) return fail(Status.TickLimit);
         const crossed = s.ticks.get(tickNext);
-        if (crossed === undefined) throw new IncompleteSnapshot(`missing initialized tick ${tickNext}`);
+        if (crossed === undefined) throw new IncompleteSnapshot(`missing initialized tick ${tickNext}`, 'tick', tickNext);
         uint(crossed.gross, 128, 'tick gross');
         signed(crossed.net, 128, 'tick net');
         liquidity += down ? -crossed.net : crossed.net;

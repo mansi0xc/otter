@@ -25,6 +25,18 @@ The bridge needs Node with TypeScript strip support on PATH; it reads no RPC,
 downloads no dependencies, and does not write benchmark or fixture artifacts.
 It is test infrastructure, not a production snapshot reader or an on-chain proof.
 
+[Checkpoint 4K](../reviews/CHECKPOINT_4K.md) adds a separate raw-storage reader
+comparison in `contracts/test/OtterSnapshotReader.t.sol`. It exports actual local
+manager bytecode and header/liquidity/bitmap/tick slots, checks the Solidity slot
+formula against `StateLibrary`, and invokes
+`web/test/snapshot-reader-cli.ts`. That bridge serves an in-memory read-only RPC
+to `captureExecution`, requiring block-hash selectors and explicit storage data.
+All quote fields are compared with the oracle, then supported results with real
+PoolManager swaps, including native ETH, concentrated gaps and tick boundaries.
+Block metadata is synthetic; this does not test a real provider, canonical-chain
+authentication or an auction. Run the targeted Forge command in the checkpoint
+report; it changes no saved fixture or benchmark.
+
 `research/discrete-counterexamples.json` is a separate negative-control artifact
 from the bounded one-sided discrete laboratory. It records exact allocations,
 counterfactual payments, funding/IR failures, rounding deviations and partial

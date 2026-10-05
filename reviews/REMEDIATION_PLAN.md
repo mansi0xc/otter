@@ -589,6 +589,32 @@ interrupted before returning their hash, browser storage loss, cross-tab action
 coordination and actual connector/testnet evidence remain. LP deposits/discovery
 and concentrated auction execution remain open. G1–G4 and the priority to preserve
 the paper's guarantees are unchanged; no new rule, utility or asset is selected.
-**7C is pending the user's commit.** Its report contains fresh wallet/build/browser
+**7C was committed by the user as `0e5b727`; the tree was clean before 4K.** Its report contains fresh wallet/build/browser
 checks and the handoff. A new selected snapshot covers the history code; earlier
 manifests retain their recorded bytes.
+
+## Checkpoint 4K: bounded raw-core state collection at one block hash
+
+[The reader checkpoint](./CHECKPOINT_4K.md) removes manual bitmap/tick-map assembly
+for a single exact-input quote. A read-only RPC callback selects one block and
+checks chain and caller-configured manager bytecode. Code and storage queries
+require that block hash and canonicality; missing/malformed data or a detected
+chain/block change fails. Header, signed bitmap/tick keys, liquidity and stored
+boundary ticks match the pinned core layout. Collection is demand-driven and
+bounded to 82 storage calls. Numerical quote math and supported statuses are
+unchanged; unsupported prefixes do not become usable output budgets.
+
+Fresh mocked-RPC and real local-core comparisons cover native ETH, concentrated
+gaps, exact boundaries, empty words, domain/traversal limits and failure paths.
+This is a state-preparation slice, not a production provider/indexer, ownership
+proof, complete counterfactual curve or authenticated concentrated epoch. Actual
+provider and testnet evidence remain; concentrated auction gates remain closed.
+The legacy allocation/payment rule, G1–G4 and the priority to preserve the paper's
+guarantees are unchanged. No new asset, utility, subsidy or weaker rule is selected.
+
+**4K is pending the user's commit.** Its report lists fresh checks and the exact
+handoff. A new selected-content snapshot adds reader/test sources; old manifests
+remain frozen and identify their earlier bytes. Next, bind a complete supported
+finite execution domain to the opening ownership/epoch records under G2/G3,
+together with a compatible mechanism under G1/G4; do not infer auction correctness
+from a correct isolated quote.

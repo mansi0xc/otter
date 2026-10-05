@@ -123,7 +123,9 @@ The current hook enforces the following integration rules:
   Later admission and settlement check the opening state; donations and exit
   reservations leave it intact. Historical records survive exits and new epochs.
   The v2 snapshot also binds capital weights and the fixed reward policy.
-  A production RPC reader remains to implement.
+  A bounded raw-core reader now collects quote state at one block hash;
+  production provider/indexer and authenticated concentrated epoch integration
+  remain unfinished. See [checkpoint 4K](./reviews/CHECKPOINT_4K.md).
 - **Concentrated execution gate.** Range positions are supported for custody.
   Order admission and swaps reject pools containing funded concentrated
   positions while the legacy auction still uses constant-product reserves.
@@ -138,6 +140,13 @@ The current hook enforces the following integration rules:
   result statuses. Tests compare it with the oracle and real PoolManager swaps.
   Missing bitmap/tick data fails explicitly. This is an offline execution model;
   the legacy auction solver still has its documented payment and tie failures.
+- **Read-only state collection.** A callback-based RPC reader checks the chain
+  and configured manager runtime fingerprint, pins code/storage reads to one
+  canonical block hash and fetches only the quote's visited words/ticks. It
+  rejects missing/malformed state and detected block changes, with at most 82
+  storage calls. Its local tests compare exported real core storage, exact quotes
+  and native/concentrated swaps. It is not an authenticated epoch or live provider
+  integration; concentrated auctions remain gated.
 - **Discrete mechanism research.** `solver/src/discrete-research.ts` maximizes
   exact linear welfare on fixed small one-sided domains and computes raw pivots,
   with independent exhaustive checks. It preserves partial-capacity diagnostics

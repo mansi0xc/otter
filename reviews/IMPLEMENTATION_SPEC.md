@@ -188,8 +188,10 @@ zero words, and every reached initialized tick. Missing data fails explicitly;
 it must not be interpreted as absent liquidity. Snapshot tick is preserved,
 including core's downward predecrement; replacing it with inverse(price) can
 choose the wrong liquidity side. The reference neither mutates nor authenticates
-its supplied maps. Test snapshots come from actual PoolManager reads, but a
-production RPC reader and concentrated snapshot integration remain to implement.
+its supplied maps. Test snapshots come from actual PoolManager reads.
+Checkpoint 4K adds a bounded callback-based raw-core reader at one block hash;
+production provider/indexer and authenticated concentrated epoch integration
+remain to implement.
 Checkpoint 4C records the opening configuration and ownership version and
 revalidates the admitted full-range epoch before execution. The local ABI/FFI
 bridge is test-only and is not an on-chain witness or verification mechanism.
@@ -632,3 +634,32 @@ record authorizes a signature, send, retry or claim. Cross-tab signing locks,
 replacement discovery after interruption, authenticated durable indexing and
 wallet/testnet end-to-end demonstrations remain unfinished. Production Solidity,
 mechanism rules, the null deployment manifest and G1–G4 are unchanged.
+
+Checkpoint 7C was committed by the user as `0e5b727`; the tree was clean before
+4K. [Checkpoint 4K](./CHECKPOINT_4K.md) supplies `captureExecution` as a bounded
+read-only state collector for the pinned core layout. It accepts a caller-supplied
+RPC adapter and chain/manager/runtime fingerprint, selects an explicit or latest
+block, and sends all code/storage queries with `blockHash` and `requireCanonical`.
+It rereads the numbered block and chain before returning. Unsupported providers,
+missing blocks/words, invalid packed state and detected reorg/session changes
+abort; no number/latest fallback fabricates a partial snapshot.
+
+The collector decodes signed storage mapping keys and tick liquidity, preserves
+core's downward-boundary tick and explicit zero bitmap words, and loads only the
+records demanded by this particular exact-input quote. It uses at most two
+header/liquidity reads, 16 words and 64 reached initialized ticks. Up to 81 bounded
+model replays use unchanged numerical math, limits and statuses. Structured
+missing-state errors replace no arithmetic. Unsupported traversal prefixes remain
+diagnostics, and zero input remains a model no-op rather than a public swap.
+
+Local tests compare actual exported PoolManager storage, browser reader, BigInt
+reference, Solidity oracle and real swaps; test block metadata/RPC are synthetic.
+No provider connection, wallet action or on-chain witness is supplied. Returned
+maps cover only the requested path, not every allocation/counterfactual. RPC data
+and the configured fingerprint remain trust inputs; checks do not independently
+authenticate consensus, ownership/reward records, opening epochs or future
+execution. Arbitrary hook/token behavior is outside the raw zero-fee model.
+Concentrated auction admission and swaps stay gated. Production Solidity, the
+legacy allocator/payment rule, assets/utility, wallet configuration and G1–G4
+are unchanged. Complete finite curve/epoch authentication and the mechanism design
+before activating those integrations.

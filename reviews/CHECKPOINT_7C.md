@@ -2,7 +2,7 @@
 
 Prepared 6 October 2026. Starting commit:
 `d76b12c2ba1f1f6e74ef449f8d6bc792286840f4`. The working tree was clean.
-Status: **local history/recovery slice verified; waiting for the user's commit**.
+Status: **committed by the user as `0e5b727`; the tree was clean before 4K**.
 
 ## Outcome
 
@@ -178,8 +178,8 @@ Suggested explanation:
 > receipt and admission-ID recovery, storage/session/reorg failure checks and
 > explicit local forgetting. Keep writes disabled pending a reviewed deployment.
 
-The assistant has not staged or committed anything. Commit these **17 files**
-and confirm before work continues:
+The assistant did not stage or commit anything. The user committed these
+**17 files** as `0e5b727`, confirming before checkpoint 4K began:
 
 ```text
 README.md

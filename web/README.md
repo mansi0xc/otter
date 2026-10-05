@@ -185,6 +185,54 @@ unrelated transaction records overwriting each other. This does not serialize
 other tabs' wallet actions, prevent duplicate manual sends or eliminate capacity
 races at the record limit. The existing action lock operates within one tab.
 
+## Read-only exact execution state preparation
+
+`src/protocol/executionSnapshot.ts` exports `captureExecution(rpc, source,
+request)`. It is a standalone research helper, not connected to the wallet UI or
+deployment manifest. `source` specifies a BigInt chain ID, manager address,
+reviewed runtime hash and full pool key. `request` specifies direction, BigInt raw
+input/price limit and an optional BigInt block number. The caller supplies a
+`SnapshotRpc` callback supporting only `eth_chainId`, `eth_getBlockByNumber`,
+`eth_getCode` and `eth_call`. No default RPC URL, network adapter, wallet, signing,
+sending or automatic retry is provided.
+
+The pinned layout is core commit `e50237c43811bd9b526eff40f26772152a42daba`.
+The manager runtime must match the caller-configured hash; that hash is a trust
+input, not an independent audit. Code and storage reads require the selected
+block's hash and `requireCanonical: true`, following
+[EIP-1898](https://eips.ethereum.org/EIPS/eip-1898). Unsupported providers fail
+instead of falling back to numbered/latest state. Before returning, the reader
+rereads the selected numbered block and chain to reject detected changes.
+Missing blocks, storage errors, malformed returns, inconsistent packed fields
+and invalid reached tick liquidity also fail explicitly.
+
+The exact BigInt reference requests missing records with structured errors. The
+reader loads at most two header/liquidity slots, 16 bitmap words and 64 reached
+initialized ticks (82 storage calls), retaining explicit empty words and signed
+tick/net-liquidity data. Up to 81 bounded model replays leave the quote's math,
+domain and statuses unchanged. Zero input is a model no-op; actual v4 public swaps
+reject zero input. Only `Complete`/`PriceLimit` quote statuses are usable;
+unsupported prefixes are diagnostics. The result includes block identity,
+source/key/layout, sparse maps, quote and storage-read count.
+
+Those maps cover **this request**, not a complete counterfactual curve. They do
+not prove consensus, finality, opening ownership, epoch validity, fee/hook/token
+delivery behavior or later execution. A trusted RPC can still lie and a later
+reorg can still occur. The raw-core model supports the existing zero-fee domain;
+arbitrary hooks remain outside it. The helper does not activate concentrated
+auctions or choose a new mechanism under G1–G4.
+
+`npm test` includes bounded mocked-RPC failure tests. For actual exported local
+core storage and swap comparisons, run from `contracts/`:
+
+```sh
+forge test --offline --match-contract '^OtterSnapshotReaderTest$' --fuzz-runs 64
+```
+
+The FFI bridge uses existing Node/viem and an in-memory RPC with synthetic block
+metadata. It uses no real provider, wallet or chain transaction. See
+[checkpoint 4K](../reviews/CHECKPOINT_4K.md) for fresh results and limits.
+
 ## Evidence and remaining work
 
 `npm test` runs offline mocked-RPC/wallet failure tests and checks the ABI subset

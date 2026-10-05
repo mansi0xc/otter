@@ -28,6 +28,14 @@ do not establish finality or an authenticated indexer. The wallet remains disabl
 by its null manifest. [7C](./CHECKPOINT_7C.md) records fresh local wallet/build and
 synthetic interface checks; no new contract or mechanism evidence is claimed.
 
+Local 4K update starts from the user-created `0e5b727` commit. It adds a bounded
+read-only raw-core state collector using one block hash, a configured runtime
+fingerprint and exact signed slot decoding. Only the quote's demanded words/ticks
+are loaded; missing state and detected block/chain changes fail. Local raw-storage
+and real-swap comparisons include native ETH and concentrated liquidity, with
+synthetic RPC/block metadata. It does not authenticate a complete epoch/curve,
+activate concentrated auctions or resolve G1–G4. See [4K](./CHECKPOINT_4K.md).
+
 ## Decision the review must support
 
 Determine whether a useful v4 mechanism can meet the requested incentive targets
@@ -185,7 +193,7 @@ scope and compensation; do not label internal tests as independent review.
 
 Use the full repository with submodules populated. The selected evidence files
 and their Solidity import closure are hashed in
-[EVIDENCE_MANIFEST_7C.json](./EVIDENCE_MANIFEST_7C.json). That manifest records the
+[EVIDENCE_MANIFEST_4K.json](./EVIDENCE_MANIFEST_4K.json). That manifest records the
 pre-patch baseline, local checkpoint, dependency commits and observed tools.
 It identifies the post-patch selected bytes and does not hash this brief or later
 status edits, authenticate an author, inspect unlisted files, or certify safety.
@@ -195,7 +203,7 @@ relying on submodule HEAD alone. Review the verifier before running it.
 From the repository root, with the already available tools:
 
 ```sh
-python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_7C.json
+python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4K.json
 ```
 
 From `solver/`:
@@ -251,6 +259,25 @@ explicit forgetting and admission-ID recovery. No contract suite is claimed as
 fresh in 7C because contracts and their ABI are unchanged. History is untrusted,
 read-only display data; finality, durable indexing, post-interruption replacement
 discovery and actual connector/testnet evidence remain open.
+
+To reproduce 4K's hash-pinned reader slice, run `npm test` and
+`npm run build -- --outDir /tmp/otter-4k-web-dist` from `web/`, and from `contracts/`:
+
+```sh
+forge test --offline --match-contract '^OtterSnapshotReaderTest$' --fuzz-runs 64
+forge test --offline --match-contract '^(OtterExecutionOracleTest|OtterExecutionReferenceTest)$' --fuzz-runs 64
+```
+
+Run the commands sequentially. Fresh 4K results: 65 mocked wallet/reader groups,
+152 solver groups, a successful TypeScript/production build, eight new reader
+tests (64 concentrated fuzz cases), and 44 existing oracle/reference regressions
+(64 reference fuzz cases). Forge metadata/storage transport is synthetic, while
+the exported storage and supported swaps use actual local core contracts. These
+tests do not exercise a provider's canonical-chain behavior or a real wallet.
+No numerical quote rule, production Solidity or economic fixture changed. The
+reader does not close G2/G3; ownership/epoch authentication and complete finite
+counterfactual coverage remain open. Detailed provenance is in the 4K report.
+
 Review `foundry.toml`: FFI is enabled for local reference comparisons and the
 test-only gas ceiling is artificially large. That ceiling is not deployment
 capacity evidence. Avoid `GasCurveTest` and `SandwichHarness` when preserving the
@@ -267,13 +294,19 @@ The [4I snapshot](./EVIDENCE_MANIFEST_4I.json) is also frozen at its checkpoint
 bytes. The separate 4J snapshot adds the checker, local CLI bridge and tests;
 changes to the previously hashed solver/test sources are explicitly identified
 in the [4J report](./CHECKPOINT_4J.md).
-The frozen 4J selection is unchanged by the wallet slice: it selected only the
-dashboard from `web/`, so a passing older hash check does not cover the new wallet
-changes. The separate 7B snapshot includes wallet files, build configuration,
+The frozen 4J selection was unchanged by the wallet slices: it selected only the
+dashboard from `web/`, so its passing older hash check did not cover the new wallet
+changes. In 4K, its selected `solver/src/execution.ts` differs solely by structured
+missing-state metadata, and `fixtures/README.md` documents the new bridge.
+Its current verification therefore detects those two changes;
+retain the older archive for the old content check. The separate 7B snapshot includes wallet files, build configuration,
 the existing lockfile and tests, excluding installed packages and generated builds.
-The 7B manifest remains frozen at its checkpoint bytes; five selected wallet
-files now differ from it. The separate 7C snapshot covers those changes plus the
-four new journal/inspection/interface files. A passing content check supplies
+The 7B manifest remains frozen at its checkpoint bytes; at 7C, five selected wallet
+files differed from it. The separate 7C snapshot covers those changes plus the
+four new journal/inspection/interface files. Its selected `solver/src/execution.ts`,
+`web/package.json` and `fixtures/README.md` now differ in 4K. The separate 4K snapshot selects 278 files,
+adding the reader, mocked tests, local FFI bridge and real-core test. All earlier
+manifests retain their bytes. A passing content check supplies
 identity only, not authenticated history, receipt correctness or grant readiness.
 A reviewer should retain their own tool versions,
 logs and content identifiers, and explain any reproduction difference. No
