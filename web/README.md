@@ -386,6 +386,36 @@ no complete original-budget/counterfactual proof. Canonical outcomes, incentives
 finality, later settlement and concentrated auctions remain unresolved. The UI
 does not invoke this helper. See [checkpoint 4O](../reviews/CHECKPOINT_4O.md).
 
+`inspectOpeningPrefixCoverage(anchor, record, frame, orders)` in
+[`batchCoverage.ts`](./src/protocol/batchCoverage.ts) is a pure inventory of
+original input coverage. Authenticate its 4O `batchBinding` anchor independently.
+It revalidates mutable record/frame/order content against that binding and
+inventories the original batch, omission of each record, and omission of all
+records for each trader address. Those last two hypotheses deliberately remain
+distinct; no participant or pivot-payment policy is selected. LP ownership and
+opening state remain fixed in these inventory cases.
+
+Each case preserves the retained original fields/order hash and sums original
+side budgets. For both directions, it reports the represented prefix, exact
+missing suffix, unsupported row indices and supported partial-consumption rows.
+A represented partial quote is not full consumption; even a missing zero point
+stays missing. Supported diagnostics outside a case's required prefix do not
+veto that case. The original case cannot be promoted because smaller removal
+cases happen to fit. All nested output arrays/entries are detached and frozen.
+The normalized, versioned `coverageHash` binds input context and inventories.
+
+`requireWholeInputOpeningPrefixes` re-evaluates those inputs and rejects any
+missing, unsupported or partial required row before whole-input experiments.
+It accepts no saved report flag as proof. At most 65 cases scan already bounded
+tables; original uint96 demands are counted exactly without Number coercion or
+enumeration. No additional RPC is made and the 0–64 work bound is unchanged.
+Passing this conservative data precondition supplies no optimization, canonical
+payments, participant guarantee, sequential/netting trace, current custody/
+lifecycle recheck, finality or later settlement promise. It is not wired into
+the UI or production settlement. [The requirements](../reviews/ORIGINAL_DOMAIN_REQUIREMENTS.md)
+state the remaining mechanism/witness obligations; [checkpoint 4P](../reviews/CHECKPOINT_4P.md)
+records the local comparisons. G1–G4 and concentrated auction gates remain open.
+
 ## Evidence and remaining work
 
 `npm test` runs offline mocked-RPC/wallet failure tests and checks the ABI subset

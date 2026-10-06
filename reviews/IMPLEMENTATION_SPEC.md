@@ -786,3 +786,30 @@ prefixes. Full original counterfactual coverage, canonical computation, accepted
 on-chain verification, concentrated integration and G1–G4 remain open. No
 production rule, valuation, asset/utility representation or weaker guarantee is
 selected, and this checkpoint does not establish grant qualification.
+
+Checkpoint 4O was committed by the user as `c644c32`; the tree was clean before
+4P. [Checkpoint 4P](./CHECKPOINT_4P.md) adds a pure original-prefix inventory.
+It revalidates mutable opening/curve/order content against an authenticated 4O
+binding, then inventories the original batch, every record omission and every
+complete trader-address omission. Each case preserves original fields and
+retained order hashes, with exact summed side budgets. The address inventory
+selects no strategic participant, false-name or LP-removal policy.
+
+Both directional prefixes report missing suffixes, unsupported rows and supported
+partial consumption separately. Missing zero rows are not invented; the actual
+model no-op stays supported. Smaller removal cases or individually covered
+budgets cannot promote an uncovered original aggregate. Huge uint96 demands are
+counted without enumeration or Number coercion; at most 65 cases classify the
+existing bounded tables. All returned nested entries/arrays are frozen and a
+versioned ABI hash binds the input context and case inventory.
+
+The separate whole-input precondition re-evaluates the bound content and refuses
+missing/unsupported/partial required rows for experiments assuming complete
+requested input. It does not accept an old successful report as proof or impose
+a new admission domain. Passing data coverage does not validate signed asks'
+economic eligibility, canonical optimization/payment rules, counterfactual
+welfare, sequential/netting traces, trader/LP incentives or execution today.
+[Original-domain requirements](./ORIGINAL_DOMAIN_REQUIREMENTS.md) state the
+remaining G1–G4 obligations for a selected rule and accepted complete witness.
+No production Solidity, numerical policy, asset/utility, wallet source/configuration
+or concentrated gate changes. No replacement rule or weaker guarantee is selected.

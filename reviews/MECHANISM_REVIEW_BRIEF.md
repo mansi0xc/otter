@@ -74,6 +74,15 @@ budgets are preserved, but the small curve prefixes still leave original-domain
 counterfactual coverage and canonical computation unresolved. G1–G4 and
 concentrated integration remain open. See [4O](./CHECKPOINT_4O.md).
 
+Local 4P update starts from the user-created `c644c32` commit. A pure inspector
+revalidates bound opening/batch content and inventories original summed side
+prefixes plus record/address removals. Missing rows, unsupported diagnostics and
+supported partial consumption remain distinct. A whole-input research precondition
+refuses incomplete required prefixes without clipping original budgets or
+trusting an old report flag. The inventory selects no participant, optimizer,
+payment or ownership-removal rule and supplies no economic witness. See
+[4P](./CHECKPOINT_4P.md) and [the remaining original-domain requirements](./ORIGINAL_DOMAIN_REQUIREMENTS.md).
+
 ## Decision the review must support
 
 Determine whether a useful v4 mechanism can meet the requested incentive targets
@@ -231,7 +240,7 @@ scope and compensation; do not label internal tests as independent review.
 
 Use the full repository with submodules populated. The selected evidence files
 and their Solidity import closure are hashed in
-[EVIDENCE_MANIFEST_4O.json](./EVIDENCE_MANIFEST_4O.json). That manifest records the
+[EVIDENCE_MANIFEST_4P.json](./EVIDENCE_MANIFEST_4P.json). That manifest records the
 pre-patch baseline, local checkpoint, dependency commits and observed tools.
 It identifies the post-patch selected bytes and does not hash this brief or later
 status edits, authenticate an author, inspect unlisted files, or certify safety.
@@ -241,7 +250,7 @@ relying on submodule HEAD alone. Review the verifier before running it.
 From the repository root, with the already available tools:
 
 ```sh
-python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4O.json
+python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4P.json
 ```
 
 From `solver/`:
@@ -393,6 +402,20 @@ full original counterfactual domain, canonical payments, future delivery or new
 mechanism are proved. No fresh full solver/broad suite/benchmark/provider/wallet
 run is claimed; production rules and saved economic evidence are unchanged.
 
+To reproduce 4P, run `npm test` and
+`npm run build -- --outDir /tmp/otter-4p-web-dist` from `web/`, then the targeted
+`OtterOpeningExecutionTest` command above from `contracts/`.
+Fresh 4P results: 126 Node groups, TypeScript/production build and 27 local
+contract tests with four 64-case fuzz groups. Twelve added Node groups cover
+aggregate/missing/partial/unsupported bounds, both removal inventories, changed
+content/anchors, frozen output and 64 seeded independently derived inventories
+through the 65-case maximum. Seven new contract tests compare actual book
+orders, oracle prefix classifications and the versioned ABI hash. Native and
+maximum-budget cases stay explicitly incomplete. RPC/block hashes are synthetic;
+no pivot computation, canonical rule, signature proof, full scalable original
+domain, future delivery or new incentive guarantee is supplied. No fresh solver,
+broad suite, benchmark, provider or wallet run is claimed.
+
 Review `foundry.toml`: FFI is enabled for local reference comparisons and the
 test-only gas ceiling is artificially large. That ceiling is not deployment
 capacity evidence. Avoid `GasCurveTest` and `SandwichHarness` when preserving the
@@ -435,6 +458,10 @@ suite, fixture README, package test entry, epoch Node test and staticcall bridge
 The separate 4O snapshot adds the complete stored-batch collector, its Node tests
 and extracted shared fixture, for 288 selected files. Earlier manifests retain
 their bytes.
+The 4O manifest is now frozen: four selected files differ in 4P (the Solidity
+suite, fixture README, package test entry and bridge). The separate 4P snapshot
+adds the coverage inspector, Node tests and original-domain requirements for
+291 selected files, without modifying earlier manifest bytes.
 A passing content check supplies
 identity only, not authenticated history, receipt correctness or grant readiness.
 A reviewer should retain their own tool versions,

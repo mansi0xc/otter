@@ -2,7 +2,8 @@
 
 Prepared 6 October 2026. Starting commit:
 `e9eecb576255ea2eee9a31cbb8987758016880c3`. The working tree was clean.
-Status: **local batch collection verified; waiting for the user's commit**.
+Status: **committed by the user as `c644c321cdecb66bd1b1d6ec2c905b1e2cb488b0`**.
+The tree was clean before [checkpoint 4P](./CHECKPOINT_4P.md).
 
 ## Outcome
 
@@ -160,8 +161,8 @@ Suggested explanation:
 > pinned epoch. Check replay, recovery and nonce bits, then require native/ERC20
 > custody to cover shared escrow and claims; add offline and real-contract tests.
 
-The assistant has not staged or committed anything. Commit these **16 files**
-and confirm before work continues:
+Historical handoff: the user committed these **16 files**. The assistant did not
+stage or commit anything:
 
 ```text
 README.md

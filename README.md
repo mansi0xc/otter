@@ -170,6 +170,11 @@ The current hook enforces the following integration rules:
   and requires native/ERC20 custody to cover shared escrow plus claims at the
   same block hash. Original budgets remain intact; bounded quote prefixes do
   not cover them automatically. See [checkpoint 4O](./reviews/CHECKPOINT_4O.md).
+- **Original-prefix coverage inventory.** A pure helper compares original summed
+  side budgets with the bound tables, distinguishing missing, unsupported and
+  partially consumed inputs. It inventories record/address removals and rejects
+  incomplete data for whole-input experiments. This verifies no economic outcome
+  or incentive theorem. See [checkpoint 4P](./reviews/CHECKPOINT_4P.md).
 - **Discrete mechanism research.** `solver/src/discrete-research.ts` maximizes
   exact linear welfare on fixed small one-sided domains and computes raw pivots,
   with independent exhaustive checks. It preserves partial-capacity diagnostics

@@ -97,6 +97,19 @@ hash identity remain synthetic. No signature history or token delivery is proved
 and original budgets do not become covered by the bounded research quote tables.
 No saved economic artifact is regenerated.
 
+[Checkpoint 4P](../reviews/CHECKPOINT_4P.md) adds seven coverage comparisons,
+including another 64-case fuzz group, to the same local Solidity suite. The
+bridge's `--coverage` mode first captures the actual complete stored batch, then
+returns the pure original/removal coverage inventory. Solidity independently
+derives retained-order hashes, budgets, missing-prefix counts, unsupported/partial
+row indices and the versioned ABI hash using actual book data and oracle quotes.
+Cases cover small complete mixed prefixes, incomplete aggregates despite covered
+individual budgets, maximum original budgets, partial and unsupported rows, and
+native custody. The complete stored batch and selected opening state remain
+fixed. These are hypothetical record/address removals, not computed pivots or
+an authenticated participant model. RPC/block hashes are synthetic; no saved
+research/benchmark artifact is regenerated and no economic rule is selected.
+
 `research/discrete-counterexamples.json` is a separate negative-control artifact
 from the bounded one-sided discrete laboratory. It records exact allocations,
 counterfactual payments, funding/IR failures, rounding deviations and partial

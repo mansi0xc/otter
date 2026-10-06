@@ -51,6 +51,13 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         EpochResult context; bytes32 ordersHash; uint256 budget0; uint256 budget1;
         uint256 balance0; uint256 balance1; uint256 escrow0; uint256 escrow1; uint256 claimable0; uint256 claimable1;
     }
+    struct DirectionCoverage {
+        bool down; uint256 requiredInput; bool domainPresent; uint256 maxInput; uint160 limit;
+        uint256 representedInputs; uint256 missingInputs; uint256[] unsupportedAt; uint256[] partialAt;
+    }
+    struct CoverageCase {
+        uint8 kind; address trader; uint8[] omittedIndices; bytes32 ordersHash; DirectionCoverage[] directions;
+    }
 
     function _record(PoolKey memory k, uint256 epoch) private view returns (OpeningRecord memory r) {
         bytes32 id = PoolId.unwrap(k.toId());
@@ -241,6 +248,65 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         (uint64 closesAt,,) = book.batches(PoolId.unwrap(k.toId()), epoch); vm.warp(closesAt);
     }
 
+    function _assertPrefix(DirectionCoverage memory d, uint256 budget, Curve memory curve) private pure returns (bool) {
+        assertEq(d.down, curve.down); assertEq(d.requiredInput, budget); assertTrue(d.domainPresent);
+        assertEq(d.maxInput, curve.maxInput); assertEq(d.limit, curve.limit);
+        uint256 examined = (budget < curve.maxInput ? budget : curve.maxInput) + 1;
+        assertEq(d.representedInputs, examined); assertEq(d.missingInputs, budget + 1 - examined);
+        uint256[] memory unsupported = new uint256[](examined); uint256[] memory partialInputs = new uint256[](examined);
+        uint256 unsupportedCount; uint256 partialCount;
+        for (uint256 i; i < examined; ++i) {
+            OtterExecutionOracle.Quote memory q = curve.points[i];
+            bool supported = q.status == OtterExecutionOracle.Status.Complete || q.status == OtterExecutionOracle.Status.PriceLimit;
+            if (!supported) unsupported[unsupportedCount++] = i;
+            else if (q.consumedInput != i) partialInputs[partialCount++] = i;
+        }
+        assembly ("memory-safe") { mstore(unsupported, unsupportedCount) mstore(partialInputs, partialCount) }
+        assertEq(d.unsupportedAt, unsupported); assertEq(d.partialAt, partialInputs);
+        return d.missingInputs == 0 && unsupportedCount == 0 && partialCount == 0;
+    }
+
+    function _coverageCheck(PoolKey memory k, uint256 cap, uint160 downLimit, bool expectedAvailable) private {
+        EpochFixture memory f = _batchFixture(k, 0, cap, address(this)); f.downLimit = downLimit;
+        (bytes32 coverageHash, bool available, CoverageCase[] memory cases) =
+            abi.decode(vm.ffi(_epochCommand("--coverage", abi.encode(f))), (bytes32, bool, CoverageCase[]));
+        bytes32 id = PoolId.unwrap(k.toId()); OtterOrderBook.Order[] memory orders = book.getOrders(id, 0);
+        address[] memory traders = new address[](orders.length); uint256 traderCount;
+        for (uint256 i; i < orders.length; ++i) {
+            bool seen; for (uint256 j; j < i; ++j) if (orders[j].trader == orders[i].trader) seen = true;
+            if (!seen) traders[traderCount++] = orders[i].trader;
+        }
+        assertEq(cases.length, 1 + orders.length + traderCount); assertLe(cases.length, 65);
+        Curve[] memory curves = new Curve[](2); OtterExecutionOracle oracle = new OtterExecutionOracle(manager);
+        for (uint256 side; side < 2; ++side) {
+            curves[side].down = side == 0; curves[side].maxInput = cap; curves[side].limit = side == 0 ? f.downLimit : f.upLimit;
+            curves[side].points = new OtterExecutionOracle.Quote[](cap + 1);
+            for (uint256 amount; amount <= cap; ++amount) curves[side].points[amount] = oracle.quoteExactInput(k, side == 0, amount, curves[side].limit);
+        }
+        bool allAvailable = true;
+        for (uint256 c; c < cases.length; ++c) {
+            CoverageCase memory current = cases[c]; uint8 kind = c == 0 ? 0 : c <= orders.length ? 1 : 2;
+            address trader = kind == 0 ? address(0) : kind == 1 ? orders[c - 1].trader : traders[c - 1 - orders.length];
+            assertEq(current.kind, kind); assertEq(current.trader, trader);
+            uint256 omittedCount;
+            for (uint256 i; i < orders.length; ++i) if ((kind == 1 && i == c - 1) || (kind == 2 && orders[i].trader == trader)) ++omittedCount;
+            uint8[] memory omitted = new uint8[](omittedCount);
+            OtterOrderBook.Order[] memory retained = new OtterOrderBook.Order[](orders.length - omittedCount);
+            uint256 removed; uint256 kept; uint256[2] memory budgets;
+            for (uint256 i; i < orders.length; ++i) {
+                if ((kind == 1 && i == c - 1) || (kind == 2 && orders[i].trader == trader)) omitted[removed++] = uint8(i);
+                else { retained[kept++] = orders[i]; budgets[orders[i].sellingCurrency0 ? 0 : 1] += orders[i].budget; }
+            }
+            assertEq(keccak256(abi.encode(current.omittedIndices)), keccak256(abi.encode(omitted)));
+            assertEq(current.ordersHash, keccak256(abi.encode(retained))); assertEq(current.directions.length, 2);
+            for (uint256 side; side < 2; ++side) if (!_assertPrefix(current.directions[side], budgets[side], curves[side])) allAvailable = false;
+        }
+        assertEq(available, allAvailable); assertEq(available, expectedAvailable);
+        assertEq(coverageHash, keccak256(abi.encode(keccak256("OtterOpeningPrefixCoverage/v1"), block.chainid, address(book),
+            id, uint256(0), book.configVersionOf(id), f.blockNumber, f.blockHash, book.snapshotHash(id, 0),
+            keccak256(abi.encode(curves)), keccak256(abi.encode(orders)), book.batchDigest(id, 0), cases)));
+    }
+
     function _captureFailure(uint256 epoch, address caller, string memory reason) private {
         Vm.FfiResult memory r = vm.tryFfi(_epochCommand("--capture", abi.encode(_epochFixture(otterKey, epoch, 8, caller))));
         assertNotEq(r.exitCode, 0); assertEq(r.stdout.length, 0);
@@ -395,5 +461,46 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         vm.chainId(bound(chainSeed, 1, type(uint64).max)); vm.roll(bound(blockSeed, 1, type(uint64).max));
         _submitStored(otterKey, side, bound(budgetSeed, 1, type(uint96).max), 123, nonceSeed, 0xA11CE, false);
         _close(otterKey, 0); _batchCheck(otterKey, 0, bound(capSeed, 0, 8), address(this));
+    }
+
+    function test_coverageMatchesCompleteSmallMixedPrefixesAndBothRemovalInventories() public {
+        _submitStored(otterKey, true, 3, type(uint128).max, 0, 0xA11CE, false);
+        _submitStored(otterKey, false, 2, 0, 1, 0xA11CE, false);
+        _submitStored(otterKey, true, 2, 0, 0, 0xB0B, false); _close(otterKey, 0);
+        _coverageCheck(otterKey, 8, TickMath.getSqrtPriceAtTick(-1200), true);
+    }
+
+    function test_coverageRejectsIncompleteAggregateDespiteCoveredIndividualBudgets() public {
+        _submitStored(otterKey, true, 5, 0, 0, 0xA11CE, false);
+        _submitStored(otterKey, true, 5, 0, 0, 0xB0B, false); _close(otterKey, 0);
+        _coverageCheck(otterKey, 8, TickMath.getSqrtPriceAtTick(-1200), false);
+    }
+
+    function test_coveragePreservesMaximumOriginalBudgetWithBoundedWork() public {
+        _submitStored(otterKey, true, type(uint96).max, type(uint128).max, type(uint256).max, 0xA11CE, true);
+        _close(otterKey, 0); _coverageCheck(otterKey, 64, TickMath.getSqrtPriceAtTick(-1200), false);
+    }
+
+    function test_coverageKeepsSupportedPartialConsumptionSeparateFromMissingData() public {
+        _submitStored(otterKey, true, 5, 0, 0, 0xA11CE, false); _close(otterKey, 0);
+        _coverageCheck(otterKey, 8, SQRT_PRICE_1_1 - 1, false);
+    }
+
+    function test_coverageKeepsUnsupportedRowsAndTheZeroNoopExplicit() public {
+        _submitStored(otterKey, true, 5, 0, 0, 0xA11CE, false); _close(otterKey, 0);
+        _coverageCheck(otterKey, 8, 0, false);
+    }
+
+    function test_coverageMatchesNativeCustodyWithoutClippingItsOriginalBudget() public {
+        PoolKey memory k = _nativeEpoch(); _close(k, 0);
+        _coverageCheck(k, 8, TickMath.getSqrtPriceAtTick(-1200), false);
+    }
+
+    function testFuzz_coverageMatchesActualOrderRemovalsAndOriginalPrefixBounds(uint8 countSeed, uint96 budgetSeed, uint8 capSeed) public {
+        uint256 n = bound(countSeed, 1, 8); uint256 cap = bound(capSeed, 0, 8);
+        uint256 budget = bound(budgetSeed, 1, uint256(type(uint96).max) / n);
+        for (uint256 i; i < n; ++i) _submitStored(otterKey, i % 2 == 0, budget, 123, i, i % 3 == 0 ? 0xB0B : 0xA11CE, false);
+        _close(otterKey, 0); _coverageCheck(otterKey, cap, TickMath.getSqrtPriceAtTick(-1200),
+            ((n + 1) / 2) * budget <= cap && (n / 2) * budget <= cap);
     }
 }

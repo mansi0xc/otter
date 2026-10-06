@@ -725,9 +725,38 @@ shared-pool escrow plus prior claims and a custody shortfall. Transport/block
 hash remain synthetic. No new full solver, broad contract suite, economic
 benchmark, live provider or wallet evidence is claimed.
 
-**4O is pending the user's commit.** Its report records fresh validation and the
+**4O was committed by the user as `c644c32`; the tree was clean before 4P.** Its report records fresh validation and the
 exact 16-file handoff. The separate 288-file content snapshot retains the 4N
 selection plus three batch/test/fixture files; earlier manifests stay frozen.
 Next specify full original-domain coverage and canonical witness obligations
 alongside a compatible G1/G4 mechanism. Concentrated integration, independent
 review and grant evidence remain necessary; no replacement rule is selected.
+
+## Checkpoint 4P: original-prefix coverage and explicit removal inventories
+
+[The coverage checkpoint](./CHECKPOINT_4P.md) revalidates opening/batch content
+against the 4O binding before comparing complete original summed side budgets
+with the captured tables. It distinguishes missing inputs, unsupported rows and
+supported partial consumption, preserving original signed quantities. The
+original batch and every record/address omission have exact retained-order hashes
+and remaining budget inventories; these are hypotheses, not a participant policy
+or computed pivots. A pure guard refuses incomplete data for whole-input research
+and evaluates the content again rather than trusting a saved report flag.
+
+Fresh validation: 126 Node groups including 64 seeded independent inventories,
+TypeScript/production build and 27 local contract tests with four 64-case fuzz
+groups. Seven new contract tests compare actual order/removal/budget inventories
+and unsupported/partial/missing classifications with the independent oracle.
+They include native custody, maximum original budgets and incomplete aggregates
+whose individual records fit the prefix. Transport/block hashes remain synthetic.
+No new solver/broad contract/benchmark/provider/wallet run is claimed.
+
+**4P is pending the user's commit.** Its report lists the exact 15-file handoff.
+A separate 291-file snapshot retains 4O evidence and adds the inspector, tests and
+[original-domain requirements](./ORIGINAL_DOMAIN_REQUIREMENTS.md). Earlier
+manifests remain frozen. Complete scalable original-domain computation, a selected
+participant/utility model, canonical allocation/payments, measured accepted
+verification and G1–G4 remain unresolved. Next use these explicit obligations
+to test a compatible mechanism rather than equating complete small prefixes
+with economic correctness. Concentrated auction integration and independent
+review remain necessary; no rule, asset/valuation or weaker guarantee is selected.
