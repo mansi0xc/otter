@@ -81,6 +81,22 @@ pending exits, collecting/expired/refundable history and actual live-state drift
 Earlier pure-binding tests remain. This slice makes no alternative swaps and
 regenerates no saved research or benchmark artifact.
 
+[Checkpoint 4O](../reviews/CHECKPOINT_4O.md) adds seven complete-batch tests to the
+same suite, including a third 64-case fuzz group. The epoch bridge's
+`--batch-reads` mode emits the extra stored-order/domain/recovery/nonce/ledger/
+ERC20-balance/replay staticcall plan, deduplicating nonce words. Solidity appends
+actual replies and the actual book native balance to the existing fixture.
+`--batch` feeds those replies to the complete collector and returns the original
+epoch metadata plus the stored-order hash, side budgets and currency liabilities.
+Solidity independently compares every value with the actual book/token balances.
+Cases include mixed orders, expired admission deadlines, 32 same-trader orders,
+native/public timing, maximum admitted fields/wide nonces, multiple pools'
+shared escrow with unwithdrawn claims, and an intentionally underfunded book.
+Runtime/storage/staticcall/balance data are real local contract data; RPC and block
+hash identity remain synthetic. No signature history or token delivery is proved,
+and original budgets do not become covered by the bounded research quote tables.
+No saved economic artifact is regenerated.
+
 `research/discrete-counterexamples.json` is a separate negative-control artifact
 from the bounded one-sided discrete laboratory. It records exact allocations,
 counterfactual payments, funding/IR failures, rounding deviations and partial

@@ -758,3 +758,31 @@ Local tests compare actual staticcall replies/runtime/storage and oracle hashes
 with synthetic RPC/block metadata. Production Solidity, wallet ABI/config/UI,
 allocation/payments/rewards/asset/utility and concentrated gates are unchanged.
 G1–G4 and complete canonical verification remain open.
+
+Checkpoint 4N was committed by the user as `e9eecb5`; the tree was clean before
+4O. [Checkpoint 4O](./CHECKPOINT_4O.md) extends the same pinned collector with
+complete stored-batch content and current custody checks. All 1–32 original
+orders must match the epoch/configuration/pool, admitted widths, positive/per-side
+uint96 budgets and distinct trader/nonce pairs. Their original ordered rolling
+digest and v2 EIP-712 domain/type must match the book. Execution validity must
+cover `executeUntil`; admission deadlines are not reinterpreted as settlement
+expiry. Each recovery flag must be false and each nonce bit present, with
+trader/word reads deduplicated. The book's actual `replay` must succeed.
+
+Shared global escrow must cover the original batch side budgets, while the book's
+native/ERC20 balance covers global escrow plus claims without uint256 overflow.
+This is a lower-bound coverage check, not enumeration of every other batch's
+obligations. Additional hash-pinned reads and a final block/timestamp/chain recheck
+bring the operation bound to 288. Returned normalized orders/liabilities and
+primitive batch metadata are frozen; existing record/frame data remain mutable.
+The separate read-only ABI and local bridge leave wallet actions unchanged.
+
+Admission through configured book code and RPC remains trusted. Signatures are
+not stored/revalidated; an EIP-1271 contract's current validation need not equal
+its admission-time state. Nonce bits alone prove no signature. Current token
+balances supply no token-code authentication or future exact-transfer guarantee.
+The original budgets are neither clipped nor replaced by the 0–64 research
+prefixes. Full original counterfactual coverage, canonical computation, accepted
+on-chain verification, concentrated integration and G1–G4 remain open. No
+production rule, valuation, asset/utility representation or weaker guarantee is
+selected, and this checkpoint does not establish grant qualification.

@@ -40,11 +40,16 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
     struct EpochFixture {
         EpochSourceRecord source; uint256 epoch; address caller; uint256 blockNumber; bytes32 blockHash; uint256 timestamp;
         bytes[] codes; EpochReply[] replies; bytes32[] slots; bytes32[] values; uint256 cap; uint160 downLimit; uint160 upLimit;
+        uint256 nativeBalance;
     }
     struct EpochResult {
         bytes32 positionsHash; bytes32 weightsHash; bytes32 snapshotHash; bytes32 curvesHash;
         uint256 pointCount; uint256 timestamp; uint256 count; uint256 executeUntil;
         bytes32 batchDigest; address solver; uint256 exclusiveUntil;
+    }
+    struct BatchResult {
+        EpochResult context; bytes32 ordersHash; uint256 budget0; uint256 budget1;
+        uint256 balance0; uint256 balance1; uint256 escrow0; uint256 escrow1; uint256 claimable0; uint256 claimable1;
     }
 
     function _record(PoolKey memory k, uint256 epoch) private view returns (OpeningRecord memory r) {
@@ -141,6 +146,7 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
                 _fingerprint(address(settlement)), _fingerprint(address(manager))));
         f.epoch = epoch; f.caller = caller; f.blockNumber = block.number; f.blockHash = core.blockHash; f.timestamp = block.timestamp;
         f.slots = core.slots; f.values = core.values; f.cap = cap; f.downLimit = core.downLimit; f.upLimit = core.upLimit;
+        f.nativeBalance = address(book).balance;
         f.codes = new bytes[](5); f.codes[0] = address(book).code; f.codes[1] = address(vault).code;
         f.codes[2] = address(hook).code; f.codes[3] = address(settlement).code; f.codes[4] = address(manager).code;
         EpochRead[] memory reads = abi.decode(vm.ffi(_epochCommand("--reads", abi.encode(f.source, epoch))), (EpochRead[]));
@@ -156,6 +162,10 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
     function _captureCheck(PoolKey memory k, uint256 epoch, uint256 cap, address caller) private {
         EpochFixture memory f = _epochFixture(k, epoch, cap, caller);
         EpochResult memory r = abi.decode(vm.ffi(_epochCommand("--capture", abi.encode(f))), (EpochResult));
+        _assertEpoch(k, epoch, cap, f, r);
+    }
+
+    function _assertEpoch(PoolKey memory k, uint256 epoch, uint256 cap, EpochFixture memory f, EpochResult memory r) private {
         OpeningRecord memory opening = _record(k, epoch); bytes32 id = PoolId.unwrap(k.toId());
         assertEq(r.positionsHash, opening.pool.positionsHash); assertEq(r.weightsHash, keccak256(abi.encode(opening.weights)));
         assertEq(r.snapshotHash, book.snapshotHash(id, epoch)); assertEq(r.timestamp, block.timestamp);
@@ -170,6 +180,65 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         }
         assertEq(r.curvesHash, keccak256(abi.encode(curves))); assertEq(r.pointCount, 2 * (cap + 1));
         book.assertSnapshot(id, epoch);
+    }
+
+    function _batchFixture(PoolKey memory k, uint256 epoch, uint256 cap, address caller) private returns (EpochFixture memory f) {
+        f = _epochFixture(k, epoch, cap, caller);
+        OtterOrderBook.Order[] memory orders = book.getOrders(PoolId.unwrap(k.toId()), epoch);
+        EpochRead[] memory extra = abi.decode(vm.ffi(_epochCommand("--batch-reads", abi.encode(f.source, epoch, orders))), (EpochRead[]));
+        assertLe(extra.length, 74);
+        EpochReply[] memory replies = new EpochReply[](f.replies.length + extra.length);
+        for (uint256 i; i < f.replies.length; ++i) replies[i] = f.replies[i];
+        for (uint256 i; i < extra.length; ++i) {
+            EpochRead memory r = extra[i];
+            assertTrue(r.target == address(book) || (r.target != address(0)
+                && (r.target == Currency.unwrap(k.currency0) || r.target == Currency.unwrap(k.currency1))));
+            (bool ok, bytes memory result) = r.target.staticcall(r.data);
+            replies[f.replies.length + i] = EpochReply(r.id, r.target, r.data, ok, result);
+        }
+        f.replies = replies;
+    }
+
+    function _bookBalance(Currency c) private view returns (uint256) {
+        if (Currency.unwrap(c) == address(0)) return address(book).balance;
+        (bool ok, bytes memory data) = Currency.unwrap(c).staticcall(abi.encodeWithSignature("balanceOf(address)", address(book)));
+        assertTrue(ok); return abi.decode(data, (uint256));
+    }
+
+    function _batchCheck(PoolKey memory k, uint256 epoch, uint256 cap, address caller) private {
+        EpochFixture memory f = _batchFixture(k, epoch, cap, caller);
+        BatchResult memory r = abi.decode(vm.ffi(_epochCommand("--batch", abi.encode(f))), (BatchResult));
+        _assertEpoch(k, epoch, cap, f, r.context);
+        bytes32 id = PoolId.unwrap(k.toId()); OtterOrderBook.Order[] memory orders = book.getOrders(id, epoch);
+        assertEq(r.ordersHash, keccak256(abi.encode(orders)));
+        uint256 budget0; uint256 budget1;
+        for (uint256 i; i < orders.length; ++i) {
+            if (orders[i].sellingCurrency0) budget0 += orders[i].budget; else budget1 += orders[i].budget;
+            assertFalse(book.orderRecovered(id, epoch, i));
+        }
+        assertEq(r.budget0, budget0); assertEq(r.budget1, budget1);
+        assertEq(r.balance0, _bookBalance(k.currency0)); assertEq(r.balance1, _bookBalance(k.currency1));
+        assertEq(r.escrow0, book.totalEscrow(Currency.unwrap(k.currency0))); assertEq(r.escrow1, book.totalEscrow(Currency.unwrap(k.currency1)));
+        assertEq(r.claimable0, book.totalClaimable(Currency.unwrap(k.currency0))); assertEq(r.claimable1, book.totalClaimable(Currency.unwrap(k.currency1)));
+        book.replay(id, epoch, orders);
+    }
+
+    function _submitStored(PoolKey memory k, bool side, uint256 budget, uint256 ask, uint256 nonce, uint256 pk, bool maximumTimes) private {
+        address trader = vm.addr(pk); address sold = Currency.unwrap(side ? k.currency0 : k.currency1);
+        uint256 value;
+        if (sold == address(0)) { vm.deal(address(this), 1e35); value = budget; }
+        else { deal(sold, trader, 1e30); vm.prank(trader); IFixtureToken(sold).approve(address(book), type(uint256).max); }
+        bytes32 id = PoolId.unwrap(k.toId()); OtterOrderBook.Order[] memory orders = new OtterOrderBook.Order[](1);
+        // Admission deadline equality is valid. Once closed, only execution validity applies.
+        orders[0] = OtterOrderBook.Order(trader, id, side, ask, budget, maximumTimes ? type(uint64).max : block.timestamp,
+            nonce, book.configVersionOf(id), book.nextEpochId(id), maximumTimes ? type(uint64).max : block.timestamp + 1 days);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, book.digestOf(orders[0]));
+        bytes[] memory signatures = new bytes[](1); signatures[0] = abi.encodePacked(r, s, v);
+        book.submit{value: value}(orders, signatures);
+    }
+
+    function _close(PoolKey memory k, uint256 epoch) private {
+        (uint64 closesAt,,) = book.batches(PoolId.unwrap(k.toId()), epoch); vm.warp(closesAt);
     }
 
     function _captureFailure(uint256 epoch, address caller, string memory reason) private {
@@ -267,5 +336,64 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         (uint64 closesAt,,) = book.batches(PoolId.unwrap(otterId), 0);
         vm.warp(uint256(closesAt) + (publicCaller ? settlement.exclusivityWindow() : 0));
         _captureCheck(otterKey, 0, bound(capSeed, 0, 8), publicCaller ? address(0xBEEF) : address(this));
+    }
+
+    function test_batchMatchesMixedOrdersMultiwordNoncesAndExpiredAdmissionDeadlines() public {
+        _submitStored(otterKey, true, 10, 3, 255, 0xA11CE, false);
+        _submitStored(otterKey, false, 7, 4, 256, 0xA11CE, false);
+        _submitStored(otterKey, true, 5, 0, 255, 0xB0B, false);
+        _close(otterKey, 0); _batchCheck(otterKey, 0, 8, address(this));
+    }
+
+    function test_batchMatches32SameTraderOrdersInOneNonceWord() public {
+        for (uint256 i; i < 32; ++i) _submitStored(otterKey, i % 2 == 0, i + 1, i, i, 0xA11CE, false);
+        _close(otterKey, 0); _batchCheck(otterKey, 0, 1, address(this));
+    }
+
+    function test_batchMatchesRealNativeCustodyAtPublicBoundary() public {
+        PoolKey memory k = _nativeEpoch();
+        _submitStored(k, false, 17, 1, 256, 0xA11CE, false);
+        (uint64 closesAt,,) = book.batches(PoolId.unwrap(k.toId()), 0);
+        vm.warp(uint256(closesAt) + settlement.exclusivityWindow()); _batchCheck(k, 0, 8, address(0xBEEF));
+    }
+
+    function test_batchMatchesMaximumAdmittedWidthsAndWideNonceWord() public {
+        // Foundry's chain environment is uint64; the pure Node domain test also
+        // checks larger uint256 chain identities without narrowing to Number.
+        vm.chainId(type(uint64).max); vm.roll((uint256(1) << 200) + 2);
+        _submitStored(otterKey, true, type(uint96).max, type(uint128).max, type(uint256).max, 0xA11CE, true);
+        _submitStored(otterKey, false, type(uint96).max, type(uint128).max, type(uint256).max, 0xB0B, true);
+        _close(otterKey, 0); _batchCheck(otterKey, 0, 0, address(this));
+    }
+
+    function test_batchCoversClaimsAndOtherPoolEscrowSharingCurrencies() public {
+        (PoolKey memory other,) = initPool(currency0, currency1, IHooks(address(hook)), 0, 60, SQRT_PRICE_1_1);
+        settlement.registerPool(other);
+        IFixtureToken(Currency.unwrap(currency0)).approve(address(vault), type(uint256).max);
+        IFixtureToken(Currency.unwrap(currency1)).approve(address(vault), type(uint256).max);
+        vault.createPosition(other, -887220, 887220, 1000, type(uint256).max, type(uint256).max);
+        _submitStored(other, true, 29, 0, 500, 0xA11CE, false);
+        bytes32 otherId = PoolId.unwrap(other.toId()); vm.warp(book.executionDeadline(otherId, 0));
+        book.refundOrder(otherId, 0, 0); assertEq(book.totalClaimable(Currency.unwrap(currency0)), 29);
+        _submitStored(other, true, 31, 0, 501, 0xA11CE, false);
+        _submitStored(otterKey, true, 11, 0, 0, 0xB0B, false);
+        _close(otterKey, 0);
+        assertEq(book.totalEscrow(Currency.unwrap(currency0)), 42);
+        assertEq(_bookBalance(currency0), 71); _batchCheck(otterKey, 0, 8, address(this));
+    }
+
+    function test_batchRejectsActualBookCustodyShortfall() public {
+        _submitStored(otterKey, true, 11, 0, 0, 0xA11CE, false); _close(otterKey, 0);
+        deal(Currency.unwrap(currency0), address(book), 10);
+        Vm.FfiResult memory r = vm.tryFfi(_epochCommand("--batch", abi.encode(_batchFixture(otterKey, 0, 8, address(this)))));
+        assertNotEq(r.exitCode, 0); assertEq(r.stdout.length, 0);
+        assertEq(string(r.stderr), "Epoch capture bridge failed: Stored batch escrow/liability coverage mismatch.\n");
+    }
+
+    function testFuzz_batchMatchesRealWideOrderIdentityAndCustody(uint64 chainSeed, uint64 blockSeed, uint96 budgetSeed,
+        uint256 nonceSeed, uint8 capSeed, bool side) public {
+        vm.chainId(bound(chainSeed, 1, type(uint64).max)); vm.roll(bound(blockSeed, 1, type(uint64).max));
+        _submitStored(otterKey, side, bound(budgetSeed, 1, type(uint96).max), 123, nonceSeed, 0xA11CE, false);
+        _close(otterKey, 0); _batchCheck(otterKey, 0, bound(capSeed, 0, 8), address(this));
     }
 }

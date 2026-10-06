@@ -348,6 +348,44 @@ review/configuration. The UI does not invoke this helper; concentrated auctions
 and G1–G4 remain gated. [Checkpoint 4N](../reviews/CHECKPOINT_4N.md) records local
 mocked-RPC and actual-contract comparisons with synthetic transport/block metadata.
 
+`captureEpochBatch(rpc, source, request)` in
+[`epochBatch.ts`](./src/protocol/epochBatch.ts) extends that collector with the
+complete stored 1–32-order batch. It uses the same source/request controls and
+adds hash-pinned `eth_getBalance` for native custody. No HTTP adapter or signing/
+sending method is supplied. It checks the book's EIP-712 name/version/BigInt-chain/
+address domain and order type, every stored pool/configuration/epoch, admitted
+numeric bounds, positive and per-side aggregate budgets, distinct trader/nonce
+pairs and execution validity through `executeUntil`. The original order sequence
+must reproduce the stored rolling digest; the book's `replay` must also succeed.
+Admission deadlines may already have expired: they governed admission, not
+settlement. The same nonce is valid for different traders. Nonce-word reads are
+cached per trader/word; every order's bit must be present and recovery flag false.
+
+For each currency, global `totalEscrow` must cover this batch's original side
+budget, and the book's native/ERC20 balance must cover the checked sum of global
+escrow and `totalClaimable`. Equality with the batch would incorrectly reject
+other pools' custody. All added reads require the selected canonical block hash;
+an extra final block/hash/timestamp/chain check rejects detected movement. At most
+**288 RPC operations** follow the existing reader/batch bounds. There is no
+retry, numbered-state fallback or partial successful result. Timeouts and
+cancellation remain the supplied adapter's responsibility.
+
+The result adds detached, frozen `orders`, a frozen two-entry `liabilities` array
+and primitive `batchBinding` (opening binding plus count, orders hash, rolling
+digest, domain separator and original side budgets). Its record/frame remain
+mutable. `storedBatchCommitment` is a pure content validator; `storedBatchReads`
+emits a bounded extra staticcall plan for local comparisons. `BATCH_ABI` is separate
+from the wallet ABI. Stored-order arrays are bounded and shape-checked before
+decoding; every reply must decode/reencode canonically.
+
+Configured book code and RPC are still trusted. Historical signatures are not
+retained or revalidated, and nonce presence alone does not prove authorization.
+An ERC20 balance reply does not authenticate token behavior or future delivery.
+Original uint96 budgets are preserved; the existing 0–64 curve prefixes supply
+no complete original-budget/counterfactual proof. Canonical outcomes, incentives,
+finality, later settlement and concentrated auctions remain unresolved. The UI
+does not invoke this helper. See [checkpoint 4O](../reviews/CHECKPOINT_4O.md).
+
 ## Evidence and remaining work
 
 `npm test` runs offline mocked-RPC/wallet failure tests and checks the ABI subset

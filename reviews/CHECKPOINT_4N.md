@@ -2,7 +2,8 @@
 
 Prepared 6 October 2026. Starting commit:
 `c3cccc6b31a2d107def42bf3b968193a40b0bf38`. The working tree was clean.
-Status: **local epoch collection verified; waiting for the user's commit**.
+Status: **committed by the user as `e9eecb576255ea2eee9a31cbb8987758016880c3`**.
+The tree was clean before [checkpoint 4O](./CHECKPOINT_4O.md).
 
 ## Outcome
 
@@ -184,8 +185,8 @@ Suggested explanation:
 > and curves at one block hash. Reject stale lifecycle, invalid clocks/caller
 > exclusivity and live-state drift; preserve mechanism and auction gates.
 
-The assistant has not staged or committed anything. Commit these **14 files**
-and confirm before work continues:
+Historical handoff: the user committed these **14 files**. The assistant did not
+stage or commit anything:
 
 ```text
 README.md

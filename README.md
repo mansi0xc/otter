@@ -165,6 +165,11 @@ The current hook enforces the following integration rules:
   caller's solver exclusivity. Book/vault assertions reject live drift. RPC and
   configured fingerprints remain trust inputs; canonical outcomes and future
   execution are unverified. See [checkpoint 4N](./reviews/CHECKPOINT_4N.md).
+- **Complete stored-batch binding.** A read-only extension binds all admitted
+  orders to their rolling digest and signing domain, checks recovery/nonce bits,
+  and requires native/ERC20 custody to cover shared escrow plus claims at the
+  same block hash. Original budgets remain intact; bounded quote prefixes do
+  not cover them automatically. See [checkpoint 4O](./reviews/CHECKPOINT_4O.md).
 - **Discrete mechanism research.** `solver/src/discrete-research.ts` maximizes
   exact linear welfare on fixed small one-sided domains and computes raw pivots,
   with independent exhaustive checks. It preserves partial-capacity diagnostics

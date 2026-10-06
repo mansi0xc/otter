@@ -692,9 +692,42 @@ not complete order authentication, canonical allocation/payments or future
 settlement guarantees. Source UI/wallet ABI/manifest, production Solidity,
 assets/utility/rules, saved research and G1–G4 remain unchanged.
 
-**4N is pending the user's commit.** Its report lists the exact 14-file handoff.
+**4N was committed by the user as `e9eecb5`; the tree was clean before 4O.** Its report lists the exact historical 14-file handoff.
 The separate 285-file manifest adds the collector, Node tests and bridge; earlier
 manifests stay frozen. Next bind complete stored orders/digest/escrow obligations
 and original counterfactual domains to this context, then meet G1–G4's mechanism
 and verifier requirements. Concentrated epoch integration and independent review
 remain necessary; no grant qualification or live deployment is claimed.
+
+## Checkpoint 4O: complete stored-batch binding and shared custody coverage
+
+[The batch checkpoint](./CHECKPOINT_4O.md) extends pinned full-range epoch
+collection with the complete stored order sequence, original side budgets,
+rolling digest and v2 signing domain/type. It checks admitted bounds, identities,
+unique trader/nonces, execution validity, unrecovered flags and nonce bits, then
+requires actual book replay. Expired admission deadlines do not invalidate an
+admitted batch. Each native/ERC20 book balance must cover shared global escrow
+plus claims; escrow must cover this batch rather than equal it. Every added read
+uses the same canonical hash selector, with a final metadata recheck. The bound
+is 288 operations, not a latency or capacity benchmark.
+
+Configured code/RPC remain trusted. Historical signatures are not retained or
+revalidated, and current balance coverage does not prove future token behavior.
+Immutable normalized orders and batch metadata do not freeze existing frames.
+Original uint96 budgets remain intact; the unchanged 0–64 prefixes provide no
+complete original-budget/counterfactual proof. Production Solidity, numerical
+rules, wallet UI/ABI/configuration, asset/utility and G1–G4 remain unchanged.
+
+Fresh validation: 114 Node groups, TypeScript/production build and 20 actual
+local book/core tests with three 64-case fuzz groups. Added contract cases cover
+mixed/native orders, expired admission deadlines, 32 orders, maximum fields,
+shared-pool escrow plus prior claims and a custody shortfall. Transport/block
+hash remain synthetic. No new full solver, broad contract suite, economic
+benchmark, live provider or wallet evidence is claimed.
+
+**4O is pending the user's commit.** Its report records fresh validation and the
+exact 16-file handoff. The separate 288-file content snapshot retains the 4N
+selection plus three batch/test/fixture files; earlier manifests stay frozen.
+Next specify full original-domain coverage and canonical witness obligations
+alongside a compatible G1/G4 mechanism. Concentrated integration, independent
+review and grant evidence remain necessary; no replacement rule is selected.

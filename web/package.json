@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types --test test/protocol.test.ts test/executionSnapshot.test.ts test/openingExecution.test.ts test/epochSnapshot.test.ts"
+    "test": "node --experimental-strip-types --test test/protocol.test.ts test/executionSnapshot.test.ts test/openingExecution.test.ts test/epochSnapshot.test.ts test/epochBatch.test.ts"
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.3",

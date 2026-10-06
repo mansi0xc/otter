@@ -63,6 +63,17 @@ with synthetic transport/block identity. Fingerprints/RPC remain trust inputs;
 complete order/escrow/canonical computation, ledger delivery, consensus and future
 execution are not established. G1–G4 remain open. See [4N](./CHECKPOINT_4N.md).
 
+Local 4O update starts from the user-created `e9eecb5` commit. The read-only
+extension binds every stored order, original side budgets, rolling digest and
+v2 signing domain to the pinned epoch. Recovery flags/nonce bits and actual
+replay are checked, and native/ERC20 book balances must cover shared global
+escrow plus claims. Admission deadlines retain their admission-only meaning.
+Configured code/RPC are trusted; signatures are not retained or revalidated.
+Current balances establish neither future delivery nor token behavior. Original
+budgets are preserved, but the small curve prefixes still leave original-domain
+counterfactual coverage and canonical computation unresolved. G1–G4 and
+concentrated integration remain open. See [4O](./CHECKPOINT_4O.md).
+
 ## Decision the review must support
 
 Determine whether a useful v4 mechanism can meet the requested incentive targets
@@ -220,7 +231,7 @@ scope and compensation; do not label internal tests as independent review.
 
 Use the full repository with submodules populated. The selected evidence files
 and their Solidity import closure are hashed in
-[EVIDENCE_MANIFEST_4N.json](./EVIDENCE_MANIFEST_4N.json). That manifest records the
+[EVIDENCE_MANIFEST_4O.json](./EVIDENCE_MANIFEST_4O.json). That manifest records the
 pre-patch baseline, local checkpoint, dependency commits and observed tools.
 It identifies the post-patch selected bytes and does not hash this brief or later
 status edits, authenticate an author, inspect unlisted files, or certify safety.
@@ -230,7 +241,7 @@ relying on submodule HEAD alone. Review the verifier before running it.
 From the repository root, with the already available tools:
 
 ```sh
-python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4N.json
+python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4O.json
 ```
 
 From `solver/`:
@@ -367,6 +378,21 @@ No alternative swaps, fresh full solver/broad contract suite/economic benchmark,
 real provider or wallet session is claimed. The prior 4M 30-regression run is
 historical. Production Solidity/rules and saved research evidence are unchanged.
 
+To reproduce 4O, run `npm test` and
+`npm run build -- --outDir /tmp/otter-4o-web-dist` from `web/`, followed by the same
+targeted `OtterOpeningExecutionTest` command above from `contracts/`.
+Fresh 4O results: 114 Node groups, TypeScript/production build and 20 local
+book/core tests with three 64-case fuzz groups. The seven added contract tests
+compare actual stored-order hashes, original side budgets and global liabilities,
+including native custody, expired admission deadlines, 32 orders, maximum fields,
+shared-pool escrow/unwithdrawn claims and an actual custody shortfall. The bridge
+exports real additional staticcalls/balances; transport/block hash are synthetic.
+The first run's unsupported above-uint64 Foundry chain fixture was corrected;
+the pure Node test still covers a larger uint256 signing domain. No signatures,
+full original counterfactual domain, canonical payments, future delivery or new
+mechanism are proved. No fresh full solver/broad suite/benchmark/provider/wallet
+run is claimed; production rules and saved economic evidence are unchanged.
+
 Review `foundry.toml`: FFI is enabled for local reference comparisons and the
 test-only gas ceiling is artificially large. That ceiling is not deployment
 capacity evidence. Avoid `GasCurveTest` and `SandwichHarness` when preserving the
@@ -404,6 +430,11 @@ The separate 4M manifest retains that selection and adds four binding/test files
 for 282 selected files. The 4M manifest is now frozen: three selected files change
 in 4N (the Solidity binding suite, package test entry and fixture README). The
 separate 4N manifest adds three collector/test/bridge files for 285 selected files.
+The 4N manifest is now frozen: five selected files differ in 4O (the Solidity
+suite, fixture README, package test entry, epoch Node test and staticcall bridge).
+The separate 4O snapshot adds the complete stored-batch collector, its Node tests
+and extracted shared fixture, for 288 selected files. Earlier manifests retain
+their bytes.
 A passing content check supplies
 identity only, not authenticated history, receipt correctness or grant readiness.
 A reviewer should retain their own tool versions,
