@@ -153,6 +153,12 @@ The current hook enforces the following integration rules:
   consumption. Partial/unsupported points remain explicit. These small research
   tables neither interpolate the curve nor set a production trade-size rule;
   see [checkpoint 4L](./reviews/CHECKPOINT_4L.md).
+- **Opening-record content binding.** A pure helper checks the book's v2 snapshot
+  hash, full-range LP roster and capital weights, then verifies every curve
+  field and sparse tick record against that context. It returns fixed metadata
+  and a curve-content hash. The caller must authenticate the supplied anchor;
+  this is not a live book reader or execution authorization. See
+  [checkpoint 4M](./reviews/CHECKPOINT_4M.md).
 - **Discrete mechanism research.** `solver/src/discrete-research.ts` maximizes
   exact linear welfare on fixed small one-sided domains and computes raw pivots,
   with independent exhaustive checks. It preserves partial-capacity diagnostics

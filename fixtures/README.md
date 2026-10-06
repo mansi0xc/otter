@@ -47,6 +47,23 @@ artifact or changing its incentive conclusions. Partial/unsupported rows remain
 explicit; no interpolation or lot policy is applied. Block metadata/RPC are still
 synthetic and this is still test infrastructure.
 
+[Checkpoint 4M](../reviews/CHECKPOINT_4M.md) adds
+`contracts/test/OtterOpeningExecution.t.sol` and
+`web/test/opening-execution-cli.ts`. The test exports real book/vault opening
+records, the stored v2 snapshot hash and actual local manager code/storage. The
+bridge recomputes roster/weight commitments, each capital weight, the full-range
+tick schedule and every bounded curve point; Solidity independently compares
+the resulting curve-content hash against its oracle. Tests cover ERC20/native
+epochs, 32 positions, repeated owners, a zero-weight position, queued exits and
+changed live state after expiry/exit. They do not execute alternative swaps in
+this slice; the prior reader suite supplies those comparisons.
+
+RPC/block metadata and the bridge's anchor are synthetic, not authenticated
+provider or consensus evidence. The pure validator requires an independently
+authenticated anchor in any real integration. It neither fetches that anchor nor
+checks current batch eligibility. No saved economic artifact is regenerated.
+Run the targeted commands in the report with existing local dependencies.
+
 `research/discrete-counterexamples.json` is a separate negative-control artifact
 from the bounded one-sided discrete laboratory. It records exact allocations,
 counterfactual payments, funding/IR failures, rounding deviations and partial

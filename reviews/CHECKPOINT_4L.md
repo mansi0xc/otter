@@ -2,7 +2,7 @@
 
 Prepared 6 October 2026. Starting commit:
 `71504c7145b3c42d1db9568c763888c017a609ba`. The working tree was clean.
-Status: **bounded research curve collection verified; waiting for the user's commit**.
+Status: **committed by the user as `e4cdfb1`; the tree was clean before 4M**.
 
 ## Outcome
 
@@ -172,8 +172,8 @@ Suggested explanation:
 > storage while retaining partial consumption and per-quote limits, and compare
 > all alternatives against local v4. Keep mechanism and auction gates unchanged.
 
-The assistant has not staged or committed anything. Commit these **13 files**
-and confirm before work continues:
+The assistant did not stage or commit anything. The user committed these
+**13 files** as `e4cdfb1` and confirmed before work continued:
 
 ```text
 README.md

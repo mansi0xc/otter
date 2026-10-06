@@ -638,9 +638,35 @@ complete counterfactual/ownership/epoch binding and the mechanism remain open.
 The current allocation/payment rule, asset/utility, concentrated gate and G1–G4
 are unchanged. No weaker guarantee or replacement rule is selected.
 
-**4L is pending the user's commit.** Its report contains the exact handoff and
+**4L was committed by the user as `e4cdfb1`; the tree was clean before 4M.** Its report contains the exact handoff and
 fresh tests. A new 278-file snapshot records the changed reader/test closure;
 older manifests stay frozen. Next specify complete original-domain/epoch
 authentication and verifier obligations under G2/G3 together with a compatible
 G1/G4 mechanism, rather than using these small tables to declare the auction
 or grant qualification complete.
+
+## Checkpoint 4M: full-range opening-record content and curve binding
+
+[The binding checkpoint](./CHECKPOINT_4M.md) adds a pure validator, without a
+network adapter or wallet integration. It compares a caller-authenticated anchor
+with the book's exact v2 commitment, complete bounded roster and capital weights.
+It checks the execution header, deterministic full-range sparse tick schedule and
+every field of every bounded curve row, then returns frozen primitive metadata
+and a normalized curve-content hash. A self-invented anchor supplies no proof of
+ownership or runtime authenticity; an old valid binding supplies no permission
+to execute today. Partial/unsupported quotes remain explicit.
+
+Fresh evidence: 88 Node groups, TypeScript/production build, six real book/vault/
+core binding tests with 64 fuzz cases, and 30 snapshot/reward regressions with
+64 snapshot-drift fuzz cases. Local tests compare exact commitments and oracle
+curves, including native epochs, the 32-position bound, repeated owners,
+zero-weight positions, queued exits and changed live state after expiry/exit.
+Transport/block metadata are synthetic; this slice runs no alternative swaps.
+No production Solidity, rule, asset/utility, saved economic evidence or gate
+changes. G1–G4 and concentrated epoch integration remain open.
+
+**4M is pending the user's commit.** Its report lists the exact 14-file handoff.
+The separate 282-file manifest adds four binding/test files; older manifests
+remain frozen. Next define and test authenticated same-block book/guard/hook
+collection and current lifecycle checks, then complete original-domain verifier
+and mechanism obligations. Content equality does not establish grant readiness.

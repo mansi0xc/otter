@@ -692,3 +692,32 @@ gates are unchanged. G1–G4 remain open; complete finite-domain and opening-epo
 binding and the mechanism's proof obligations before integrating canonical
 settlement. Test fixture gas combines many alternative swaps and is not a
 production verifier/capacity benchmark.
+
+Checkpoint 4L was committed by the user as `e4cdfb1`; the tree was clean before
+4M. [Checkpoint 4M](./CHECKPOINT_4M.md) adds a pure full-range opening-record
+validator. Its caller must independently authenticate the expected anchor and
+same-block reads. It recomputes the book's exact v2 snapshot commitment and roster/
+weights hashes, validates the complete 1–32-position roster and each rounded
+capital weight, and matches chain/book/guard/pool/epoch/configuration/reward-policy
+and read-block identities. Individual zero weights and repeated owners are
+allowed; position IDs are unique and total weight must be positive.
+
+The captured source/key/manager and execution header must match the opening
+record. Each cached word and tick must agree with the deterministic two-endpoint
+full-range schedule, and every field of every bounded curve row is recomputed.
+Missing visited state throws; partial and unsupported statuses are not upgraded.
+Ordered domains and all ten quote fields form a normalized ABI curve-content
+hash. Only fixed primitive metadata is returned, without mutable input references
+or a blanket statement that all rows are executable. Concentrated/mixed-range
+records remain outside this validator's admission domain.
+
+This is necessary **content binding**, not an authenticated RPC epoch reader,
+ownership proof, lifecycle/deadline check, canonical mechanism or accepted
+on-chain witness. An anchor forged alongside a record can pass; historical
+matching content can also pass without being eligible for current settlement.
+Runtime/consensus trust, complete original budgets and counterfactual coverage,
+hook/token delivery and future execution revalidation remain separate obligations.
+Local comparisons use actual book/vault records and core storage with synthetic
+transport/block metadata. No production Solidity, wallet manifest, allocation,
+payment, reward policy, asset/utility or concentrated gate changes. G1–G4 remain
+open; this checkpoint does not select a replacement mechanism or weaker guarantee.

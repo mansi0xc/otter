@@ -261,6 +261,44 @@ open under G1–G4. All raw-RPC, finality, hook/token and epoch limits above sti
 apply. [Checkpoint 4L](../reviews/CHECKPOINT_4L.md) records fresh mocked and local
 real-core checks, including the existing whole-payment witness's exact fills.
 
+`bindOpeningExecution(anchor, record, frame)` in
+[`openingExecution.ts`](./src/protocol/openingExecution.ts) is a pure content
+validator for the **currently admitted full-range model**. The caller supplies
+an independently authenticated `OpeningAnchor`, the stored `OpeningRecord`
+and a captured curve frame at the anchor's read block. The anchor declares chain,
+book, guard, pool, epoch, configuration, reward policy, snapshot hash and read
+block number/hash. The record includes the complete bounded LP roster and
+weights; its ABI matches the book's `OtterOpeningSnapshot/v2` commitment.
+
+The validator checks that commitment and all identity fields, recomputes each
+capital weight from rounded principal, and checks IDs, full-range endpoints and
+liquidity totals. Same owners may hold several positions; individual zero weights
+are retained when the total is positive. It binds the frame's key/manager/header
+and read block, checks every cached word/tick against the deterministic two-endpoint
+full-range schedule, and requotes every declared raw input. Fabricated tick data
+is rejected even when its quotes agree with that fabricated schedule. Missing
+visited records throw. Fee, numeric, roster and existing traversal/prefix bounds
+remain unchanged; partial and unsupported rows retain their actual statuses.
+
+The returned frozen object contains only declared primitive identity fields,
+`positionsHash`, `weightsHash`, `snapshotHash`, `curvesHash` and `pointCount`.
+`curvesHash` is keccak256 of ABI-encoded ordered curve domains and all ten quote
+fields. It identifies that normalized table, not the RPC/cache/runtime history.
+The result contains no frame or roster references and cannot certify a later
+mutation of those inputs. `openingCommitment(record)` exposes the exact v2 hashes
+with representation checks; it alone does not apply economic/domain validation.
+
+This helper performs **no RPC or wallet action**. A forged anchor can be supplied
+with a forged record. Real use still needs hash-pinned book/guard/hook/runtime
+authentication and same-block reads, current lifecycle/deadline/configuration
+checks, complete batch/counterfactual domains and execution revalidation. An old
+record with matching old state is historical content, not current permission to
+settle. Concentrated/mixed ranges are rejected, and the helper supplies no
+canonical payment or incentive proof. The product UI does not invoke it and its
+deployment manifest remains null. [Checkpoint 4M](../reviews/CHECKPOINT_4M.md)
+records fresh mocked and actual local book/core comparisons, with synthetic
+transport and block identity.
+
 ## Evidence and remaining work
 
 `npm test` runs offline mocked-RPC/wallet failure tests and checks the ABI subset
