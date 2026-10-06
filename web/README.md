@@ -416,6 +416,38 @@ the UI or production settlement. [The requirements](../reviews/ORIGINAL_DOMAIN_R
 state the remaining mechanism/witness obligations; [checkpoint 4P](../reviews/CHECKPOINT_4P.md)
 records the local comparisons. G1–G4 and concentrated auction gates remain open.
 
+## Stored-batch one-sided pivot research
+
+`researchBoundOneSidedBatch` in [boundResearch.ts](./src/protocol/boundResearch.ts)
+revalidates the same authenticated batch/opening inputs and requires complete,
+supported, fully consumed original prefixes in both directions, including the
+explicit zero rows. It derives the sole trading direction from all original
+orders and refuses mixed batches. It accepts at most eight original records,
+0–64 whole raw input units and 100,000 original Cartesian budget vectors. Those
+are laboratory work bounds, not a production trade-size or admission policy.
+Large quantities are rejected rather than clipped, sampled or rescaled.
+
+The fixed original table is shared by the original batch and every single-record
+and whole-address removal. Retained signed fields/budgets are unchanged. Exact
+linear welfare, quantity and ask/order-hash ties match independent scan and
+Cartesian optimizers in every case. The output preserves retained identities,
+allocations, exact WAD-scaled pivot numerators, floor/ceil/minimum diagnostics,
+unspent inputs and signed deficits. Address diagnostics also retain the sum of
+original per-record whole-unit minima; an aggregate minimum cannot replace it.
+All result objects/nested arrays are detached and frozen. The versioned
+`researchHash` binds the coverage hash and normalized result, without granting
+settlement authority. Input frames must still be revalidated when reused.
+
+Actual book/core comparisons expose integer funding and per-record delivery
+failures. Record and address pivots are separate hypotheses; address grouping
+neither proves beneficial ownership nor supplies a policy for distributing a
+group payment. No two-sided objective, sequential/netting trace, new LP utility,
+subsidy, fractional asset, guarantee-preserving mechanism or scalable verifier
+is supplied. The pure API makes no RPC/custody/lifecycle/signature recheck, and
+the UI does not call it. See [checkpoint 4Q](../reviews/CHECKPOINT_4Q.md) for exact
+witnesses and the synthetic-transport boundary. G1–G4 and concentrated auction
+gates remain open.
+
 ## Evidence and remaining work
 
 `npm test` runs offline mocked-RPC/wallet failure tests and checks the ABI subset

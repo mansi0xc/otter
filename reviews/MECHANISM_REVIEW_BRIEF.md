@@ -83,6 +83,16 @@ trusting an old report flag. The inventory selects no participant, optimizer,
 payment or ownership-removal rule and supplies no economic witness. See
 [4P](./CHECKPOINT_4P.md) and [the remaining original-domain requirements](./ORIGINAL_DOMAIN_REQUIREMENTS.md).
 
+Local 4Q update starts from the user-created `14044fe` commit. The complete
+original-prefix guard feeds the existing one-sided linear-welfare laboratory
+using unmodified stored quantities. Original and every record/address removal
+agree between independent optimizers on the same original table. Actual core
+outputs expose record funding deficits, a distinct-trader deficit after address
+grouping, and a funded grouped payment unable to cover original per-record
+minima. Grouping remains a hypothesis, with no distribution or replacement
+participant policy. Mixed/large/incomplete domains refuse calculation rather
+than narrow reports. G1–G4 remain open. See [4Q](./CHECKPOINT_4Q.md).
+
 ## Decision the review must support
 
 Determine whether a useful v4 mechanism can meet the requested incentive targets
@@ -240,7 +250,7 @@ scope and compensation; do not label internal tests as independent review.
 
 Use the full repository with submodules populated. The selected evidence files
 and their Solidity import closure are hashed in
-[EVIDENCE_MANIFEST_4P.json](./EVIDENCE_MANIFEST_4P.json). That manifest records the
+[EVIDENCE_MANIFEST_4Q.json](./EVIDENCE_MANIFEST_4Q.json). That manifest records the
 pre-patch baseline, local checkpoint, dependency commits and observed tools.
 It identifies the post-patch selected bytes and does not hash this brief or later
 status edits, authenticate an author, inspect unlisted files, or certify safety.
@@ -250,7 +260,7 @@ relying on submodule HEAD alone. Review the verifier before running it.
 From the repository root, with the already available tools:
 
 ```sh
-python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4P.json
+python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4Q.json
 ```
 
 From `solver/`:
@@ -416,6 +426,22 @@ no pivot computation, canonical rule, signature proof, full scalable original
 domain, future delivery or new incentive guarantee is supplied. No fresh solver,
 broad suite, benchmark, provider or wallet run is claimed.
 
+To reproduce 4Q, run `npm test` and
+`npm run build -- --outDir /tmp/otter-4q-web-dist` from `web/`,
+`npm run test:discrete` from `solver/`, then the targeted
+`OtterOpeningExecutionTest` command above from `contracts/` with 64 fuzz runs.
+Fresh results: 137 Node groups, TypeScript/production build, 17 discrete research
+groups and 34 local contract tests with five 64-case fuzz groups. Eleven new
+Node groups include 64 independent seeded cases. Seven new contract tests cover
+same-address split/merged records, distinct traders, signed fractional-cost minima,
+native custody, refusal cases and fuzzed original/removal pivots. Solidity checks
+every retained allocation by Cartesian enumeration over actual stored budgets
+against independent oracle outputs, then derives all exact and rounded transfers,
+minima, deficits and the versioned ABI hash. No accepted economic verifier,
+production payment policy, historical signature proof, real provider, future
+delivery, two-sided mechanism or new incentive guarantee is supplied. RPC/block
+metadata are synthetic; saved research/benchmark artifacts remain unchanged.
+
 Review `foundry.toml`: FFI is enabled for local reference comparisons and the
 test-only gas ceiling is artificially large. That ceiling is not deployment
 capacity evidence. Avoid `GasCurveTest` and `SandwichHarness` when preserving the
@@ -462,6 +488,10 @@ The 4O manifest is now frozen: four selected files differ in 4P (the Solidity
 suite, fixture README, package test entry and bridge). The separate 4P snapshot
 adds the coverage inspector, Node tests and original-domain requirements for
 291 selected files, without modifying earlier manifest bytes.
+The 4P manifest is now frozen: six selected files differ in 4Q (the Solidity
+suite, fixture README, package test entry, bridge, coverage Node test and shared
+batch fixture). The separate 4Q snapshot adds the bound adapter and Node tests
+for 293 selected files, retaining all earlier manifest bytes.
 A passing content check supplies
 identity only, not authenticated history, receipt correctness or grant readiness.
 A reviewer should retain their own tool versions,

@@ -5,6 +5,7 @@ import { captureEpochExecution, epochReads, EPOCH_TARGETS, type EpochSource } fr
 import { captureEpochBatch, storedBatchReads, ORDER_COMPONENTS, type BatchRpc } from '../src/protocol/epochBatch.ts'
 import type { Order } from '../src/protocol/orders.ts'
 import { inspectOpeningPrefixCoverage, COVERAGE_CASE_COMPONENTS } from '../src/protocol/batchCoverage.ts'
+import { researchBoundOneSidedBatch, RESEARCH_RESULT_COMPONENTS } from '../src/protocol/boundResearch.ts'
 import { POOL_KEY_COMPONENTS, EXTSLOAD_ABI, type SnapshotRpc } from '../src/protocol/executionSnapshot.ts'
 const fingerprint = [{ name: 'address', type: 'address' }, { name: 'runtimeHash', type: 'bytes32' }] as const
 const sourceComponents = [{ name: 'chainId', type: 'uint256' }, { name: 'configVersion', type: 'uint256' },
@@ -29,7 +30,7 @@ const outputAbi = [
 ] as const
 try {
   const mode = process.argv[2], payload = process.argv[3]
-  if (process.argv.length !== 4 || !['--reads', '--capture', '--batch-reads', '--batch', '--coverage'].includes(mode) || !payload || payload.length > 500000 || !/^0x(?:[0-9a-fA-F]{2})+$/.test(payload)) throw new Error('Expected one bounded epoch fixture and mode.')
+  if (process.argv.length !== 4 || !['--reads', '--capture', '--batch-reads', '--batch', '--coverage', '--research'].includes(mode) || !payload || payload.length > 500000 || !/^0x(?:[0-9a-fA-F]{2})+$/.test(payload)) throw new Error('Expected one bounded epoch fixture and mode.')
   if (mode === '--reads') {
     const [source, epoch] = decodeAbiParameters(planAbi, payload as Hex)
     if (encodeAbiParameters(planAbi, [source, epoch]).toLowerCase() !== payload.toLowerCase()) throw new Error('Noncanonical epoch read plan.')
@@ -75,12 +76,16 @@ try {
     }
     const request = { epoch: f.epoch as bigint, caller: f.caller, blockNumber: f.blockNumber as bigint,
       domains: [{ down: true, maxInput: f.cap as bigint, limit: f.downLimit }, { down: false, maxInput: f.cap as bigint, limit: f.upLimit }] }
-    const result = mode === '--batch' || mode === '--coverage' ? await captureEpochBatch(rpc, s, request) : await captureEpochExecution(rpc, s, request)
+    const result = ['--batch', '--coverage', '--research'].includes(mode) ? await captureEpochBatch(rpc, s, request) : await captureEpochExecution(rpc, s, request)
     const b = result.binding, e = result.eligibility
     const values = [b.positionsHash, b.weightsHash, b.snapshotHash, b.curvesHash,
       BigInt(b.pointCount), e.blockTimestamp, BigInt(e.count), result.record.executeUntil, e.batchDigest, e.solver, e.exclusiveUntil]
     if ('batchBinding' in result) {
-      if (mode === '--coverage') {
+      if (mode === '--research') {
+        const research = researchBoundOneSidedBatch(result.batchBinding, result.record, result.frame, result.orders)
+        process.stdout.write(encodeAbiParameters([{ type: 'bytes32' }, { type: 'bytes32' },
+          { type: 'tuple', components: RESEARCH_RESULT_COMPONENTS }], [research.coverageHash, research.researchHash, research]))
+      } else if (mode === '--coverage') {
         const coverage = inspectOpeningPrefixCoverage(result.batchBinding, result.record, result.frame, result.orders)
         process.stdout.write(encodeAbiParameters([{ type: 'bytes32' }, { type: 'bool' },
           { type: 'tuple[]', components: COVERAGE_CASE_COMPONENTS }], [coverage.coverageHash, coverage.wholeInputPrefixesAvailable, coverage.cases]))

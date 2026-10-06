@@ -751,7 +751,8 @@ They include native custody, maximum original budgets and incomplete aggregates
 whose individual records fit the prefix. Transport/block hashes remain synthetic.
 No new solver/broad contract/benchmark/provider/wallet run is claimed.
 
-**4P is pending the user's commit.** Its report lists the exact 15-file handoff.
+**4P was committed by the user as `14044fe`; the tree was clean before 4Q.**
+Its report lists the exact historical 15-file handoff.
 A separate 291-file snapshot retains 4O evidence and adds the inspector, tests and
 [original-domain requirements](./ORIGINAL_DOMAIN_REQUIREMENTS.md). Earlier
 manifests remain frozen. Complete scalable original-domain computation, a selected
@@ -760,3 +761,36 @@ verification and G1–G4 remain unresolved. Next use these explicit obligations
 to test a compatible mechanism rather than equating complete small prefixes
 with economic correctness. Concentrated auction integration and independent
 review remain necessary; no rule, asset/valuation or weaker guarantee is selected.
+
+## Checkpoint 4Q: stored-batch original-domain pivot diagnostics
+
+[The bound research checkpoint](./CHECKPOINT_4Q.md) requires complete original
+prefixes before evaluating the existing one-sided linear-welfare hypothesis on
+actual stored quantities. Every original/record/address removal uses the same
+original table and agrees between independent scan and Cartesian optimizers.
+Mixed batches, excess records, incomplete/unsupported/partial prefixes and excess
+exhaustive work fail without narrowing inputs. Exact pivot numerators, whole-unit
+floor/ceil/minimum checks, unspent inputs and signed deficits remain explicit.
+
+Actual book/core outputs expose a split-record funding deficit. Grouping addresses
+changes that result, but distinct traders still have a deficit. A second actual
+witness shows that a funded grouped payment cannot cover the sum of original
+signed per-record minima. No group-payment distribution or replacement participant
+policy is selected; aggregate IR cannot silently replace original delivery checks.
+The bounded hypothesis leaves the user's requested guarantees as open research.
+
+Fresh validation: 137 Node groups with 64 seeded independent bound cases,
+TypeScript/production build, 17 existing discrete research groups, and 34 local
+contract tests with five 64-case fuzz groups. Solidity independently enumerates
+every retained vector and derives all payments and diagnostics from actual
+orders/oracle outputs. Transport/block hashes remain synthetic. No fresh broad
+contract suite, benchmark, provider, wallet or production mechanism is claimed.
+
+**4Q is pending the user's commit.** Its report lists the exact 16-file handoff.
+The separate 293-file snapshot adds the bound adapter and Node tests while
+retaining the frozen 4P selection. Earlier manifests stay byte-for-byte frozen.
+Next investigate conditions that preserve original per-record delivery, useful
+integer allocations, funding and the requested incentives together; do not
+promote address grouping or restrict reports just because a small witness fits.
+Complete scalable original-domain/two-sided verification, combined trader/LP
+incentives, concentrated auction integration and independent review remain open.

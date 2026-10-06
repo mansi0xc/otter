@@ -813,3 +813,38 @@ welfare, sequential/netting traces, trader/LP incentives or execution today.
 remaining G1–G4 obligations for a selected rule and accepted complete witness.
 No production Solidity, numerical policy, asset/utility, wallet source/configuration
 or concentrated gate changes. No replacement rule or weaker guarantee is selected.
+
+Checkpoint 4P was committed by the user as `14044fe`; the tree was clean before
+4Q. [Checkpoint 4Q](./CHECKPOINT_4Q.md) connects the complete original-prefix
+guard to the existing one-sided raw-unit linear-welfare laboratory. The pure
+adapter derives direction from the complete original batch, rejects mixed orders
+and preserves every original signed quantity. The same full original output
+table is used by the original batch and every record/address removal. Every case
+must agree between scan and independent Cartesian optimizers, including quantity
+and ask/order-hash ties. Bound work is eight records, at most 64 original raw
+input units and 100,000 original vectors, without sampling or clipping.
+
+Record pivots use single-record removal. Separate address diagnostics remove
+all records for that address and expose group cost, exact pivot, floor/ceil,
+aggregate minimum and the sum of original per-record minima. Neither model is
+selected as the strategic participant policy. The output keeps negative residuals
+and positive funding deficits; no missing amount becomes a funded reward pot.
+All nested results are frozen and a versioned ABI hash binds the calculation to
+the coverage context; it is not an accepted on-chain outcome commitment.
+
+Actual admitted orders and core quotes reproduce F(0)=0, F(1)=0, F(2)=1:
+two zero-ask one-unit records demand two output units under record pivots, while
+one merged record demands one. Address grouping changes the same-address result
+but leaves a deficit for two distinct traders. With two same-address one-unit
+records at ask WAD/4, the grouped ceil payment of one unit is funded yet cannot
+meet two original per-record minima of one unit each. No allocation of that
+payment can satisfy those signed minima. These are scoped research calculations,
+not a deployed pivot rule or a proof of profitable production exploitation.
+
+Solidity independently enumerates retained vectors and derives all transfer
+diagnostics from actual stored orders and the oracle. RPC/block identity remains
+synthetic, and neither the pure calculation nor its hash authenticates new
+anchors or future settlement. Large original-domain computation, canonical
+two-sided settlement, integer incentives/liveness, beneficial ownership and
+trader/LP overlap remain open under G1–G4. Production contracts, numerical rules,
+asset/utility, minima and concentrated auction gates are unchanged.

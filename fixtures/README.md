@@ -110,6 +110,22 @@ fixed. These are hypothetical record/address removals, not computed pivots or
 an authenticated participant model. RPC/block hashes are synthetic; no saved
 research/benchmark artifact is regenerated and no economic rule is selected.
 
+[Checkpoint 4Q](../reviews/CHECKPOINT_4Q.md) adds seven stored-batch pivot tests,
+including a fifth 64-case fuzz group. The test-only `--research` bridge first
+captures the actual complete stored batch, then requires full original input
+coverage before calling the bounded one-sided laboratory. Solidity independently
+enumerates every retained budget vector against oracle outputs from the fixed
+opening state, checks the tie policy and derives all record/address pivots,
+rounding/minimum diagnostics, deficits and the versioned result hash. Actual
+ERC20 and native orders reproduce the split-record deficit; distinct traders
+still have a deficit after address grouping, and a funded aggregate can fail
+the sum of original signed per-record minima. Invalid coverage, mixed batches,
+excess records and excess exhaustive work are rejected without narrowing inputs.
+The Node coverage fixture is extracted into the existing shared helper without
+registering another copy of its tests. No saved economic/benchmark artifact is
+regenerated. RPC/block metadata remain synthetic; the research hash is not an
+accepted settlement witness and no production payment policy is selected.
+
 `research/discrete-counterexamples.json` is a separate negative-control artifact
 from the bounded one-sided discrete laboratory. It records exact allocations,
 counterfactual payments, funding/IR failures, rounding deviations and partial

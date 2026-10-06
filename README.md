@@ -175,6 +175,12 @@ The current hook enforces the following integration rules:
   partially consumed inputs. It inventories record/address removals and rejects
   incomplete data for whole-input experiments. This verifies no economic outcome
   or incentive theorem. See [checkpoint 4P](./reviews/CHECKPOINT_4P.md).
+- **Bound stored-batch pivot diagnostics.** A pure adapter checks complete small
+  one-sided original domains and every record/address removal with independent
+  optimizers. Actual book/core tests expose record funding deficits and a funded
+  aggregate that cannot meet original per-record minima. Address grouping remains
+  a comparison hypothesis; no payment rule is adopted. See
+  [checkpoint 4Q](./reviews/CHECKPOINT_4Q.md).
 - **Discrete mechanism research.** `solver/src/discrete-research.ts` maximizes
   exact linear welfare on fixed small one-sided domains and computes raw pivots,
   with independent exhaustive checks. It preserves partial-capacity diagnostics

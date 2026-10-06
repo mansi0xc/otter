@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
-import { decodeFunctionData, encodeFunctionResult, keccak256, zeroAddress, type Address, type Hash, type Hex } from 'viem'
-import { epochReads, EPOCH_ABI, EPOCH_TARGETS, type EpochSource, type EpochRequest } from '../src/protocol/epochSnapshot.ts'
+import { storedBatchCommitment } from '../src/protocol/epochBatch.ts'
+import { orderHash, type Order } from '../src/protocol/orders.ts'
+import { decodeFunctionData, encodeFunctionResult, encodeAbiParameters, keccak256, zeroAddress, zeroHash, type Address, type Hash, type Hex } from 'viem'
+import { captureEpochExecution, epochReads, EPOCH_ABI, EPOCH_TARGETS, type EpochSource, type EpochRequest } from '../src/protocol/epochSnapshot.ts'
 import { openingCommitment, OPENING_TYPEHASH, type OpeningRecord } from '../src/protocol/openingExecution.ts'
 import { executionPoolId, executionSlots, EXTSLOAD_ABI, type SnapshotRpc } from '../src/protocol/executionSnapshot.ts'
 import { Q96, bitmapPosition, sqrtPriceAtTick } from '../../solver/src/execution.ts'
@@ -65,4 +67,21 @@ export function fixture() {
   const request: EpochRequest = { epoch: 0n, caller: addr(100), domains: [
     { down: true, maxInput: 8n, limit: sqrtPriceAtTick(-1200) }, { down: false, maxInput: 8n, limit: sqrtPriceAtTick(1200) }] }
   return { source, record, state, values, responses, storage, codes, rpc, request, reads, slots }
+}
+
+const digest = (orders: readonly Order[]) => orders.reduce((h, o) => keccak256(encodeAbiParameters([{ type: 'bytes32' }, { type: 'bytes32' }], [h, orderHash(o)])), zeroHash)
+export async function coverageFixture(options: { cap?: bigint; overrides?: Partial<Order>[]; downLimit?: bigint; oneDirection?: boolean } = {}) {
+  const f = fixture(), overrides = options.overrides ?? [{ budget: 3n }, { budget: 2n, sellingCurrency0: false }, { budget: 2n, trader: addr(101) }]
+  const orders: Order[] = overrides.map((o, i) => ({ trader: addr(100), poolId: f.record.poolId, sellingCurrency0: true,
+    budget: 1n, ask: 0n, deadline: 1000n, nonce: BigInt(i), configVersion: 1n, epoch: 0n, maxExecutionTime: 1960n, ...o }))
+  f.values.set('book.batches', [1060n, orders.length, false]); f.values.set('book.batchDigest', digest(orders))
+  f.request.domains.forEach(d => { d.maxInput = options.cap ?? 8n })
+  if (options.downLimit !== undefined) f.request.domains[0].limit = options.downLimit
+  if (options.oneDirection) f.request.domains.splice(1)
+  const captured = await captureEpochExecution(f.rpc, f.source, f.request)
+  const batch = storedBatchCommitment({ ...captured.binding, count: orders.length, executeUntil: captured.record.executeUntil, batchDigest: digest(orders) }, orders)
+  const { orders: _, ...hashes } = batch
+  const anchor = { ...captured.binding, ...hashes, count: orders.length }
+  const args = () => [anchor, captured.record, captured.frame, orders] as const
+  return { ...captured, orders, anchor, args }
 }

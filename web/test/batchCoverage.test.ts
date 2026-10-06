@@ -2,29 +2,11 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { encodeAbiParameters, keccak256, zeroHash, type Address } from 'viem'
 import { inspectOpeningPrefixCoverage, requireWholeInputOpeningPrefixes, COVERAGE_ABI, COVERAGE_TYPEHASH } from '../src/protocol/batchCoverage.ts'
-import { storedBatchCommitment, ORDER_COMPONENTS } from '../src/protocol/epochBatch.ts'
+import { ORDER_COMPONENTS } from '../src/protocol/epochBatch.ts'
 import { bindOpeningExecution } from '../src/protocol/openingExecution.ts'
-import { captureEpochExecution } from '../src/protocol/epochSnapshot.ts'
-import { orderHash, type Order } from '../src/protocol/orders.ts'
 import { Status, sqrtPriceAtTick } from '../../solver/src/execution.ts'
-import { fixture as epochFixture } from './epoch-batch-fixture.ts'
+import { coverageFixture as fixture } from './epoch-batch-fixture.ts'
 const addr = (n: number) => `0x${n.toString(16).padStart(40, '0')}` as Address
-const digest = (orders: readonly Order[]) => orders.reduce((h, o) => keccak256(encodeAbiParameters([{ type: 'bytes32' }, { type: 'bytes32' }], [h, orderHash(o)])), zeroHash)
-async function fixture(options: { cap?: bigint; overrides?: Partial<Order>[]; downLimit?: bigint; oneDirection?: boolean } = {}) {
-  const f = epochFixture(), overrides = options.overrides ?? [{ budget: 3n }, { budget: 2n, sellingCurrency0: false }, { budget: 2n, trader: addr(101) }]
-  const orders: Order[] = overrides.map((o, i) => ({ trader: addr(100), poolId: f.record.poolId, sellingCurrency0: true,
-    budget: 1n, ask: 0n, deadline: 1000n, nonce: BigInt(i), configVersion: 1n, epoch: 0n, maxExecutionTime: 1960n, ...o }))
-  f.values.set('book.batches', [1060n, orders.length, false]); f.values.set('book.batchDigest', digest(orders))
-  f.request.domains.forEach(d => { d.maxInput = options.cap ?? 8n })
-  if (options.downLimit !== undefined) f.request.domains[0].limit = options.downLimit
-  if (options.oneDirection) f.request.domains.splice(1)
-  const captured = await captureEpochExecution(f.rpc, f.source, f.request)
-  const batch = storedBatchCommitment({ ...captured.binding, count: orders.length, executeUntil: captured.record.executeUntil, batchDigest: digest(orders) }, orders)
-  const { orders: _, ...hashes } = batch
-  const anchor = { ...captured.binding, ...hashes, count: orders.length }
-  const args = () => [anchor, captured.record, captured.frame, orders] as const
-  return { ...captured, orders, anchor, args }
-}
 test('original coverage reaches aggregate budgets and binds deterministic, deeply frozen inventory without input mutation', async () => {
   const f = await fixture(), before = structuredClone(f.args()), r = inspectOpeningPrefixCoverage(...f.args())
   assert.equal(r.scope, 'opening-alternative-prefixes'); assert.equal(r.wholeInputPrefixesAvailable, true)

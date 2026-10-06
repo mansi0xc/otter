@@ -58,6 +58,30 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
     struct CoverageCase {
         uint8 kind; address trader; uint8[] omittedIndices; bytes32 ordersHash; DirectionCoverage[] directions;
     }
+    struct ResearchCase {
+        uint8 kind; address trader; uint8[] omittedIndices; uint8[] indices; bytes32 ordersHash; uint256[] fill;
+        uint256 totalInput; uint256 output; uint256 welfareNumerator; uint256 costNumerator;
+        uint256 scanEvaluated; uint256 exhaustiveEvaluated;
+    }
+    struct RecordTransfer {
+        uint8 index; bytes32 id; address trader; uint256 spent; uint256 unspent; uint256 withoutWelfareNumerator;
+        uint256 paymentNumerator; uint256 floorPayment; uint256 ceilPayment; uint256 minimumPayment; bool floorIR;
+    }
+    struct AddressTransfer {
+        address trader; uint8[] indices; uint256 spent; uint256 unspent; uint256 costNumerator; uint256 withoutWelfareNumerator;
+        uint256 paymentNumerator; uint256 floorPayment; uint256 ceilPayment; uint256 aggregateMinimumPayment;
+        uint256 sumRecordMinimumPayment; uint256 recordPaymentNumerator; uint256 recordCeilPayment;
+        int256 recordVsGroupPaymentNumerator; bool groupedCeilMeetsRecordMinimums;
+    }
+    struct ResearchResult {
+        bool down; address soldCurrency; address paymentCurrency; uint256 originalInput; uint256 vectorBound;
+        ResearchCase[] cases; RecordTransfer[] records; AddressTransfer[] addresses;
+        int256 recordRawDeficitNumerator; int256 recordCeilResidual; uint256 recordCeilDeficit;
+        int256 addressRawDeficitNumerator; int256 addressCeilResidual; uint256 addressCeilDeficit;
+    }
+    struct ResearchChoice { uint256[] fill; uint256 input; uint256 output; uint256 welfare; uint256 cost; }
+    struct ResearchScan { uint8[] indices; uint256[] outputs; uint256[] rank; uint256[] amounts; uint256 evaluated; ResearchChoice best; }
+    uint256 private constant RESEARCH_WAD = 1e18;
 
     function _record(PoolKey memory k, uint256 epoch) private view returns (OpeningRecord memory r) {
         bytes32 id = PoolId.unwrap(k.toId());
@@ -266,7 +290,7 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         return d.missingInputs == 0 && unsupportedCount == 0 && partialCount == 0;
     }
 
-    function _coverageCheck(PoolKey memory k, uint256 cap, uint160 downLimit, bool expectedAvailable) private {
+    function _coverageCheck(PoolKey memory k, uint256 cap, uint160 downLimit, bool expectedAvailable) private returns (bytes32) {
         EpochFixture memory f = _batchFixture(k, 0, cap, address(this)); f.downLimit = downLimit;
         (bytes32 coverageHash, bool available, CoverageCase[] memory cases) =
             abi.decode(vm.ffi(_epochCommand("--coverage", abi.encode(f))), (bytes32, bool, CoverageCase[]));
@@ -305,6 +329,134 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         assertEq(coverageHash, keccak256(abi.encode(keccak256("OtterOpeningPrefixCoverage/v1"), block.chainid, address(book),
             id, uint256(0), book.configVersionOf(id), f.blockNumber, f.blockHash, book.snapshotHash(id, 0),
             keccak256(abi.encode(curves)), keccak256(abi.encode(orders)), book.batchDigest(id, 0), cases)));
+        return coverageHash;
+    }
+
+    // Independent Cartesian enumeration over actual retained budgets/output.
+    // No cheapest-prefix allocation or Node optimizer is used by this oracle.
+    function _visitResearch(OtterOrderBook.Order[] memory orders, ResearchScan memory scan, uint256 depth, uint256 input, uint256 cost) private pure {
+        if (depth < scan.indices.length) {
+            OtterOrderBook.Order memory order = orders[scan.indices[depth]];
+            for (uint256 take; take <= order.budget; ++take) {
+                scan.amounts[depth] = take; _visitResearch(orders, scan, depth + 1, input + take, cost + order.ask * take);
+            }
+            return;
+        }
+        ++scan.evaluated;
+        uint256 gross = scan.outputs[input] * RESEARCH_WAD;
+        if (cost > gross) return;
+        uint256 welfare = gross - cost;
+        bool better = welfare > scan.best.welfare || (welfare == scan.best.welfare && input > scan.best.input);
+        if (welfare == scan.best.welfare && input == scan.best.input) for (uint256 j; j < scan.rank.length; ++j) {
+            uint256 i = scan.rank[j]; if (scan.amounts[i] == scan.best.fill[i]) continue;
+            better = scan.amounts[i] > scan.best.fill[i]; break;
+        }
+        if (better) {
+            uint256[] memory fill = new uint256[](scan.amounts.length);
+            for (uint256 i; i < fill.length; ++i) fill[i] = scan.amounts[i];
+            scan.best = ResearchChoice(fill, input, scan.outputs[input], welfare, cost);
+        }
+    }
+
+    function _assertResearchChoice(OtterOrderBook.Order[] memory orders, ResearchCase memory c, uint256[] memory outputs) private view {
+        uint256 n = c.indices.length; ResearchScan memory scan;
+        scan.indices = c.indices; scan.outputs = outputs; scan.rank = new uint256[](n); scan.amounts = new uint256[](n);
+        scan.best.fill = new uint256[](n); uint256 budget;
+        for (uint256 i; i < n; ++i) { scan.rank[i] = i; budget += orders[c.indices[i]].budget; }
+        for (uint256 i; i < n; ++i) for (uint256 j = i + 1; j < n; ++j) {
+            OtterOrderBook.Order memory left = orders[c.indices[scan.rank[i]]]; OtterOrderBook.Order memory right = orders[c.indices[scan.rank[j]]];
+            if (right.ask < left.ask || (right.ask == left.ask && book.hashOrder(right) < book.hashOrder(left)))
+                (scan.rank[i], scan.rank[j]) = (scan.rank[j], scan.rank[i]);
+        }
+        _visitResearch(orders, scan, 0, 0, 0);
+        assertEq(c.fill, scan.best.fill); assertEq(c.totalInput, scan.best.input); assertEq(c.output, scan.best.output);
+        assertEq(c.welfareNumerator, scan.best.welfare); assertEq(c.costNumerator, scan.best.cost);
+        assertEq(c.exhaustiveEvaluated, scan.evaluated); assertEq(c.scanEvaluated, budget + 1);
+    }
+
+    function _ceilResearch(uint256 value) private pure returns (uint256) { return (value + RESEARCH_WAD - 1) / RESEARCH_WAD; }
+
+    function _assertResearchTransfers(OtterOrderBook.Order[] memory orders, ResearchResult memory r) private view {
+        ResearchCase memory base = r.cases[0]; uint256 recordPaid; uint256 recordCeil;
+        assertEq(r.records.length, orders.length);
+        for (uint256 i; i < orders.length; ++i) {
+            RecordTransfer memory t = r.records[i]; uint256 cost = orders[i].ask * base.fill[i];
+            uint256 withoutWelfare = r.cases[i + 1].welfareNumerator;
+            uint256 payment = cost + base.welfareNumerator - withoutWelfare;
+            assertEq(t.index, i); assertEq(t.id, book.hashOrder(orders[i])); assertEq(t.trader, orders[i].trader);
+            assertEq(t.spent, base.fill[i]); assertEq(t.unspent, orders[i].budget - base.fill[i]); assertEq(t.withoutWelfareNumerator, withoutWelfare);
+            assertEq(t.paymentNumerator, payment); assertEq(t.floorPayment, payment / RESEARCH_WAD); assertEq(t.ceilPayment, _ceilResearch(payment));
+            assertEq(t.minimumPayment, _ceilResearch(cost)); assertEq(t.floorIR, t.floorPayment >= t.minimumPayment);
+            recordPaid += payment; recordCeil += t.ceilPayment;
+        }
+        uint256 addressPaid; uint256 addressCeil;
+        assertEq(r.addresses.length, r.cases.length - 1 - orders.length);
+        for (uint256 j; j < r.addresses.length; ++j) {
+            AddressTransfer memory a = r.addresses[j]; ResearchCase memory withoutCase = r.cases[1 + orders.length + j];
+            assertEq(a.trader, withoutCase.trader); assertEq(keccak256(abi.encode(a.indices)), keccak256(abi.encode(withoutCase.omittedIndices)));
+            uint256 spent; uint256 unspent; uint256 cost; uint256 minimum; uint256 recordNumerator; uint256 recordWhole;
+            for (uint256 k; k < a.indices.length; ++k) {
+                uint256 i = a.indices[k]; spent += base.fill[i]; unspent += orders[i].budget - base.fill[i]; cost += orders[i].ask * base.fill[i];
+                minimum += r.records[i].minimumPayment; recordNumerator += r.records[i].paymentNumerator; recordWhole += r.records[i].ceilPayment;
+            }
+            uint256 payment = cost + base.welfareNumerator - withoutCase.welfareNumerator;
+            assertEq(a.spent, spent); assertEq(a.unspent, unspent); assertEq(a.costNumerator, cost);
+            assertEq(a.withoutWelfareNumerator, withoutCase.welfareNumerator); assertEq(a.paymentNumerator, payment);
+            assertEq(a.floorPayment, payment / RESEARCH_WAD); assertEq(a.ceilPayment, _ceilResearch(payment));
+            assertEq(a.aggregateMinimumPayment, _ceilResearch(cost)); assertEq(a.sumRecordMinimumPayment, minimum);
+            assertEq(a.recordPaymentNumerator, recordNumerator); assertEq(a.recordCeilPayment, recordWhole);
+            assertEq(a.recordVsGroupPaymentNumerator, int256(recordNumerator) - int256(payment));
+            assertEq(a.groupedCeilMeetsRecordMinimums, a.ceilPayment >= minimum);
+            addressPaid += payment; addressCeil += a.ceilPayment;
+        }
+        assertEq(r.recordRawDeficitNumerator, int256(recordPaid) - int256(base.output * RESEARCH_WAD));
+        assertEq(r.recordCeilResidual, int256(base.output) - int256(recordCeil));
+        assertEq(r.recordCeilDeficit, recordCeil > base.output ? recordCeil - base.output : 0);
+        assertEq(r.addressRawDeficitNumerator, int256(addressPaid) - int256(base.output * RESEARCH_WAD));
+        assertEq(r.addressCeilResidual, int256(base.output) - int256(addressCeil));
+        assertEq(r.addressCeilDeficit, addressCeil > base.output ? addressCeil - base.output : 0);
+    }
+
+    function _researchCheck(PoolKey memory k, uint256 cap) private returns (ResearchResult memory r) {
+        uint160 downLimit = TickMath.getSqrtPriceAtTick(-1200);
+        bytes32 expectedCoverage = _coverageCheck(k, cap, downLimit, true);
+        EpochFixture memory f = _batchFixture(k, 0, cap, address(this));
+        bytes32 coverage; bytes32 researchHash;
+        (coverage, researchHash, r) = abi.decode(vm.ffi(_epochCommand("--research", abi.encode(f))), (bytes32, bytes32, ResearchResult));
+        assertEq(coverage, expectedCoverage);
+        OtterOrderBook.Order[] memory orders = book.getOrders(PoolId.unwrap(k.toId()), 0);
+        assertEq(r.down, orders[0].sellingCurrency0); assertEq(r.soldCurrency, Currency.unwrap(r.down ? k.currency0 : k.currency1));
+        assertEq(r.paymentCurrency, Currency.unwrap(r.down ? k.currency1 : k.currency0));
+        uint256 input; uint256 vectors = 1; address[] memory traders = new address[](orders.length); uint256 traderCount;
+        for (uint256 i; i < orders.length; ++i) {
+            input += orders[i].budget; vectors *= orders[i].budget + 1;
+            bool seen; for (uint256 j; j < i; ++j) if (orders[j].trader == orders[i].trader) seen = true;
+            if (!seen) traders[traderCount++] = orders[i].trader;
+        }
+        assertEq(r.originalInput, input); assertEq(r.vectorBound, vectors); assertEq(r.cases.length, 1 + orders.length + traderCount);
+        uint256[] memory outputs = new uint256[](input + 1); OtterExecutionOracle oracle = new OtterExecutionOracle(manager);
+        for (uint256 i; i <= input; ++i) {
+            OtterExecutionOracle.Quote memory q = oracle.quoteExactInput(k, r.down, i, r.down ? f.downLimit : f.upLimit);
+            assertEq(uint8(q.status), uint8(OtterExecutionOracle.Status.Complete)); assertEq(q.consumedInput, i); outputs[i] = q.output;
+        }
+        for (uint256 c; c < r.cases.length; ++c) {
+            ResearchCase memory current = r.cases[c]; uint8 kind = c == 0 ? 0 : c <= orders.length ? 1 : 2;
+            address trader = kind == 0 ? address(0) : kind == 1 ? orders[c - 1].trader : traders[c - 1 - orders.length];
+            assertEq(current.kind, kind); assertEq(current.trader, trader);
+            uint256 removed;
+            for (uint256 i; i < orders.length; ++i) if ((kind == 1 && i == c - 1) || (kind == 2 && orders[i].trader == trader)) ++removed;
+            uint8[] memory omitted = new uint8[](removed); uint8[] memory indices = new uint8[](orders.length - removed);
+            OtterOrderBook.Order[] memory retained = new OtterOrderBook.Order[](indices.length); uint256 skipped; uint256 kept;
+            for (uint256 i; i < orders.length; ++i) {
+                if ((kind == 1 && i == c - 1) || (kind == 2 && orders[i].trader == trader)) omitted[skipped++] = uint8(i);
+                else { indices[kept] = uint8(i); retained[kept++] = orders[i]; }
+            }
+            assertEq(keccak256(abi.encode(current.omittedIndices)), keccak256(abi.encode(omitted)));
+            assertEq(keccak256(abi.encode(current.indices)), keccak256(abi.encode(indices)));
+            assertEq(current.ordersHash, keccak256(abi.encode(retained))); _assertResearchChoice(orders, current, outputs);
+        }
+        _assertResearchTransfers(orders, r);
+        assertEq(researchHash, keccak256(abi.encode(keccak256("OtterBoundOneSidedResearch/v1"), expectedCoverage, r)));
     }
 
     function _captureFailure(uint256 epoch, address caller, string memory reason) private {
@@ -337,17 +489,21 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
     }
 
     function _nativeEpoch() private returns (PoolKey memory k) {
+        return _nativeEpoch(1e18);
+    }
+
+    function _nativeEpoch(uint256 budget) private returns (PoolKey memory k) {
         (k,) = initPool(Currency.wrap(address(0)), currency1, IHooks(address(hook)), 0, 60, SQRT_PRICE_1_1);
         settlement.registerPool(k); vm.deal(address(this), 1e35);
         IFixtureToken(Currency.unwrap(currency1)).approve(address(vault), type(uint256).max);
         uint256 debt = SqrtPriceMath.getAmount0Delta(SQRT_PRICE_1_1, TickMath.getSqrtPriceAtTick(887220), 1000, true);
         vault.createPosition{value: debt}(k, -887220, 887220, 1000, type(uint256).max, type(uint256).max);
         OtterOrderBook.Order[] memory orders = new OtterOrderBook.Order[](1);
-        orders[0] = OtterOrderBook.Order(vm.addr(0xA11CE), PoolId.unwrap(k.toId()), true, 0, 1e18,
+        orders[0] = OtterOrderBook.Order(vm.addr(0xA11CE), PoolId.unwrap(k.toId()), true, 0, budget,
             block.timestamp + 1 days, 0, 1, 0, block.timestamp + 1 days);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(0xA11CE, book.digestOf(orders[0]));
         bytes[] memory sigs = new bytes[](1); sigs[0] = abi.encodePacked(r, s, v);
-        book.submit{value: 1e18}(orders, sigs);
+        book.submit{value: budget}(orders, sigs);
     }
 
     function test_bindingMatchesRealNativeEpoch() public {
@@ -502,5 +658,91 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         for (uint256 i; i < n; ++i) _submitStored(otterKey, i % 2 == 0, budget, 123, i, i % 3 == 0 ? 0xB0B : 0xA11CE, false);
         _close(otterKey, 0); _coverageCheck(otterKey, cap, TickMath.getSqrtPriceAtTick(-1200),
             ((n + 1) / 2) * budget <= cap && (n / 2) * budget <= cap);
+    }
+
+    function test_researchSameAddressSplitExposesRecordFundingDeficit() public {
+        _submitStored(otterKey, true, 1, 0, 0, 0xA11CE, false);
+        _submitStored(otterKey, true, 1, 0, 1, 0xA11CE, false); _close(otterKey, 0);
+        ResearchResult memory r = _researchCheck(otterKey, 8);
+        assertEq(r.cases[0].totalInput, 2); assertEq(r.cases[0].output, 1);
+        assertEq(r.records[0].paymentNumerator, RESEARCH_WAD); assertEq(r.records[1].paymentNumerator, RESEARCH_WAD);
+        assertEq(r.recordRawDeficitNumerator, int256(RESEARCH_WAD)); assertEq(r.recordCeilDeficit, 1);
+        assertEq(r.addresses.length, 1); assertEq(r.addresses[0].paymentNumerator, RESEARCH_WAD);
+        assertEq(r.addressRawDeficitNumerator, 0); assertEq(r.addressCeilDeficit, 0);
+    }
+
+    function test_researchMergedRecordHasDifferentPivotAtSameAggregateInput() public {
+        _submitStored(otterKey, true, 2, 0, 0, 0xA11CE, false); _close(otterKey, 0);
+        ResearchResult memory r = _researchCheck(otterKey, 8);
+        assertEq(r.cases[0].totalInput, 2); assertEq(r.cases[0].output, 1);
+        assertEq(r.records[0].paymentNumerator, RESEARCH_WAD); assertEq(r.recordCeilDeficit, 0);
+        assertEq(r.addressRawDeficitNumerator, 0);
+    }
+
+    function test_researchGroupingDoesNotFundDistinctTraderPivots() public {
+        _submitStored(otterKey, true, 1, 0, 0, 0xA11CE, false);
+        _submitStored(otterKey, true, 1, 0, 0, 0xB0B, false); _close(otterKey, 0);
+        ResearchResult memory r = _researchCheck(otterKey, 8);
+        assertEq(r.addresses.length, 2); assertEq(r.cases[0].output, 1);
+        assertEq(r.recordRawDeficitNumerator, int256(RESEARCH_WAD)); assertEq(r.recordCeilDeficit, 1);
+        assertEq(r.addressRawDeficitNumerator, int256(RESEARCH_WAD)); assertEq(r.addressCeilDeficit, 1);
+    }
+
+    function test_researchFundedAggregateCannotMeetSignedPerRecordMinima() public {
+        _submitStored(otterKey, true, 1, RESEARCH_WAD / 4, 0, 0xA11CE, false);
+        _submitStored(otterKey, true, 1, RESEARCH_WAD / 4, 1, 0xA11CE, false); _close(otterKey, 0);
+        ResearchResult memory r = _researchCheck(otterKey, 8);
+        assertEq(r.cases[0].welfareNumerator, RESEARCH_WAD / 2);
+        for (uint256 i; i < 2; ++i) {
+            assertEq(r.records[i].paymentNumerator, 3 * RESEARCH_WAD / 4);
+            assertEq(r.records[i].minimumPayment, 1); assertFalse(r.records[i].floorIR);
+        }
+        assertEq(r.recordRawDeficitNumerator, int256(RESEARCH_WAD / 2)); assertEq(r.recordCeilDeficit, 1);
+        assertEq(r.addresses[0].aggregateMinimumPayment, 1); assertEq(r.addresses[0].sumRecordMinimumPayment, 2);
+        assertEq(r.addresses[0].ceilPayment, 1); assertFalse(r.addresses[0].groupedCeilMeetsRecordMinimums);
+        assertEq(r.addressCeilDeficit, 0);
+    }
+
+    function test_researchMatchesNativeSameAddressSplit() public {
+        PoolKey memory k = _nativeEpoch(1);
+        _submitStored(k, true, 1, 0, 1, 0xA11CE, false); _close(k, 0);
+        ResearchResult memory r = _researchCheck(k, 8);
+        assertEq(r.soldCurrency, address(0)); assertEq(r.paymentCurrency, Currency.unwrap(k.currency1));
+        assertEq(r.cases[0].output, 1); assertEq(r.recordCeilDeficit, 1); assertEq(r.addressCeilDeficit, 0);
+    }
+
+    function _researchFailure(uint256 cap, uint160 downLimit, string memory reason) private {
+        EpochFixture memory f = _batchFixture(otterKey, 0, cap, address(this)); f.downLimit = downLimit;
+        Vm.FfiResult memory result = vm.tryFfi(_epochCommand("--research", abi.encode(f)));
+        assertNotEq(result.exitCode, 0); assertEq(result.stdout.length, 0);
+        assertEq(string(result.stderr), string.concat("Epoch capture bridge failed: ", reason, "\n"));
+    }
+
+    function test_researchRejectsIncompletePartialUnsupportedMixedAndExcessWork() public {
+        uint256 clean = vm.snapshotState(); uint160 limit = TickMath.getSqrtPriceAtTick(-1200);
+        string memory missing = "Original opening prefixes contain missing, unsupported or partially consumed inputs.";
+        _submitStored(otterKey, true, 9, 0, 0, 0xA11CE, false); _close(otterKey, 0);
+        _researchFailure(8, limit, missing); assertTrue(vm.revertToState(clean));
+        _submitStored(otterKey, true, 4, 0, 0, 0xA11CE, false); _close(otterKey, 0);
+        _researchFailure(8, SQRT_PRICE_1_1 - 1, missing); _researchFailure(8, 0, missing);
+        assertTrue(vm.revertToState(clean));
+        _submitStored(otterKey, true, 1, 0, 0, 0xA11CE, false);
+        _submitStored(otterKey, false, 1, 0, 1, 0xA11CE, false); _close(otterKey, 0);
+        _researchFailure(8, limit, "Bound one-sided research cannot omit opposing orders or select a direction for a mixed batch.");
+        assertTrue(vm.revertToState(clean));
+        for (uint256 i; i < 9; ++i) _submitStored(otterKey, true, 1, 0, i, 0xA11CE, false);
+        _close(otterKey, 0); _researchFailure(16, limit, "Bound one-sided research requires 1..8 original orders.");
+        assertTrue(vm.revertToState(clean));
+        for (uint256 i; i < 8; ++i) _submitStored(otterKey, true, 6, 0, i, 0xA11CE, false);
+        _close(otterKey, 0); _researchFailure(64, limit, "Bound one-sided research exceeds the exhaustive vector work limit.");
+    }
+
+    function testFuzz_researchMatchesActualOriginalAndRemovalPivots(uint8 countSeed, uint8 budgetSeed, uint64 askSeed,
+        bool down, bool sameTrader) public {
+        uint256 n = bound(countSeed, 1, 3); uint256 budget = bound(budgetSeed, 1, 3);
+        uint256 ask = bound(askSeed, 0, 2 * RESEARCH_WAD);
+        for (uint256 i; i < n; ++i) _submitStored(otterKey, down, budget, ask, i,
+            sameTrader || i % 2 == 0 ? 0xA11CE : 0xB0B, false);
+        _close(otterKey, 0); _researchCheck(otterKey, 16);
     }
 }
