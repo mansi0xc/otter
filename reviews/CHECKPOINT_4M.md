@@ -2,7 +2,7 @@
 
 Prepared 6 October 2026. Starting commit:
 `e4cdfb1ebb1db2724bf1fae23374f8dbdda2249b`. The working tree was clean.
-Status: **local content binding verified; waiting for the user's commit**.
+Status: **committed by the user as `c3cccc6`; the tree was clean before 4N**.
 
 ## Outcome
 
@@ -176,8 +176,8 @@ Suggested explanation:
 > supplied opening context. Reject fabricated tick schedules and changed headers;
 > keep anchor authentication, mechanism research and auction gates explicit.
 
-The assistant has not staged or committed anything. Commit these **14 files**
-and confirm before work continues:
+The assistant did not stage or commit anything. The user committed these
+**14 files** as `c3cccc6` and confirmed before work continued:
 
 ```text
 README.md

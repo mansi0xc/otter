@@ -54,6 +54,15 @@ metadata are synthetic; the caller must authenticate a real anchor independently
 No current lifecycle or canonical mechanism validation is supplied. G1–G4 and
 concentrated integration remain open. See [4M](./CHECKPOINT_4M.md).
 
+Local 4N update starts from the user-created `c3cccc6` commit. A read-only epoch
+collector checks five configured runtimes, wiring, opening records and current
+closed-window/caller eligibility at one block hash, then binds the bounded curve
+table. Book/vault assertions reject live drift; pending exits do not veto current
+batch support. Local tests export actual staticcall replies and core storage,
+with synthetic transport/block identity. Fingerprints/RPC remain trust inputs;
+complete order/escrow/canonical computation, ledger delivery, consensus and future
+execution are not established. G1–G4 remain open. See [4N](./CHECKPOINT_4N.md).
+
 ## Decision the review must support
 
 Determine whether a useful v4 mechanism can meet the requested incentive targets
@@ -211,7 +220,7 @@ scope and compensation; do not label internal tests as independent review.
 
 Use the full repository with submodules populated. The selected evidence files
 and their Solidity import closure are hashed in
-[EVIDENCE_MANIFEST_4M.json](./EVIDENCE_MANIFEST_4M.json). That manifest records the
+[EVIDENCE_MANIFEST_4N.json](./EVIDENCE_MANIFEST_4N.json). That manifest records the
 pre-patch baseline, local checkpoint, dependency commits and observed tools.
 It identifies the post-patch selected bytes and does not hash this brief or later
 status edits, authenticate an author, inspect unlisted files, or certify safety.
@@ -221,7 +230,7 @@ relying on submodule HEAD alone. Review the verifier before running it.
 From the repository root, with the already available tools:
 
 ```sh
-python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4M.json
+python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4N.json
 ```
 
 From `solver/`:
@@ -338,6 +347,26 @@ broad contract, benchmark, real provider or wallet run is claimed. Production
 Solidity, numerical rules and saved research evidence are unchanged; a passing
 content binding supplies neither authenticated history nor settlement permission.
 
+To reproduce 4N's pinned epoch-collection slice, run `npm test` and
+`npm run build -- --outDir /tmp/otter-4n-web-dist` from `web/`, then from `contracts/`:
+
+```sh
+forge test --offline --match-contract '^OtterOpeningExecutionTest$' --fuzz-runs 64
+```
+
+Fresh 4N results: 101 Node groups, TypeScript/production build and 13 local book/
+core tests with two 64-case fuzz groups. Thirteen new Node groups cover ABI
+agreement with artifacts, fingerprints/wiring, clocks/exclusivity, lifecycle,
+malformed replies, view failures, missing core state, source mutation and detected
+chain/block/timestamp drift. Seven new contract tests include 64 collection fuzz
+cases and actual native/public-boundary, maximum-roster, zero-weight/pending-exit
+and negative lifecycle/live-state comparisons. The prior six binding tests,
+including 64 binding fuzz cases, pass in the same run. The separate bridge exports
+36 actual staticcall replies and five runtimes; RPC/block metadata remain synthetic.
+No alternative swaps, fresh full solver/broad contract suite/economic benchmark,
+real provider or wallet session is claimed. The prior 4M 30-regression run is
+historical. Production Solidity/rules and saved research evidence are unchanged.
+
 Review `foundry.toml`: FFI is enabled for local reference comparisons and the
 test-only gas ceiling is artificially large. That ceiling is not deployment
 capacity evidence. Avoid `GasCurveTest` and `SandwichHarness` when preserving the
@@ -372,7 +401,10 @@ README). The new 4L snapshot retains the same 278-file selection and records
 those changed bytes, without altering earlier hashes. The 4L manifest is now
 frozen: two selected files differ in 4M (`web/package.json` and the fixture README).
 The separate 4M manifest retains that selection and adds four binding/test files,
-for 282 selected files. A passing content check supplies
+for 282 selected files. The 4M manifest is now frozen: three selected files change
+in 4N (the Solidity binding suite, package test entry and fixture README). The
+separate 4N manifest adds three collector/test/bridge files for 285 selected files.
+A passing content check supplies
 identity only, not authenticated history, receipt correctness or grant readiness.
 A reviewer should retain their own tool versions,
 logs and content identifiers, and explain any reproduction difference. No

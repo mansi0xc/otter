@@ -64,6 +64,23 @@ authenticated anchor in any real integration. It neither fetches that anchor nor
 checks current batch eligibility. No saved economic artifact is regenerated.
 Run the targeted commands in the report with existing local dependencies.
 
+[Checkpoint 4N](../reviews/CHECKPOINT_4N.md) extends the same Solidity suite with
+seven epoch-collection tests, including one fuzz group. The separate
+`web/test/epoch-snapshot-cli.ts` bridge first emits the collector's fixed view-call
+plan. Solidity obtains each reply with an actual `staticcall`, including the
+book's snapshot assertion and vault's batch-support assertion, then exports those
+success/revert results, all five runtimes and actual core storage to the bridge.
+The collector checks fingerprints, wiring, current clocks/caller exclusivity and
+the complete opening-record/curve binding. Solidity independently compares the
+returned metadata, commitments and oracle curve hash.
+
+The bridge uses an in-memory RPC and synthetic block hash. Actual local replies
+do not establish a live provider, finality or accepted settlement witness. Tests
+include native/public-window boundaries, 32 positions, zero-weight ownership,
+pending exits, collecting/expired/refundable history and actual live-state drift.
+Earlier pure-binding tests remain. This slice makes no alternative swaps and
+regenerates no saved research or benchmark artifact.
+
 `research/discrete-counterexamples.json` is a separate negative-control artifact
 from the bounded one-sided discrete laboratory. It records exact allocations,
 counterfactual payments, funding/IR failures, rounding deviations and partial

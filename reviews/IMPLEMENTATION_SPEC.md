@@ -721,3 +721,40 @@ Local comparisons use actual book/vault records and core storage with synthetic
 transport/block metadata. No production Solidity, wallet manifest, allocation,
 payment, reward policy, asset/utility or concentrated gate changes. G1–G4 remain
 open; this checkpoint does not select a replacement mechanism or weaker guarantee.
+
+Checkpoint 4M was committed by the user as `c3cccc6`; the tree was clean before
+4N. [Checkpoint 4N](./CHECKPOINT_4N.md) composes the full-range binding with a
+read-only, hash-pinned epoch collector. A separate caller-configured research
+source declares BigInt chain/configuration, policy, pool key and five distinct
+book/guard/hook/settlement/manager addresses and runtime hashes. Runtime equality
+checks a configured fingerprint, not an independent audit or consensus proof.
+Controls are copied/validated before awaits; the source wallet remains unchanged.
+
+At one selected block number/hash/timestamp, code, all 36 view calls and demanded
+core storage require canonical hash selectors. The collector checks registration,
+domain/currencies/configuration/policy and immutable wiring, obtains the full
+opening roster/weights/root and count/digest, and requires successful book snapshot
+and vault batch-support assertions. It intentionally uses batch support rather
+than admission support, preserving queued exits' inability to veto the current
+epoch. Canonical ABI responses and pre-decoding 1–32 array bounds prevent oversized
+roster replies from entering the decoder.
+
+The stored epoch must be current/nonterminal/nonempty, not executing/released/
+credited, with derived state `Closed` and timestamp in `[closesAt, executeUntil)`.
+The requested caller must be the configured solver or reach the inclusive
+exclusivity endpoint before expiry. Solver-zero configurations still admit public
+callers after that endpoint. This preserves the legacy exclusivity rule. The
+curve reader is wrapped to reject a different numbered-block identity before
+inner code/storage reads; final hash/timestamp/chain checks reject detected drift.
+At most 212 RPC operations follow existing bounds, without retries/fallback.
+Provider latency and timeout/cancellation are outside this callback-based helper.
+
+Returned binding/eligibility metadata contain primitives; record/frame content
+remains mutable and may not be reused after mutation as a certified table. The
+helper supplies no order replay/signature/solvency proof, canonical computation,
+ledger/token-delivery authentication, complete original-domain/counterfactual
+coverage, accepted on-chain witness, finality or future-transaction guarantee.
+Local tests compare actual staticcall replies/runtime/storage and oracle hashes
+with synthetic RPC/block metadata. Production Solidity, wallet ABI/config/UI,
+allocation/payments/rewards/asset/utility and concentrated gates are unchanged.
+G1–G4 and complete canonical verification remain open.

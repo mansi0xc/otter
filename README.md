@@ -159,6 +159,12 @@ The current hook enforces the following integration rules:
   and a curve-content hash. The caller must authenticate the supplied anchor;
   this is not a live book reader or execution authorization. See
   [checkpoint 4M](./reviews/CHECKPOINT_4M.md).
+- **Pinned opening-epoch collection.** A read-only helper checks configured
+  book/vault/hook/settlement/manager fingerprints and wiring, collects the opening
+  record and curves at one block hash, and enforces the current closed window and
+  caller's solver exclusivity. Book/vault assertions reject live drift. RPC and
+  configured fingerprints remain trust inputs; canonical outcomes and future
+  execution are unverified. See [checkpoint 4N](./reviews/CHECKPOINT_4N.md).
 - **Discrete mechanism research.** `solver/src/discrete-research.ts` maximizes
   exact linear welfare on fixed small one-sided domains and computes raw pivots,
   with independent exhaustive checks. It preserves partial-capacity diagnostics

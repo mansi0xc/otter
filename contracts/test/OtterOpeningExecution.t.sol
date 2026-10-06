@@ -32,6 +32,20 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         bytes code; bytes32[] slots; bytes32[] values; uint256 cap; uint160 downLimit; uint160 upLimit;
     }
     struct Curve { bool down; uint256 maxInput; uint160 limit; OtterExecutionOracle.Quote[] points; }
+    struct Fingerprint { address target; bytes32 runtimeHash; }
+    struct EpochContracts { Fingerprint book; Fingerprint guard; Fingerprint hook; Fingerprint settlement; Fingerprint manager; }
+    struct EpochSourceRecord { uint256 chainId; uint256 configVersion; bytes32 rewardPolicyHash; PoolKey key; EpochContracts contracts; }
+    struct EpochRead { string id; address target; bytes data; }
+    struct EpochReply { string id; address target; bytes data; bool ok; bytes result; }
+    struct EpochFixture {
+        EpochSourceRecord source; uint256 epoch; address caller; uint256 blockNumber; bytes32 blockHash; uint256 timestamp;
+        bytes[] codes; EpochReply[] replies; bytes32[] slots; bytes32[] values; uint256 cap; uint160 downLimit; uint160 upLimit;
+    }
+    struct EpochResult {
+        bytes32 positionsHash; bytes32 weightsHash; bytes32 snapshotHash; bytes32 curvesHash;
+        uint256 pointCount; uint256 timestamp; uint256 count; uint256 executeUntil;
+        bytes32 batchDigest; address solver; uint256 exclusiveUntil;
+    }
 
     function _record(PoolKey memory k, uint256 epoch) private view returns (OpeningRecord memory r) {
         bytes32 id = PoolId.unwrap(k.toId());
@@ -111,6 +125,59 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         vm.stopPrank();
     }
 
+    function _epochCommand(string memory mode, bytes memory payload) private pure returns (string[] memory args) {
+        args = new string[](5); args[0] = "node"; args[1] = "--experimental-strip-types";
+        args[2] = "../web/test/epoch-snapshot-cli.ts"; args[3] = mode; args[4] = vm.toString(payload);
+    }
+
+    function _fingerprint(address target) private view returns (Fingerprint memory) {
+        return Fingerprint(target, target.codehash);
+    }
+
+    function _epochFixture(PoolKey memory k, uint256 epoch, uint256 cap, address caller) private returns (EpochFixture memory f) {
+        Fixture memory core = _fixture(k, epoch, cap);
+        f.source = EpochSourceRecord(block.chainid, core.record.configVersion, core.record.rewardPolicyHash, k,
+            EpochContracts(_fingerprint(address(book)), _fingerprint(address(vault)), _fingerprint(address(hook)),
+                _fingerprint(address(settlement)), _fingerprint(address(manager))));
+        f.epoch = epoch; f.caller = caller; f.blockNumber = block.number; f.blockHash = core.blockHash; f.timestamp = block.timestamp;
+        f.slots = core.slots; f.values = core.values; f.cap = cap; f.downLimit = core.downLimit; f.upLimit = core.upLimit;
+        f.codes = new bytes[](5); f.codes[0] = address(book).code; f.codes[1] = address(vault).code;
+        f.codes[2] = address(hook).code; f.codes[3] = address(settlement).code; f.codes[4] = address(manager).code;
+        EpochRead[] memory reads = abi.decode(vm.ffi(_epochCommand("--reads", abi.encode(f.source, epoch))), (EpochRead[]));
+        assertEq(reads.length, 36); f.replies = new EpochReply[](reads.length);
+        for (uint256 i; i < reads.length; ++i) {
+            EpochRead memory r = reads[i];
+            assertTrue(r.target == address(book) || r.target == address(vault) || r.target == address(hook) || r.target == address(settlement));
+            (bool ok, bytes memory result) = r.target.staticcall(r.data);
+            f.replies[i] = EpochReply(r.id, r.target, r.data, ok, result);
+        }
+    }
+
+    function _captureCheck(PoolKey memory k, uint256 epoch, uint256 cap, address caller) private {
+        EpochFixture memory f = _epochFixture(k, epoch, cap, caller);
+        EpochResult memory r = abi.decode(vm.ffi(_epochCommand("--capture", abi.encode(f))), (EpochResult));
+        OpeningRecord memory opening = _record(k, epoch); bytes32 id = PoolId.unwrap(k.toId());
+        assertEq(r.positionsHash, opening.pool.positionsHash); assertEq(r.weightsHash, keccak256(abi.encode(opening.weights)));
+        assertEq(r.snapshotHash, book.snapshotHash(id, epoch)); assertEq(r.timestamp, block.timestamp);
+        (, uint32 count,) = book.batches(id, epoch); assertEq(r.count, count);
+        assertEq(r.executeUntil, book.executionDeadline(id, epoch)); assertEq(r.batchDigest, book.batchDigest(id, epoch));
+        assertEq(r.solver, settlement.solver()); assertEq(r.exclusiveUntil, uint256(opening.closesAt) + settlement.exclusivityWindow());
+        Curve[] memory curves = new Curve[](2); OtterExecutionOracle oracle = new OtterExecutionOracle(manager);
+        for (uint256 side; side < 2; ++side) {
+            curves[side].down = side == 0; curves[side].maxInput = cap; curves[side].limit = side == 0 ? f.downLimit : f.upLimit;
+            curves[side].points = new OtterExecutionOracle.Quote[](cap + 1);
+            for (uint256 amount; amount <= cap; ++amount) curves[side].points[amount] = oracle.quoteExactInput(k, side == 0, amount, curves[side].limit);
+        }
+        assertEq(r.curvesHash, keccak256(abi.encode(curves))); assertEq(r.pointCount, 2 * (cap + 1));
+        book.assertSnapshot(id, epoch);
+    }
+
+    function _captureFailure(uint256 epoch, address caller, string memory reason) private {
+        Vm.FfiResult memory r = vm.tryFfi(_epochCommand("--capture", abi.encode(_epochFixture(otterKey, epoch, 8, caller))));
+        assertNotEq(r.exitCode, 0); assertEq(r.stdout.length, 0);
+        assertEq(string(r.stderr), string.concat("Epoch capture bridge failed: ", reason, "\n"));
+    }
+
     function test_bindingMatchesActualBookRosterWeightsAndCurves() public {
         _addOwner(address(0xBEEF), 1000); vm.roll(1234); _submitActiveOrder(); _check(otterKey, 0, 8);
     }
@@ -134,8 +201,8 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         assertEq(string(result.stderr), "Opening execution bridge failed: Opening execution header mismatch.\n");
     }
 
-    function test_bindingMatchesRealNativeEpoch() public {
-        (PoolKey memory k,) = initPool(Currency.wrap(address(0)), currency1, IHooks(address(hook)), 0, 60, SQRT_PRICE_1_1);
+    function _nativeEpoch() private returns (PoolKey memory k) {
+        (k,) = initPool(Currency.wrap(address(0)), currency1, IHooks(address(hook)), 0, 60, SQRT_PRICE_1_1);
         settlement.registerPool(k); vm.deal(address(this), 1e35);
         IFixtureToken(Currency.unwrap(currency1)).approve(address(vault), type(uint256).max);
         uint256 debt = SqrtPriceMath.getAmount0Delta(SQRT_PRICE_1_1, TickMath.getSqrtPriceAtTick(887220), 1000, true);
@@ -145,12 +212,60 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
             block.timestamp + 1 days, 0, 1, 0, block.timestamp + 1 days);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(0xA11CE, book.digestOf(orders[0]));
         bytes[] memory sigs = new bytes[](1); sigs[0] = abi.encodePacked(r, s, v);
-        book.submit{value: 1e18}(orders, sigs); _check(k, 0, 8);
+        book.submit{value: 1e18}(orders, sigs);
+    }
+
+    function test_bindingMatchesRealNativeEpoch() public {
+        _check(_nativeEpoch(), 0, 8);
     }
 
     function testFuzz_bindingMatchesActualWideChainBlockAndRoster(uint64 chainSeed, uint64 blockSeed, uint64 liquiditySeed, uint8 capSeed) public {
         vm.chainId(bound(chainSeed, 1, type(uint64).max)); vm.roll(bound(blockSeed, 1, type(uint64).max));
         _addOwner(address(0xBEEF), uint128(bound(liquiditySeed, 2, 1e18)));
         _submitActiveOrder(); _check(otterKey, 0, bound(capSeed, 0, 8));
+    }
+
+    function test_captureMatchesRealClosedEpochWithZeroWeightAndPendingExit() public {
+        _addOwner(address(0xC1), 1); _submitActiveOrder(); vault.requestExit(1, 1e21);
+        (uint64 closesAt,,) = book.batches(PoolId.unwrap(otterId), 0); vm.warp(closesAt);
+        _captureCheck(otterKey, 0, 8, address(this));
+    }
+
+    function test_captureMatchesMaximumRosterAndRepeatedOwner() public {
+        for (uint256 i; i < 31; ++i) _addOwner(address(0xBEEF), 1000 + uint128(i));
+        _submitActiveOrder(); (uint64 closesAt,,) = book.batches(PoolId.unwrap(otterId), 0); vm.warp(closesAt);
+        _captureCheck(otterKey, 0, 1, address(this));
+    }
+
+    function test_captureMatchesNativeAtPublicExclusivityBoundary() public {
+        PoolKey memory k = _nativeEpoch(); (uint64 closesAt,,) = book.batches(PoolId.unwrap(k.toId()), 0);
+        vm.warp(uint256(closesAt) + settlement.exclusivityWindow()); _captureCheck(k, 0, 8, address(0xBEEF));
+    }
+
+    function test_captureRejectsCollectingExpiredAndRefundableEpoch() public {
+        _submitActiveOrder(); _captureFailure(0, address(this), "Epoch is outside the current closed execution window.");
+        vm.warp(book.executionDeadline(PoolId.unwrap(otterId), 0));
+        _captureFailure(0, address(this), "Epoch is outside the current closed execution window.");
+        book.expire(PoolId.unwrap(otterId), 0);
+        _captureFailure(0, address(this), "Epoch is outside the current closed execution window.");
+    }
+
+    function test_captureRejectsOtherCallerInsideSolverWindow() public {
+        _submitActiveOrder(); (uint64 closesAt,,) = book.batches(PoolId.unwrap(otterId), 0); vm.warp(closesAt);
+        _captureFailure(0, address(0xBEEF), "Epoch caller is inside the solver-only window.");
+    }
+
+    function test_captureRejectsChangedLiveStateThroughActualBookAssertion() public {
+        _submitActiveOrder(); (uint64 closesAt,,) = book.batches(PoolId.unwrap(otterId), 0); vm.warp(closesAt);
+        bytes32 base = keccak256(abi.encode(PoolId.unwrap(otterId), uint256(6)));
+        vm.store(address(manager), bytes32(uint256(base) + 3), bytes32(uint256(1e21 + 1)));
+        _captureFailure(0, address(this), "Epoch staticcall reverted or was not exported.");
+    }
+
+    function testFuzz_captureMatchesWideIdentityClocksAndActualReplies(uint64 chainSeed, uint64 blockSeed, uint8 capSeed, bool publicCaller) public {
+        vm.chainId(bound(chainSeed, 1, type(uint64).max)); vm.roll(bound(blockSeed, 1, type(uint64).max)); _submitActiveOrder();
+        (uint64 closesAt,,) = book.batches(PoolId.unwrap(otterId), 0);
+        vm.warp(uint256(closesAt) + (publicCaller ? settlement.exclusivityWindow() : 0));
+        _captureCheck(otterKey, 0, bound(capSeed, 0, 8), publicCaller ? address(0xBEEF) : address(this));
     }
 }

@@ -665,8 +665,36 @@ Transport/block metadata are synthetic; this slice runs no alternative swaps.
 No production Solidity, rule, asset/utility, saved economic evidence or gate
 changes. G1–G4 and concentrated epoch integration remain open.
 
-**4M is pending the user's commit.** Its report lists the exact 14-file handoff.
+**4M was committed by the user as `c3cccc6`; the tree was clean before 4N.** Its report lists the exact 14-file handoff.
 The separate 282-file manifest adds four binding/test files; older manifests
 remain frozen. Next define and test authenticated same-block book/guard/hook
 collection and current lifecycle checks, then complete original-domain verifier
 and mechanism obligations. Content equality does not establish grant readiness.
+
+## Checkpoint 4N: pinned full-range epoch collection and current eligibility
+
+[The collector checkpoint](./CHECKPOINT_4N.md) obtains the stored opening record,
+its commitment and bounded curves through a caller-supplied read-only RPC at one
+block hash. It checks five configured runtime fingerprints, contract wiring,
+registration/version/policy, book/vault assertions and current epoch lifecycle.
+Collection requires a nonterminal, unconsumed closed window and the intended
+caller's eligibility under existing solver exclusivity. All state queries use
+canonical hash selectors; detected block/timestamp/chain drift aborts, without
+fallback/retry. Roster arrays and the fixed 36-view plan are bounded. Existing
+curve bounds supply a 212-RPC-operation upper bound, not a latency/cost benchmark.
+
+Fresh validation: 101 Node groups, TypeScript/production build and 13 local
+book/core tests with two 64-case fuzz groups. Seven new contract tests export
+actual staticcall replies and runtimes, including native/public-window boundaries,
+queued exits, 32 positions and collecting/expired/refundable/live-drift rejection.
+The transport/block hash are synthetic. Epoch timing and content validation are
+not complete order authentication, canonical allocation/payments or future
+settlement guarantees. Source UI/wallet ABI/manifest, production Solidity,
+assets/utility/rules, saved research and G1–G4 remain unchanged.
+
+**4N is pending the user's commit.** Its report lists the exact 14-file handoff.
+The separate 285-file manifest adds the collector, Node tests and bridge; earlier
+manifests stay frozen. Next bind complete stored orders/digest/escrow obligations
+and original counterfactual domains to this context, then meet G1–G4's mechanism
+and verifier requirements. Concentrated epoch integration and independent review
+remain necessary; no grant qualification or live deployment is claimed.

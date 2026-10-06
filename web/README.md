@@ -299,6 +299,55 @@ deployment manifest remains null. [Checkpoint 4M](../reviews/CHECKPOINT_4M.md)
 records fresh mocked and actual local book/core comparisons, with synthetic
 transport and block identity.
 
+`captureEpochExecution(rpc, source, request)` in
+[`epochSnapshot.ts`](./src/protocol/epochSnapshot.ts) composes that validator with
+read-only epoch collection. Its separate research `EpochSource` declares a BigInt
+chain/configuration, reward-policy hash, exact pool key and **five distinct
+address/runtime fingerprints**: book, guard, hook, settlement and manager. These
+are caller-configured trust inputs, not discovered or downloaded safe defaults.
+The existing wallet manifest/ABI and interface are unchanged.
+
+`request` specifies the stored epoch, intended settlement `caller`, one/two bounded
+curve domains and an optional exact BigInt block number. All controls are copied
+and validated before awaits. The helper selects one block number/hash/timestamp,
+requires `blockHash`/`requireCanonical` for every code/view/storage read, verifies
+all runtimes and checks registration, snapshot domain, configured currencies/
+policy/version and book/guard/hook/settlement/manager wiring. Its 36 view calls
+collect the opening record and stored hash, count/digest, lifecycle flags and
+settlement exclusivity; successful book snapshot and vault batch-support assertions
+are required. It does not call the admission assertion: a queued exit cannot veto
+the current batch. Canonical ABI replies and bounded 1–32 dynamic arrays are
+required, with array shape checked before decoding.
+
+The epoch must be current, nonterminal, nonempty and unconsumed, with derived
+state `Closed` and `closesAt <= blockTimestamp < executeUntil`. A non-solver caller
+must also reach `closesAt + exclusivityWindow`; that endpoint is inclusive and
+must precede expiry. A zero configured solver is supported after the public
+window. This checks the **existing** rule; it does not remove solver exclusivity.
+Admission pause is not a settlement veto. Historical/collecting/expired/consumed
+records cannot be returned as currently eligible.
+
+The same-block curve reader then runs through a wrapper that rejects an inner
+block change before further state reads. The 4M validator checks commitments,
+full-range schedule, weights and every curve row. Final block/hash/timestamp and
+chain rechecks reject detected changes. There are at most 36 view calls, 162 core
+storage calls, six code reads (the manager is checked twice) and eight metadata
+queries: **212 RPC operations** under existing reader bounds, with no retries or
+number/latest state fallback. This bounds requests, not provider latency; timeout/
+cancellation behavior is still the adapter's responsibility.
+
+The return contains `binding`, `record`, `frame` and frozen primitive `eligibility`
+metadata (block timestamp, count/digest, caller, solver, exclusivity endpoint).
+Record/frame maps and quotes remain mutable; do not treat a later-mutated frame
+as certified by the returned hashes. Partial/unsupported rows remain diagnostic
+even when epoch/caller timing is valid. No complete order replay/signature/escrow
+balance check, canonical allocation/payment verification, token delivery, ledger
+authentication, complete original-budget counterfactual domain, finality or future
+execution promise is supplied. RPC can lie and fingerprints require independent
+review/configuration. The UI does not invoke this helper; concentrated auctions
+and G1–G4 remain gated. [Checkpoint 4N](../reviews/CHECKPOINT_4N.md) records local
+mocked-RPC and actual-contract comparisons with synthetic transport/block metadata.
+
 ## Evidence and remaining work
 
 `npm test` runs offline mocked-RPC/wallet failure tests and checks the ABI subset
