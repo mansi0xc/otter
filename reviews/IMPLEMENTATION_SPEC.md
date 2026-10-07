@@ -848,3 +848,40 @@ anchors or future settlement. Large original-domain computation, canonical
 two-sided settlement, integer incentives/liveness, beneficial ownership and
 trader/LP overlap remain open under G1–G4. Production contracts, numerical rules,
 asset/utility, minima and concentrated auction gates are unchanged.
+
+Checkpoint 4Q was committed by the user as `ff2718d`; the tree was clean before
+4R. [Checkpoint 4R](./CHECKPOINT_4R.md) adds a pure signed-minimum feasibility
+frontier after recomputing 4Q from authenticated original inputs. Each original,
+record-removal and address-removal case retains the same original output table
+and signed quantities. At every reachable retained input, a quantity dynamic
+program and separate Cartesian enumerator must agree on the least sum of
+original per-record whole-unit minima. Ties use lower exact cost, then the
+existing ask/order-hash fill priority. Exact cost, signed welfare, aggregate and
+per-record minima, aligned fills and deficits remain explicit.
+
+Within the represented one-sided single-swap/output-backed numeric model, a
+fill can receive integer payments meeting all original minimums exactly when
+their sum is no greater than actual output. Paying the minima establishes
+arithmetic existence only, before extra obligations; no such payment policy is
+adopted. Per-quantity minima determine whether any vector at that input can
+satisfy those delivery bounds. They do not define a welfare optimizer, truthful
+payments, beneficial ownership, trader/LP utility or a deployable verifier.
+
+Actual positive-ask split records can have no positive-output feasible vector
+on the complete small domain, even though unrestricted welfare is positive.
+Merging records changes minimum delivery semantics. Conversely, zero-ask split
+records have feasible delivery despite unfunded record pivots. At opening tick
+-6000, a budget-1 ask-WAD/10 record and budget-2 ask-2WAD/5 record show another
+conflict: the unrestricted `[1,1]` fill at input 2 needs two minimum-output units,
+but output is one; `[0,2]` at the same input needs one, with greater exact cost
+and lower welfare. The frontier reports that difference without replacing the
+allocation rule or claiming that delivery feasibility repairs incentives.
+
+The versioned frontier hash binds all normalized cases/rows to the recomputed
+4Q research hash. Nested objects/arrays are detached and frozen. The same small
+work/refusal bounds remain; no sampled/clipped quantities, valuation grid,
+minimum-trade policy, grouped payment, subsidy or fractional asset is introduced.
+Complete scalable original-domain computation, canonical two-sided settlement,
+report-dependent feasibility incentives and G1–G4 remain unresolved. Production
+Solidity, numerical rules, original minima, assets/utility and auction gates
+are unchanged.

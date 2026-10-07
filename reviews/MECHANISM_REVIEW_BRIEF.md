@@ -93,6 +93,15 @@ minima. Grouping remains a hypothesis, with no distribution or replacement
 participant policy. Mixed/large/incomplete domains refuse calculation rather
 than narrow reports. G1–G4 remain open. See [4Q](./CHECKPOINT_4Q.md).
 
+Local 4R update starts from the user-created `ff2718d` commit. A pure inspector
+recomputes 4Q and compares dynamic programming with independent enumeration of
+least whole-unit per-record minima at every original/removal input quantity.
+Actual cases distinguish infeasible signed delivery from a feasible fill with
+unfunded pivots. At tick -6000, a funded same-input fill can require higher exact
+report cost and lower welfare than the unrestricted choice. The frontier changes
+no delivery semantics or allocation/payment policy and proves no incentive
+guarantee. G1–G4 remain open. See [4R](./CHECKPOINT_4R.md).
+
 ## Decision the review must support
 
 Determine whether a useful v4 mechanism can meet the requested incentive targets
@@ -250,7 +259,7 @@ scope and compensation; do not label internal tests as independent review.
 
 Use the full repository with submodules populated. The selected evidence files
 and their Solidity import closure are hashed in
-[EVIDENCE_MANIFEST_4Q.json](./EVIDENCE_MANIFEST_4Q.json). That manifest records the
+[EVIDENCE_MANIFEST_4R.json](./EVIDENCE_MANIFEST_4R.json). That manifest records the
 pre-patch baseline, local checkpoint, dependency commits and observed tools.
 It identifies the post-patch selected bytes and does not hash this brief or later
 status edits, authenticate an author, inspect unlisted files, or certify safety.
@@ -260,7 +269,7 @@ relying on submodule HEAD alone. Review the verifier before running it.
 From the repository root, with the already available tools:
 
 ```sh
-python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4Q.json
+python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4R.json
 ```
 
 From `solver/`:
@@ -442,6 +451,22 @@ production payment policy, historical signature proof, real provider, future
 delivery, two-sided mechanism or new incentive guarantee is supplied. RPC/block
 metadata are synthetic; saved research/benchmark artifacts remain unchanged.
 
+To reproduce 4R, run `npm test` and
+`npm run build -- --outDir /tmp/otter-4r-web-dist` from `web/`, then the targeted
+`OtterOpeningExecutionTest` command above from `contracts/` with 64 fuzz runs.
+Fresh results: 148 Node groups, TypeScript/production build and 41 local contract
+tests with six 64-case fuzz groups. The eleven new Node groups include
+64 independent seeded frontier checks; seven added contract tests independently
+derive all original/removal per-quantity minimum vectors, costs, ties and numeric
+delivery flags from actual budgets/core output, including native openings at
+1:1 and tick -6000. The existing research helper now returns its already verified
+hash and uses the actual opening tick for its default limit; old 1:1 behavior is
+unchanged. No production contract, solver numerical source, saved economic
+artifact, dependency pin, UI action or deployment configuration is changed.
+The diagnostic is not constrained-welfare maximization or truthful payments.
+No new full solver/broad contract suite, benchmark, provider or wallet run is
+claimed. Old research tests/economic evidence retain their historical provenance.
+
 Review `foundry.toml`: FFI is enabled for local reference comparisons and the
 test-only gas ceiling is artificially large. That ceiling is not deployment
 capacity evidence. Avoid `GasCurveTest` and `SandwichHarness` when preserving the
@@ -492,6 +517,10 @@ The 4P manifest is now frozen: six selected files differ in 4Q (the Solidity
 suite, fixture README, package test entry, bridge, coverage Node test and shared
 batch fixture). The separate 4Q snapshot adds the bound adapter and Node tests
 for 293 selected files, retaining all earlier manifest bytes.
+The 4Q manifest is now frozen: four selected files differ in 4R (the Solidity
+suite, fixture README, package test entry and bridge). The separate 4R snapshot
+adds the signed-minimum inspector and Node tests for 295 selected files; older
+manifests remain byte-for-byte frozen.
 A passing content check supplies
 identity only, not authenticated history, receipt correctness or grant readiness.
 A reviewer should retain their own tool versions,

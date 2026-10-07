@@ -786,7 +786,8 @@ every retained vector and derives all payments and diagnostics from actual
 orders/oracle outputs. Transport/block hashes remain synthetic. No fresh broad
 contract suite, benchmark, provider, wallet or production mechanism is claimed.
 
-**4Q is pending the user's commit.** Its report lists the exact 16-file handoff.
+**4Q was committed by the user as `ff2718d`; the tree was clean before 4R.**
+Its report lists the exact historical 16-file handoff.
 The separate 293-file snapshot adds the bound adapter and Node tests while
 retaining the frozen 4P selection. Earlier manifests stay byte-for-byte frozen.
 Next investigate conditions that preserve original per-record delivery, useful
@@ -794,3 +795,34 @@ integer allocations, funding and the requested incentives together; do not
 promote address grouping or restrict reports just because a small witness fits.
 Complete scalable original-domain/two-sided verification, combined trader/LP
 incentives, concentrated auction integration and independent review remain open.
+
+## Checkpoint 4R: complete small-domain signed-minimum feasibility
+
+[The minimum checkpoint](./CHECKPOINT_4R.md) distinguishes whether a fill can
+receive any integer output payments meeting every original signed minimum from
+whether a particular pivot rule is funded. For every original/removal input
+quantity, dynamic programming and independent Cartesian enumeration agree on
+the least sum of whole-unit per-record minima, preserving original quantities
+and the full opening table. No grouped delivery or constrained welfare rule is
+selected. A versioned hash binds the frozen calculation to fresh 4Q research.
+
+Actual cases show no positive-output feasible vector for the positive-ask split
+witness; merging changes delivery semantics. Zero-ask split fills remain feasible
+despite pivot deficits. A native/core opening at tick -6000 shows that a feasible
+vector at the same input can require higher exact report cost and lower welfare.
+This exposes an allocation/delivery problem that payment rounding alone cannot
+fix. Choosing report-dependent feasibility or a new optimization target would
+still require its own incentive proof and user-approved mechanism decision.
+
+Fresh validation: 148 Node groups with 64 independent seeded frontier cases,
+TypeScript/production build and 41 local contract tests with six 64-case fuzz
+groups. Every actual retained budget vector is checked against independent
+oracle outputs. The exact handoff is recorded in the checkpoint report.
+**4R is pending the user's commit.** Its 14-file handoff includes a separate
+295-file snapshot adding the frontier inspector and Node tests; previous
+manifests remain frozen. Next test the interaction between signed deliverability
+and report-response incentives on authenticated complete small domains, while
+retaining the paper's requested guarantees. Do not equate a funded fill or a
+minimum-payout frontier with a compatible mechanism. Large original domains,
+canonical two-sided verification, combined trader/LP incentives, concentrated
+auction integration and independent review remain open under G1–G4.

@@ -448,6 +448,41 @@ the UI does not call it. See [checkpoint 4Q](../reviews/CHECKPOINT_4Q.md) for ex
 witnesses and the synthetic-transport boundary. G1–G4 and concentrated auction
 gates remain open.
 
+## Complete small-domain signed minimum feasibility
+
+`inspectSignedMinimumFeasibility` in
+[minimumFeasibility.ts](./src/protocol/minimumFeasibility.ts) recomputes the bound
+4Q research from the original authenticated inputs; a saved result/hash is not
+accepted. Its full-input, one-sided, eight-record, 64-raw-unit and 100,000-vector
+research bounds and refusal behavior are unchanged. It adds no RPC or UI action.
+
+For each original/record/address-removal case and every reachable retained input
+quantity, a quantity dynamic program minimizes `sum(ceil(ask_i * fill_i / WAD))`.
+Separate Cartesian enumeration must agree. Ties use lower exact report cost,
+then greater fill in ascending ask/order-hash priority. Each row keeps its aligned
+fill, actual opening output, exact cost, signed welfare, aggregate minimum,
+original per-record minimum sum, deficit and numeric feasibility flag. The
+original table/price limit and retained quantities remain fixed across cases.
+
+The result distinguishes whether the 4Q welfare fill meets original minimums,
+whether a different fill at the same input can meet them, and whether any positive
+input/positive output allocation meets them. An unfunded pivot can have a feasible
+fill; some positive-ask split batches have no positive-output feasible fill.
+Minimizing whole-unit payouts can select higher exact report cost and lower
+welfare. This is a delivery diagnostic, not maximization of welfare on a new
+feasible set or a payment/participant policy. Treating it as such needs separate
+incentive and allocation proofs. No grouped delivery or aggregate IR replaces
+original per-record checks.
+
+All nested results are frozen. The versioned `minimumHash` binds the normalized
+frontier to the recomputed 4Q research hash, without creating an accepted on-chain
+witness. Numeric feasibility concerns exact integer output backed only by the
+represented one-sided single swap, before extra fees/rewards. It supplies no
+future token delivery, lifecycle/custody/signature recheck, finality or current
+execution permission. [Checkpoint 4R](../reviews/CHECKPOINT_4R.md) records exact
+witnesses, actual-core comparisons and trust/model limits. G1–G4 and concentrated
+auction gates remain open.
+
 ## Evidence and remaining work
 
 `npm test` runs offline mocked-RPC/wallet failure tests and checks the ABI subset

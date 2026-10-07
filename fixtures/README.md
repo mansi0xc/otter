@@ -126,6 +126,23 @@ registering another copy of its tests. No saved economic/benchmark artifact is
 regenerated. RPC/block metadata remain synthetic; the research hash is not an
 accepted settlement witness and no production payment policy is selected.
 
+[Checkpoint 4R](../reviews/CHECKPOINT_4R.md) adds seven signed-minimum comparisons,
+including a sixth 64-case fuzz group. The test-only `--minimum` bridge first
+captures the complete stored batch and recomputes the 4Q diagnostics. A pure
+inspector compares a quantity dynamic program with separate Cartesian enumeration
+for the least sum of original whole-unit per-record minima at every retained
+input. Solidity independently enumerates actual stored budget vectors against
+oracle outputs, checking each row's minimum, exact cost, deterministic tie,
+signed welfare, deficit and metadata/hash. Tests distinguish no positive-output
+feasible allocation, delivery feasibility despite a pivot deficit, and a
+same-input feasible allocation whose exact report cost is higher than the
+unrestricted welfare choice. Actual native/core opening at tick -6000 reproduces
+the latter; native 1:1 and ERC20 cases cover the original minimum witness.
+Maximum asks/records and incomplete/mixed/excess-work refusals stay explicit.
+RPC/block metadata remain synthetic. The diagnostic defines no constrained
+welfare optimizer or incentive theorem and changes no production delivery rule,
+saved research fixture or benchmark artifact.
+
 `research/discrete-counterexamples.json` is a separate negative-control artifact
 from the bounded one-sided discrete laboratory. It records exact allocations,
 counterfactual payments, funding/IR failures, rounding deviations and partial

@@ -181,6 +181,12 @@ The current hook enforces the following integration rules:
   aggregate that cannot meet original per-record minima. Address grouping remains
   a comparison hypothesis; no payment rule is adopted. See
   [checkpoint 4Q](./reviews/CHECKPOINT_4Q.md).
+- **Signed-minimum feasibility research.** A pure diagnostic independently checks
+  the least whole-unit per-record payout needed at every small original/removal
+  input quantity. It distinguishes an undeliverable fill from an unfunded pivot;
+  some batches have no positive-output feasible fill, while others require a
+  different, higher-cost fill at the same input. No allocation/payment policy
+  changes. See [checkpoint 4R](./reviews/CHECKPOINT_4R.md).
 - **Discrete mechanism research.** `solver/src/discrete-research.ts` maximizes
   exact linear welfare on fixed small one-sided domains and computes raw pivots,
   with independent exhaustive checks. It preserves partial-capacity diagnostics

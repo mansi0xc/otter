@@ -2,7 +2,7 @@
 
 Prepared 6 October 2026. Starting commit:
 `14044fe2db62afbe080010965ca27a7074cdefaa`. The working tree was clean.
-Status: **local bound calculations verified; waiting for the user's commit**.
+Status: **committed by the user as `ff2718d`; the tree was clean before 4R**.
 
 ## Outcome and unresolved failures
 

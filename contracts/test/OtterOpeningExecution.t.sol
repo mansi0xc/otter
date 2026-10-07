@@ -81,6 +81,17 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
     }
     struct ResearchChoice { uint256[] fill; uint256 input; uint256 output; uint256 welfare; uint256 cost; }
     struct ResearchScan { uint8[] indices; uint256[] outputs; uint256[] rank; uint256[] amounts; uint256 evaluated; ResearchChoice best; }
+    struct MinimumPoint {
+        uint256 totalInput; uint256 output; uint256[] fill; uint256 minimumPayment; uint256 aggregateMinimumPayment;
+        uint256 costNumerator; int256 welfareNumerator; uint256 deficit; bool feasible;
+    }
+    struct MinimumCase {
+        uint8 kind; address trader; uint8[] omittedIndices; uint8[] indices; bytes32 ordersHash; MinimumPoint[] points;
+        uint256 vectorCount; uint256 dpTransitions; uint256 researchInput; uint256 researchMinimumPayment;
+        uint256 researchMinimumDeficit; uint256 sameInputMinimumPayment; bool sameInputFeasible; bool positiveOutputAllocationExists;
+    }
+    struct MinimumResult { MinimumCase[] cases; }
+    struct MinimumScan { ResearchScan allocation; MinimumPoint[] points; bool[] present; uint256 vectors; }
     uint256 private constant RESEARCH_WAD = 1e18;
 
     function _record(PoolKey memory k, uint256 epoch) private view returns (OpeningRecord memory r) {
@@ -417,11 +428,11 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         assertEq(r.addressCeilDeficit, addressCeil > base.output ? addressCeil - base.output : 0);
     }
 
-    function _researchCheck(PoolKey memory k, uint256 cap) private returns (ResearchResult memory r) {
-        uint160 downLimit = TickMath.getSqrtPriceAtTick(-1200);
+    function _researchCheck(PoolKey memory k, uint256 cap) private returns (ResearchResult memory r, bytes32 researchHash) {
+        uint160 downLimit = TickMath.getSqrtPriceAtTick(book.openingSnapshot(PoolId.unwrap(k.toId()), 0).tick - 1200);
         bytes32 expectedCoverage = _coverageCheck(k, cap, downLimit, true);
         EpochFixture memory f = _batchFixture(k, 0, cap, address(this));
-        bytes32 coverage; bytes32 researchHash;
+        bytes32 coverage;
         (coverage, researchHash, r) = abi.decode(vm.ffi(_epochCommand("--research", abi.encode(f))), (bytes32, bytes32, ResearchResult));
         assertEq(coverage, expectedCoverage);
         OtterOrderBook.Order[] memory orders = book.getOrders(PoolId.unwrap(k.toId()), 0);
@@ -493,17 +504,21 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
     }
 
     function _nativeEpoch(uint256 budget) private returns (PoolKey memory k) {
-        (k,) = initPool(Currency.wrap(address(0)), currency1, IHooks(address(hook)), 0, 60, SQRT_PRICE_1_1);
-        settlement.registerPool(k); vm.deal(address(this), 1e35);
-        IFixtureToken(Currency.unwrap(currency1)).approve(address(vault), type(uint256).max);
-        uint256 debt = SqrtPriceMath.getAmount0Delta(SQRT_PRICE_1_1, TickMath.getSqrtPriceAtTick(887220), 1000, true);
-        vault.createPosition{value: debt}(k, -887220, 887220, 1000, type(uint256).max, type(uint256).max);
+        k = _nativePool(SQRT_PRICE_1_1);
         OtterOrderBook.Order[] memory orders = new OtterOrderBook.Order[](1);
         orders[0] = OtterOrderBook.Order(vm.addr(0xA11CE), PoolId.unwrap(k.toId()), true, 0, budget,
             block.timestamp + 1 days, 0, 1, 0, block.timestamp + 1 days);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(0xA11CE, book.digestOf(orders[0]));
         bytes[] memory sigs = new bytes[](1); sigs[0] = abi.encodePacked(r, s, v);
         book.submit{value: budget}(orders, sigs);
+    }
+
+    function _nativePool(uint160 sqrtPrice) private returns (PoolKey memory k) {
+        (k,) = initPool(Currency.wrap(address(0)), currency1, IHooks(address(hook)), 0, 60, sqrtPrice);
+        settlement.registerPool(k); vm.deal(address(this), 1e35);
+        IFixtureToken(Currency.unwrap(currency1)).approve(address(vault), type(uint256).max);
+        uint256 debt = SqrtPriceMath.getAmount0Delta(sqrtPrice, TickMath.getSqrtPriceAtTick(887220), 1000, true);
+        vault.createPosition{value: debt}(k, -887220, 887220, 1000, type(uint256).max, type(uint256).max);
     }
 
     function test_bindingMatchesRealNativeEpoch() public {
@@ -663,7 +678,7 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
     function test_researchSameAddressSplitExposesRecordFundingDeficit() public {
         _submitStored(otterKey, true, 1, 0, 0, 0xA11CE, false);
         _submitStored(otterKey, true, 1, 0, 1, 0xA11CE, false); _close(otterKey, 0);
-        ResearchResult memory r = _researchCheck(otterKey, 8);
+        (ResearchResult memory r,) = _researchCheck(otterKey, 8);
         assertEq(r.cases[0].totalInput, 2); assertEq(r.cases[0].output, 1);
         assertEq(r.records[0].paymentNumerator, RESEARCH_WAD); assertEq(r.records[1].paymentNumerator, RESEARCH_WAD);
         assertEq(r.recordRawDeficitNumerator, int256(RESEARCH_WAD)); assertEq(r.recordCeilDeficit, 1);
@@ -673,7 +688,7 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
 
     function test_researchMergedRecordHasDifferentPivotAtSameAggregateInput() public {
         _submitStored(otterKey, true, 2, 0, 0, 0xA11CE, false); _close(otterKey, 0);
-        ResearchResult memory r = _researchCheck(otterKey, 8);
+        (ResearchResult memory r,) = _researchCheck(otterKey, 8);
         assertEq(r.cases[0].totalInput, 2); assertEq(r.cases[0].output, 1);
         assertEq(r.records[0].paymentNumerator, RESEARCH_WAD); assertEq(r.recordCeilDeficit, 0);
         assertEq(r.addressRawDeficitNumerator, 0);
@@ -682,7 +697,7 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
     function test_researchGroupingDoesNotFundDistinctTraderPivots() public {
         _submitStored(otterKey, true, 1, 0, 0, 0xA11CE, false);
         _submitStored(otterKey, true, 1, 0, 0, 0xB0B, false); _close(otterKey, 0);
-        ResearchResult memory r = _researchCheck(otterKey, 8);
+        (ResearchResult memory r,) = _researchCheck(otterKey, 8);
         assertEq(r.addresses.length, 2); assertEq(r.cases[0].output, 1);
         assertEq(r.recordRawDeficitNumerator, int256(RESEARCH_WAD)); assertEq(r.recordCeilDeficit, 1);
         assertEq(r.addressRawDeficitNumerator, int256(RESEARCH_WAD)); assertEq(r.addressCeilDeficit, 1);
@@ -691,7 +706,7 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
     function test_researchFundedAggregateCannotMeetSignedPerRecordMinima() public {
         _submitStored(otterKey, true, 1, RESEARCH_WAD / 4, 0, 0xA11CE, false);
         _submitStored(otterKey, true, 1, RESEARCH_WAD / 4, 1, 0xA11CE, false); _close(otterKey, 0);
-        ResearchResult memory r = _researchCheck(otterKey, 8);
+        (ResearchResult memory r,) = _researchCheck(otterKey, 8);
         assertEq(r.cases[0].welfareNumerator, RESEARCH_WAD / 2);
         for (uint256 i; i < 2; ++i) {
             assertEq(r.records[i].paymentNumerator, 3 * RESEARCH_WAD / 4);
@@ -706,7 +721,7 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
     function test_researchMatchesNativeSameAddressSplit() public {
         PoolKey memory k = _nativeEpoch(1);
         _submitStored(k, true, 1, 0, 1, 0xA11CE, false); _close(k, 0);
-        ResearchResult memory r = _researchCheck(k, 8);
+        (ResearchResult memory r,) = _researchCheck(k, 8);
         assertEq(r.soldCurrency, address(0)); assertEq(r.paymentCurrency, Currency.unwrap(k.currency1));
         assertEq(r.cases[0].output, 1); assertEq(r.recordCeilDeficit, 1); assertEq(r.addressCeilDeficit, 0);
     }
@@ -744,5 +759,169 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         for (uint256 i; i < n; ++i) _submitStored(otterKey, down, budget, ask, i,
             sameTrader || i % 2 == 0 ? 0xA11CE : 0xB0B, false);
         _close(otterKey, 0); _researchCheck(otterKey, 16);
+    }
+
+    // Separate Cartesian minimum oracle: no Node DP or welfare optimizer.
+    function _visitMinimum(OtterOrderBook.Order[] memory orders, MinimumScan memory scan, uint256 depth,
+        uint256 input, uint256 minimum, uint256 cost) private pure {
+        ResearchScan memory a = scan.allocation;
+        if (depth < a.indices.length) {
+            OtterOrderBook.Order memory order = orders[a.indices[depth]];
+            for (uint256 take; take <= order.budget; ++take) {
+                a.amounts[depth] = take; uint256 term = order.ask * take;
+                _visitMinimum(orders, scan, depth + 1, input + take, minimum + _ceilResearch(term), cost + term);
+            }
+            return;
+        }
+        ++scan.vectors; MinimumPoint memory previous = scan.points[input];
+        bool wins = !scan.present[input] || minimum < previous.minimumPayment
+            || (minimum == previous.minimumPayment && cost < previous.costNumerator);
+        if (scan.present[input] && minimum == previous.minimumPayment && cost == previous.costNumerator)
+            for (uint256 j; j < a.rank.length; ++j) {
+                uint256 i = a.rank[j]; if (a.amounts[i] == previous.fill[i]) continue;
+                wins = a.amounts[i] > previous.fill[i]; break;
+            }
+        if (wins) {
+            uint256[] memory fill = new uint256[](a.amounts.length);
+            for (uint256 i; i < fill.length; ++i) fill[i] = a.amounts[i];
+            scan.points[input].fill = fill; scan.points[input].minimumPayment = minimum;
+            scan.points[input].costNumerator = cost; scan.present[input] = true;
+        }
+    }
+
+    function _assertMinimumCase(OtterOrderBook.Order[] memory orders, MinimumCase memory c, ResearchCase memory baseline,
+        uint256[] memory outputs) private view {
+        assertEq(c.kind, baseline.kind); assertEq(c.trader, baseline.trader); assertEq(c.ordersHash, baseline.ordersHash);
+        assertEq(keccak256(abi.encode(c.indices)), keccak256(abi.encode(baseline.indices)));
+        assertEq(keccak256(abi.encode(c.omittedIndices)), keccak256(abi.encode(baseline.omittedIndices)));
+        MinimumScan memory scan; uint256 n = c.indices.length;
+        scan.allocation.indices = c.indices; scan.allocation.rank = new uint256[](n); scan.allocation.amounts = new uint256[](n);
+        uint256 budget; uint256 transitions; uint256 vectors = 1;
+        for (uint256 i; i < n; ++i) {
+            uint256 b = orders[c.indices[i]].budget; transitions += (budget + 1) * (b + 1); budget += b; vectors *= b + 1;
+            scan.allocation.rank[i] = i;
+        }
+        for (uint256 i; i < n; ++i) for (uint256 j = i + 1; j < n; ++j) {
+            OtterOrderBook.Order memory left = orders[c.indices[scan.allocation.rank[i]]];
+            OtterOrderBook.Order memory right = orders[c.indices[scan.allocation.rank[j]]];
+            if (right.ask < left.ask || (right.ask == left.ask && book.hashOrder(right) < book.hashOrder(left)))
+                (scan.allocation.rank[i], scan.allocation.rank[j]) = (scan.allocation.rank[j], scan.allocation.rank[i]);
+        }
+        scan.points = new MinimumPoint[](budget + 1); scan.present = new bool[](budget + 1);
+        _visitMinimum(orders, scan, 0, 0, 0, 0);
+        assertEq(c.vectorCount, vectors); assertEq(c.vectorCount, scan.vectors); assertEq(c.dpTransitions, transitions);
+        assertEq(c.points.length, budget + 1); bool positive;
+        for (uint256 q; q <= budget; ++q) {
+            assertTrue(scan.present[q]); MinimumPoint memory expected = scan.points[q]; MinimumPoint memory point = c.points[q];
+            uint256 out = outputs[q]; uint256 shortfall = expected.minimumPayment > out ? expected.minimumPayment - out : 0;
+            assertEq(point.totalInput, q); assertEq(point.output, out); assertEq(point.fill, expected.fill);
+            assertEq(point.minimumPayment, expected.minimumPayment); assertEq(point.aggregateMinimumPayment, _ceilResearch(expected.costNumerator));
+            assertEq(point.costNumerator, expected.costNumerator); assertEq(point.welfareNumerator, int256(out * RESEARCH_WAD) - int256(expected.costNumerator));
+            assertEq(point.deficit, shortfall); assertEq(point.feasible, shortfall == 0);
+            if (q > 0 && out > 0 && shortfall == 0) positive = true;
+        }
+        uint256 referenceMinimum;
+        for (uint256 i; i < n; ++i) referenceMinimum += _ceilResearch(orders[c.indices[i]].ask * baseline.fill[i]);
+        assertEq(c.researchInput, baseline.totalInput); assertEq(c.researchMinimumPayment, referenceMinimum);
+        assertEq(c.researchMinimumDeficit, referenceMinimum > baseline.output ? referenceMinimum - baseline.output : 0);
+        uint256 sameInputMinimum = scan.points[baseline.totalInput].minimumPayment;
+        assertEq(c.sameInputMinimumPayment, sameInputMinimum); assertEq(c.sameInputFeasible, sameInputMinimum <= baseline.output);
+        assertEq(c.positiveOutputAllocationExists, positive);
+    }
+
+    function _minimumCheck(PoolKey memory k, uint256 cap) private returns (MinimumResult memory r) {
+        (ResearchResult memory baseline, bytes32 expectedResearchHash) = _researchCheck(k, cap);
+        EpochFixture memory f = _batchFixture(k, 0, cap, address(this)); bytes32 researchHash; bytes32 minimumHash;
+        (researchHash, minimumHash, r) = abi.decode(vm.ffi(_epochCommand("--minimum", abi.encode(f))), (bytes32, bytes32, MinimumResult));
+        assertEq(researchHash, expectedResearchHash); assertEq(r.cases.length, baseline.cases.length);
+        OtterOrderBook.Order[] memory orders = book.getOrders(PoolId.unwrap(k.toId()), 0);
+        uint256[] memory outputs = new uint256[](baseline.originalInput + 1); OtterExecutionOracle oracle = new OtterExecutionOracle(manager);
+        for (uint256 q; q < outputs.length; ++q) {
+            OtterExecutionOracle.Quote memory quote = oracle.quoteExactInput(k, baseline.down, q, baseline.down ? f.downLimit : f.upLimit);
+            assertEq(uint8(quote.status), uint8(OtterExecutionOracle.Status.Complete)); assertEq(quote.consumedInput, q); outputs[q] = quote.output;
+        }
+        for (uint256 c; c < r.cases.length; ++c) _assertMinimumCase(orders, r.cases[c], baseline.cases[c], outputs);
+        assertEq(minimumHash, keccak256(abi.encode(keccak256("OtterSignedMinimumFrontier/v1"), researchHash, r)));
+    }
+
+    function test_minimumSplitPositiveAsksHaveNoPositiveOutputFeasibleFill() public {
+        _submitStored(otterKey, true, 1, RESEARCH_WAD / 4, 0, 0xA11CE, false);
+        _submitStored(otterKey, true, 1, RESEARCH_WAD / 4, 1, 0xA11CE, false); _close(otterKey, 0);
+        MinimumCase memory c = _minimumCheck(otterKey, 8).cases[0];
+        assertEq(c.points.length, 3); assertEq(c.points[1].minimumPayment, 1); assertEq(c.points[1].output, 0);
+        assertEq(c.points[2].minimumPayment, 2); assertEq(c.points[2].output, 1);
+        assertEq(c.researchMinimumDeficit, 1); assertFalse(c.sameInputFeasible); assertFalse(c.positiveOutputAllocationExists);
+    }
+
+    function test_minimumMergedRecordChangesDeliveryFeasibility() public {
+        _submitStored(otterKey, true, 2, RESEARCH_WAD / 4, 0, 0xA11CE, false); _close(otterKey, 0);
+        MinimumCase memory c = _minimumCheck(otterKey, 8).cases[0];
+        assertEq(c.points[2].costNumerator, RESEARCH_WAD / 2); assertEq(c.points[2].minimumPayment, 1);
+        assertTrue(c.sameInputFeasible); assertTrue(c.positiveOutputAllocationExists);
+    }
+
+    function test_minimumDeliveryFeasibilityDoesNotRepairPivotFunding() public {
+        _submitStored(otterKey, true, 1, 0, 0, 0xA11CE, false);
+        _submitStored(otterKey, true, 1, 0, 1, 0xA11CE, false); _close(otterKey, 0);
+        (ResearchResult memory baseline,) = _researchCheck(otterKey, 8);
+        MinimumCase memory c = _minimumCheck(otterKey, 8).cases[0];
+        assertEq(c.researchMinimumDeficit, 0); assertTrue(c.positiveOutputAllocationExists); assertEq(baseline.recordCeilDeficit, 1);
+    }
+
+    function test_minimumMatchesActualNativeOriginalAndRemovalDomains() public {
+        PoolKey memory k = _nativePool(SQRT_PRICE_1_1);
+        _submitStored(k, true, 1, RESEARCH_WAD / 4, 0, 0xA11CE, false);
+        _submitStored(k, true, 1, RESEARCH_WAD / 4, 1, 0xA11CE, false); _close(k, 0);
+        MinimumCase memory c = _minimumCheck(k, 8).cases[0];
+        assertEq(c.points[2].output, 1); assertEq(c.points[2].minimumPayment, 2); assertFalse(c.positiveOutputAllocationExists);
+    }
+
+    function test_minimumSameInputFeasibilityCanRequireHigherExactCostAllocation() public {
+        PoolKey memory k = _nativePool(TickMath.getSqrtPriceAtTick(-6000));
+        _submitStored(k, true, 1, RESEARCH_WAD / 10, 0, 0xA11CE, false);
+        _submitStored(k, true, 2, 2 * RESEARCH_WAD / 5, 1, 0xA11CE, false); _close(k, 0);
+        MinimumCase memory c = _minimumCheck(k, 8).cases[0];
+        assertEq(c.researchInput, 2); assertEq(c.researchMinimumPayment, 2); assertEq(c.researchMinimumDeficit, 1);
+        assertTrue(c.sameInputFeasible); assertEq(c.points[2].fill[0], 0); assertEq(c.points[2].fill[1], 2);
+        assertEq(c.points[2].minimumPayment, 1); assertEq(c.points[2].costNumerator, 4 * RESEARCH_WAD / 5);
+        assertEq(c.points[2].welfareNumerator, int256(RESEARCH_WAD / 5));
+    }
+
+    function _minimumFailure(uint256 cap, uint160 downLimit, string memory reason) private {
+        EpochFixture memory f = _batchFixture(otterKey, 0, cap, address(this)); f.downLimit = downLimit;
+        Vm.FfiResult memory result = vm.tryFfi(_epochCommand("--minimum", abi.encode(f)));
+        assertNotEq(result.exitCode, 0); assertEq(result.stdout.length, 0);
+        assertEq(string(result.stderr), string.concat("Epoch capture bridge failed: ", reason, "\n"));
+    }
+
+    function test_minimumMaximumBoundsAndRefusalCasesRemainExplicit() public {
+        uint256 clean = vm.snapshotState(); uint160 limit = TickMath.getSqrtPriceAtTick(-1200);
+        _submitStored(otterKey, false, 2, type(uint128).max, type(uint256).max, 0xA11CE, true); _close(otterKey, 0);
+        MinimumCase memory c = _minimumCheck(otterKey, 8).cases[0]; assertLt(c.points[2].welfareNumerator, 0);
+        assertTrue(vm.revertToState(clean));
+        for (uint256 i; i < 8; ++i) _submitStored(otterKey, true, 1, RESEARCH_WAD / 4, i, 0xA11CE, false);
+        _close(otterKey, 0); c = _minimumCheck(otterKey, 8).cases[0];
+        assertEq(c.vectorCount, 256); assertEq(c.points.length, 9); assertFalse(c.positiveOutputAllocationExists);
+        assertTrue(vm.revertToState(clean));
+        string memory missing = "Original opening prefixes contain missing, unsupported or partially consumed inputs.";
+        _submitStored(otterKey, true, 9, 0, 0, 0xA11CE, false); _close(otterKey, 0); _minimumFailure(8, limit, missing);
+        assertTrue(vm.revertToState(clean));
+        _submitStored(otterKey, true, 4, 0, 0, 0xA11CE, false); _close(otterKey, 0);
+        _minimumFailure(8, SQRT_PRICE_1_1 - 1, missing); _minimumFailure(8, 0, missing); assertTrue(vm.revertToState(clean));
+        _submitStored(otterKey, true, 1, 0, 0, 0xA11CE, false); _submitStored(otterKey, false, 1, 0, 1, 0xA11CE, false);
+        _close(otterKey, 0); _minimumFailure(8, limit, "Bound one-sided research cannot omit opposing orders or select a direction for a mixed batch.");
+        assertTrue(vm.revertToState(clean));
+        for (uint256 i; i < 9; ++i) _submitStored(otterKey, true, 1, 0, i, 0xA11CE, false);
+        _close(otterKey, 0); _minimumFailure(16, limit, "Bound one-sided research requires 1..8 original orders."); assertTrue(vm.revertToState(clean));
+        for (uint256 i; i < 8; ++i) _submitStored(otterKey, true, 6, 0, i, 0xA11CE, false);
+        _close(otterKey, 0); _minimumFailure(64, limit, "Bound one-sided research exceeds the exhaustive vector work limit.");
+    }
+
+    function testFuzz_minimumMatchesEveryActualOriginalAndRemovalQuantity(uint8 countSeed, uint8 budgetSeed,
+        uint64 askSeed, bool down, bool sameTrader) public {
+        uint256 n = bound(countSeed, 1, 3); uint256 budget = bound(budgetSeed, 1, 3);
+        for (uint256 i; i < n; ++i) _submitStored(otterKey, down, budget, bound(uint256(askSeed) + i * 123456789, 0, 2 * RESEARCH_WAD),
+            i, sameTrader || i % 2 == 0 ? 0xA11CE : 0xB0B, false);
+        _close(otterKey, 0); _minimumCheck(otterKey, 16);
     }
 }
