@@ -818,7 +818,7 @@ Fresh validation: 148 Node groups with 64 independent seeded frontier cases,
 TypeScript/production build and 41 local contract tests with six 64-case fuzz
 groups. Every actual retained budget vector is checked against independent
 oracle outputs. The exact handoff is recorded in the checkpoint report.
-**4R is pending the user's commit.** Its 14-file handoff includes a separate
+**4R was committed by the user as `b25bea0`; the tree was clean before 4S.** Its 14-file handoff includes a separate
 295-file snapshot adding the frontier inspector and Node tests; previous
 manifests remain frozen. Next test the interaction between signed deliverability
 and report-response incentives on authenticated complete small domains, while
@@ -826,3 +826,42 @@ retaining the paper's requested guarantees. Do not equate a funded fill or a
 minimum-payout frontier with a compatible mechanism. Large original domains,
 canonical two-sided verification, combined trader/LP incentives, concentrated
 auction integration and independent review remain open under G1–G4.
+
+
+## Checkpoint 4S: complete bound ask-response transfer diagnostics
+
+[The report-response checkpoint](./CHECKPOINT_4S.md) separates signed delivery
+and funding from necessary integer truthfulness. Original one-sided profiles are
+recomputed independently under one fixed opening/curve context and original
+budget/identity/nonce/clocks/other orders. Only the selected ask changes. A
+single-record target with no directly owned opening LP position is an explicit
+research hypothesis; no production participant policy is changed.
+
+An actual native full-range liquidity-2 opening completely covers original
+input 0–4. All selected efficient fills are deliverable and their ceil pivots
+are funded. However, the target's efficient input changes 2 to 0 between asks
+WAD/16 and 3WAD/16, requiring a whole-unit payment difference in [1/8,3/8].
+A verified truthfulness-only negative cycle rules out any integer payments for
+those responses even without delivery bounds. Constant-fill finite certificates,
+delivery-only failures and unavailable funding due to other minima are distinct.
+The adapter does not choose a new rule or prove complete incentives.
+
+**4S is pending the user's commit.** Its exact handoff is in the checkpoint
+report. [Completion status](./COMPLETION_STATUS.md) assesses the critical path:
+local custody/execution/recovery foundations are implemented and tested, while
+G1–G4, canonical verification, concentrated auctions, external reviews, live
+integration and complete economics remain open. A research-grant packet is
+closer, with real applicant/budget/owner/reviewer facts and current intake terms
+still needed. The next research deliverable should consolidate claim assumptions
+and compatibility obligations before more variants are tested. Further tests
+must answer a named obligation or concrete compatible proposal; passing test
+counts alone do not measure completion. The user's guarantee-preserving choice,
+production assets/valuations/minima/rewards and execution gates remain unchanged.
+
+Fresh 4S validation: 159 Node groups with 64 independent seeded menus,
+TypeScript/production build, 12 existing transfer research groups, and 45 local
+contract tests with six 64-case fuzz groups (384 contract fuzz cases). The
+separate 297-file snapshot retains the frozen 4R selection and adds the inspector
+and Node tests; four old selected files differ and earlier manifests remain
+frozen. The Solidity import closure remains 97. No production numerical rules,
+wallet action/configuration, saved economics or dependency pins are changed.

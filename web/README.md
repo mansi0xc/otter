@@ -509,3 +509,46 @@ The local exit interface and fresh validation are recorded in
 state and disabled writes; it is not a real wallet connection or live deployment.
 History, storage and receipt failure tests and the isolated synthetic browser
 preview are recorded in [checkpoint 7C](../reviews/CHECKPOINT_7C.md).
+
+
+## Bound finite ask-response research
+
+`src/protocol/reportMenu.ts: inspectBoundAskResponses` takes 1–16 freshly
+revalidated complete small one-sided profiles and an original target index.
+Only that record's reported ask may change: original budget, identity, nonce,
+clocks, other orders, opening/curve/block/runtime context and order sequence
+remain fixed. The target must have exactly one original record and no direct
+opening LP position under this diagnostic's single-role hypothesis. This is
+not production admission policy or authentication of beneficial control/aliases.
+
+Each profile recomputes 4Q and retains chosen input, original per-record minima,
+actual output, candidate ceil pivot and funding deficit. The existing integer
+transfer checker returns a finite necessary payment certificate or a closed
+negative cycle, which is checked before returning. A loose check uses lower 0
+and the existing raw output representation ceiling. A tighter necessary check
+uses the target's signed minimum and the room remaining after the other
+original minima. If those other minima already exceed output, the funded check
+is explicitly unavailable (kind 0); its zero-room sentinel is not a funded
+zero-payment result. Kind 1 only satisfies these finite target inequalities;
+kind 2 has a checked infeasibility certificate. Other traders' truthful payments,
+extra rewards/obligations and full type spaces are not proved.
+
+The actual native/core full-range liquidity-2 example covers original input
+0–4 completely. Efficient target inputs change from 2 to 0 between asks WAD/16
+and 3WAD/16 with a fixed budget-2 rival at WAD/8. Every selected fill meets all
+signed minima and the ceil pivots are funded, yet even loose integer
+truthfulness has a truthfulness-only negative cycle. No integral transfer
+assignment implements those fill responses. A constant-fill reverse-currency
+example passes the finite inequalities without proving a complete mechanism.
+
+The normalized `OtterBoundAskResponse/v1` ABI hash binds context, fixed report
+fields, all profile diagnostics and certificates. Results are detached/frozen;
+input content is rechecked on each call. Caller-authenticated anchors, book code,
+source and RPC remain trust inputs. The UI does not call the helper, and a hash
+is not an accepted settlement witness or permission to transact. The test-only
+`--menu` bridge reuses complete batch capture in isolated alternative fixture
+worlds, with synthetic block identity and no real RPC. Per-profile payload,
+record/vector and prefix bounds remain in force. See [4S](../reviews/CHECKPOINT_4S.md)
+for checks, exact witness, model limits and the commit handoff. G1–G4 and the
+concentrated auction gates remain open; production numerical/asset/minimum
+policies are unchanged.

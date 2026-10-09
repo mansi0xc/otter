@@ -102,6 +102,17 @@ report cost and lower welfare than the unrestricted choice. The frontier changes
 no delivery semantics or allocation/payment policy and proves no incentive
 guarantee. G1–G4 remain open. See [4R](./CHECKPOINT_4R.md).
 
+Local 4S update starts from the user-created `b25bea0` commit. Finite ask-response
+profiles freshly recompute complete original 4Q domains while only one target
+ask changes. An actual native liquidity-2 full-range example has funded and
+deliverable efficient fills but no whole-unit truthful target transfer assignment:
+the winning-minus-losing payment must lie in [1/8,3/8] raw output units. Checked
+truthfulness-only negative cycles establish the conflict independently of delivery
+bounds. Passing finite constant-fill certificates do not prove a mechanism;
+other-minimum deficits leave funded analysis unavailable. No participant/rule/
+representation change is selected. See [4S](./CHECKPOINT_4S.md) and
+[completion status](./COMPLETION_STATUS.md); G1–G4 remain open.
+
 ## Decision the review must support
 
 Determine whether a useful v4 mechanism can meet the requested incentive targets
@@ -259,7 +270,7 @@ scope and compensation; do not label internal tests as independent review.
 
 Use the full repository with submodules populated. The selected evidence files
 and their Solidity import closure are hashed in
-[EVIDENCE_MANIFEST_4R.json](./EVIDENCE_MANIFEST_4R.json). That manifest records the
+[EVIDENCE_MANIFEST_4S.json](./EVIDENCE_MANIFEST_4S.json). That manifest records the
 pre-patch baseline, local checkpoint, dependency commits and observed tools.
 It identifies the post-patch selected bytes and does not hash this brief or later
 status edits, authenticate an author, inspect unlisted files, or certify safety.
@@ -269,7 +280,7 @@ relying on submodule HEAD alone. Review the verifier before running it.
 From the repository root, with the already available tools:
 
 ```sh
-python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4R.json
+python3 reviews/verify_evidence.py --root . --manifest reviews/EVIDENCE_MANIFEST_4S.json
 ```
 
 From `solver/`:
@@ -526,3 +537,27 @@ identity only, not authenticated history, receipt correctness or grant readiness
 A reviewer should retain their own tool versions,
 logs and content identifiers, and explain any reproduction difference. No
 external transfer or publication is authorized by this local packet.
+
+
+To reproduce 4S, run `npm test` and
+`npm run build -- --outDir /tmp/otter-4s-web-dist` from `web/`, then
+`npm run test:transfers` from `solver/`. From `contracts/`, run the targeted
+`OtterOpeningExecutionTest` command with 64 fuzz runs, with generated build/cache
+outputs in `/tmp`. The diagnostic is research tooling and is not called by the
+wallet UI or production settlement. The test-only `--menu` capture bridge exports
+actual isolated alternative stored states with synthetic transport/block identity.
+Direct Solidity utility and signed-floor cycle checks do not reuse the graph
+checker. No saved economic artifacts or production numerical rules are changed.
+The separate [4S manifest](./EVIDENCE_MANIFEST_4S.json) retains the frozen 295-file
+4R selection and adds the adapter and Node tests. Four old selected files differ:
+the Solidity suite, fixture README, package test entry and bridge. Earlier
+manifests remain frozen. Content identity is not proof, signatures, external
+review, future settlement or deployment certification.
+
+Fresh 4S results: 159 Node groups (eleven new, including 64 seeded independent
+menu checks), TypeScript/production build, 12 existing transfer research groups
+and 45 targeted contract tests with six 64-case fuzz groups. Four new actual-core
+menu tests are added; all 41 old contract tests pass. The import closure remains
+97 files. Native test setup optionally accepts liquidity and the research helper
+optionally accepts its declared down limit; defaults and production behavior are
+unchanged. See the checkpoint report for the exact 15-file commit handoff.

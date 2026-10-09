@@ -143,6 +143,21 @@ RPC/block metadata remain synthetic. The diagnostic defines no constrained
 welfare optimizer or incentive theorem and changes no production delivery rule,
 saved research fixture or benchmark artifact.
 
+[Checkpoint 4S](../reviews/CHECKPOINT_4S.md) adds four actual-contract report-menu
+comparisons using the test-only `--menu` bridge. Alternative stored batches are
+captured in isolated snapshot worlds with the same pool/opening, clocks, budget,
+identity and other original fields; only the selected ask changes. Independent
+Solidity enumeration checks each 4Q profile, oracle outputs and minima, then
+direct scaled-utility inequalities or exact signed-floor closed cycles verify
+returned certificates. The native full-range liquidity-2 case completely covers
+original input 0–4 and has funded/deliverable chosen fills but no integer truthful
+target payment assignment. Reverse-currency constant fills, signed-minimum
+failure, unavailable funding when other minima exceed output and changed-original-
+budget refusal are separate cases. Block/RPC identity stays synthetic. No
+simultaneous historical alternative blocks, deployed exploit, selected rule,
+beneficial-owner model or external review is established. Saved research and
+economic artifacts are unchanged.
+
 `research/discrete-counterexamples.json` is a separate negative-control artifact
 from the bounded one-sided discrete laboratory. It records exact allocations,
 counterfactual payments, funding/IR failures, rounding deviations and partial

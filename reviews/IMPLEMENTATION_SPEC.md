@@ -885,3 +885,38 @@ Complete scalable original-domain computation, canonical two-sided settlement,
 report-dependent feasibility incentives and G1–G4 remain unresolved. Production
 Solidity, numerical rules, original minima, assets/utility and auction gates
 are unchanged.
+
+
+Checkpoint 4R was committed by the user as `b25bea0`; the tree was clean before
+4S. [Checkpoint 4S](./CHECKPOINT_4S.md) binds 1–16 finite ask-response profiles to
+complete original one-sided domains before reusing the existing integer transfer
+checker. The context key includes the opening/curve hashes, read block identity,
+manager runtime and order-domain separator. Masking only the selected ask in an
+original order-array comparison key holds true budget, identity, nonce, clocks,
+other reports and sequence fixed. It selects no domain restriction: exactly one
+target record and no direct opening LP ownership state the diagnostic's
+single-role hypothesis, not production admission or beneficial-control proof.
+
+A native full-range liquidity-2 actual-core opening supplies F(0..4)=0,0,1,1,1
+with every original request completely consumed. Budget-2 target ask responses
+WAD/16 and 3WAD/16 against a fixed budget-2 WAD/8 rival have efficient target
+inputs 2 and 0. All chosen minima and ceil pivots are funded. Necessary
+truthfulness requires the integral payment difference to lie in [1/8,3/8]
+output units, which contains no integer. A checked truthfulness-only cycle of
+weight -1 establishes this without using delivery/funding bounds. This scoped
+one-sided raw-unit linear-welfare hypothesis conflicts with unrestricted exact
+whole-unit truthfulness, even after 4Q original coverage and 4R deliverability.
+It is not a universal theorem against Otter, the paper or other representations.
+
+The helper separately checks finite loose inequalities and necessary funded
+target bounds. Other original minimum deficits make funding analysis unavailable;
+zero room is then only a sentinel. Feasible certificates check direct utilities;
+infeasible certificates have verified closed signed-floor cycles. Neither proves
+joint payment implementability across participants, rewards/LP roles, two-sided
+execution or a complete report domain. The versioned content hash and deeply
+frozen result are not an accepted canonical witness. Actual-contract FFI worlds
+are isolated counterfactuals with synthetic block metadata; pure anchors remain
+caller authenticated. No production allocator, numerical source, valuation,
+budget/minimum, payment asset, reward policy, UI action or concentrated gate
+changes. G1–G4 remain unresolved. [Completion status](./COMPLETION_STATUS.md)
+records the critical path and separates a research-grant packet from readiness.

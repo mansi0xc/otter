@@ -92,6 +92,17 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
     }
     struct MinimumResult { MinimumCase[] cases; }
     struct MinimumScan { ResearchScan allocation; MinimumPoint[] points; bool[] present; uint256 vectors; }
+    struct MenuEdge { uint8 from; uint8 to; int256 limit; uint8 kind; }
+    struct MenuAnalysis { uint8 kind; uint256[] payments; MenuEdge[] cycle; int256 cycleWeight; uint256 relaxations; }
+    struct MenuReport {
+        uint256 ask; uint256 input; uint256 minimumPayment; uint256 otherMinimumPayment; uint256 output;
+        uint256 availablePayment; uint256 otherMinimumDeficit; bytes32 researchHash; bytes32 ordersHash; bytes32 targetOrderHash;
+        uint256 ceilPivotPayment; uint256 pivotCeilDeficit;
+    }
+    struct MenuResult {
+        bytes32 contextHash; bytes32 fixedReportsHash; uint8 targetIndex; address trader; uint256 trueBudget; bool down;
+        address soldCurrency; address paymentCurrency; MenuReport[] reports; MenuAnalysis loose; MenuAnalysis funded;
+    }
     uint256 private constant RESEARCH_WAD = 1e18;
 
     function _record(PoolKey memory k, uint256 epoch) private view returns (OpeningRecord memory r) {
@@ -429,9 +440,12 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
     }
 
     function _researchCheck(PoolKey memory k, uint256 cap) private returns (ResearchResult memory r, bytes32 researchHash) {
-        uint160 downLimit = TickMath.getSqrtPriceAtTick(book.openingSnapshot(PoolId.unwrap(k.toId()), 0).tick - 1200);
+        return _researchCheck(k, cap, TickMath.getSqrtPriceAtTick(book.openingSnapshot(PoolId.unwrap(k.toId()), 0).tick - 1200));
+    }
+
+    function _researchCheck(PoolKey memory k, uint256 cap, uint160 downLimit) private returns (ResearchResult memory r, bytes32 researchHash) {
         bytes32 expectedCoverage = _coverageCheck(k, cap, downLimit, true);
-        EpochFixture memory f = _batchFixture(k, 0, cap, address(this));
+        EpochFixture memory f = _batchFixture(k, 0, cap, address(this)); f.downLimit = downLimit;
         bytes32 coverage;
         (coverage, researchHash, r) = abi.decode(vm.ffi(_epochCommand("--research", abi.encode(f))), (bytes32, bytes32, ResearchResult));
         assertEq(coverage, expectedCoverage);
@@ -514,11 +528,15 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
     }
 
     function _nativePool(uint160 sqrtPrice) private returns (PoolKey memory k) {
+        return _nativePool(sqrtPrice, 1000);
+    }
+
+    function _nativePool(uint160 sqrtPrice, uint128 liquidity) private returns (PoolKey memory k) {
         (k,) = initPool(Currency.wrap(address(0)), currency1, IHooks(address(hook)), 0, 60, sqrtPrice);
         settlement.registerPool(k); vm.deal(address(this), 1e35);
         IFixtureToken(Currency.unwrap(currency1)).approve(address(vault), type(uint256).max);
-        uint256 debt = SqrtPriceMath.getAmount0Delta(sqrtPrice, TickMath.getSqrtPriceAtTick(887220), 1000, true);
-        vault.createPosition{value: debt}(k, -887220, 887220, 1000, type(uint256).max, type(uint256).max);
+        uint256 debt = SqrtPriceMath.getAmount0Delta(sqrtPrice, TickMath.getSqrtPriceAtTick(887220), liquidity, true);
+        vault.createPosition{value: debt}(k, -887220, 887220, liquidity, type(uint256).max, type(uint256).max);
     }
 
     function test_bindingMatchesRealNativeEpoch() public {
@@ -923,5 +941,141 @@ contract OtterOpeningExecutionTest is OtterHookFixture {
         for (uint256 i; i < n; ++i) _submitStored(otterKey, down, budget, bound(uint256(askSeed) + i * 123456789, 0, 2 * RESEARCH_WAD),
             i, sameTrader || i % 2 == 0 ? 0xA11CE : 0xB0B, false);
         _close(otterKey, 0); _minimumCheck(otterKey, 16);
+    }
+
+    function _menuReport(ResearchResult memory r, bytes32 hash, OtterOrderBook.Order[] memory orders) private view returns (MenuReport memory p) {
+        p.ask = orders[0].ask; p.input = r.records[0].spent; p.minimumPayment = r.records[0].minimumPayment;
+        for (uint256 i = 1; i < orders.length; ++i) p.otherMinimumPayment += r.records[i].minimumPayment;
+        p.output = r.cases[0].output;
+        if (p.otherMinimumPayment > p.output) p.otherMinimumDeficit = p.otherMinimumPayment - p.output;
+        else p.availablePayment = p.output - p.otherMinimumPayment;
+        p.researchHash = hash; p.ordersHash = keccak256(abi.encode(orders)); p.targetOrderHash = book.hashOrder(orders[0]);
+        p.ceilPivotPayment = r.records[0].ceilPayment; p.pivotCeilDeficit = r.recordCeilDeficit;
+    }
+
+    function _assertMenuCertificate(MenuReport[] memory reports, MenuAnalysis memory a, bool funded) private pure {
+        uint256 n = reports.length;
+        if (a.kind == 0) {
+            assertTrue(funded); bool unavailable;
+            for (uint256 i; i < n; ++i) if (reports[i].otherMinimumDeficit > 0) unavailable = true;
+            assertTrue(unavailable); assertEq(a.payments.length, 0); assertEq(a.cycle.length, 0); assertEq(a.cycleWeight, 0); return;
+        }
+        uint256 maximumOutput = (uint256(1) << 120) - 1;
+        if (a.kind == 1) {
+            assertEq(a.payments.length, n); assertEq(a.cycle.length, 0); assertEq(a.cycleWeight, 0);
+            for (uint256 i; i < n; ++i) {
+                assertGe(a.payments[i], funded ? reports[i].minimumPayment : 0);
+                assertLe(a.payments[i], funded ? reports[i].availablePayment : maximumOutput);
+                for (uint256 j; j < n; ++j) assertGe(
+                    int256(RESEARCH_WAD) * (int256(a.payments[i]) - int256(a.payments[j])),
+                    int256(reports[i].ask) * (int256(reports[i].input) - int256(reports[j].input)));
+            }
+            return;
+        }
+        assertEq(a.kind, 2); assertEq(a.payments.length, 0); assertGt(a.cycle.length, 0);
+        bool[] memory seen = new bool[](n + 1); int256 weight;
+        for (uint256 i; i < a.cycle.length; ++i) {
+            MenuEdge memory e = a.cycle[i]; assertLe(e.from, n); assertLe(e.to, n);
+            assertFalse(seen[e.from]); seen[e.from] = true; assertEq(e.to, a.cycle[(i + 1) % a.cycle.length].from);
+            if (e.kind == 0) {
+                assertLt(e.from, n); assertLt(e.to, n); assertNotEq(e.from, e.to);
+                int256 numerator = int256(reports[e.from].ask) * (int256(reports[e.to].input) - int256(reports[e.from].input));
+                assertLe(e.limit * int256(RESEARCH_WAD), numerator); assertGt((e.limit + 1) * int256(RESEARCH_WAD), numerator);
+            } else if (e.kind == 1) {
+                assertEq(e.to, n); assertLt(e.from, n); assertEq(e.limit, -int256(funded ? reports[e.from].minimumPayment : 0));
+            } else {
+                assertEq(e.kind, 2); assertEq(e.from, n); assertLt(e.to, n);
+                assertEq(e.limit, int256(funded ? reports[e.to].availablePayment : maximumOutput));
+            }
+            weight += e.limit;
+        }
+        assertEq(weight, a.cycleWeight); assertLt(weight, 0);
+    }
+
+    function _menuCheck(PoolKey memory k, uint256[] memory asks, uint256 targetBudget,
+        uint256 otherBudget, uint256 otherAsk, uint256 otherCount, bool down, uint160 downLimit) private returns (MenuResult memory r) {
+        // These are alternate isolated worlds, not simultaneous historical blocks.
+        uint256 clean = vm.snapshotState(); uint256 cap = targetBudget + otherBudget * otherCount;
+        EpochFixture[] memory fixtures = new EpochFixture[](asks.length); MenuReport[] memory expected = new MenuReport[](asks.length);
+        for (uint256 i; i < asks.length; ++i) {
+            assertTrue(vm.revertToState(clean));
+            _submitStored(k, down, targetBudget, asks[i], 0, 0xA11CE, false);
+            for (uint256 j; j < otherCount; ++j) _submitStored(k, down, otherBudget, otherAsk, 0, 0xB0B + j, false);
+            _close(k, 0);
+            (ResearchResult memory baseline, bytes32 hash) = _researchCheck(k, cap, downLimit);
+            expected[i] = _menuReport(baseline, hash, book.getOrders(PoolId.unwrap(k.toId()), 0));
+            fixtures[i] = _batchFixture(k, 0, cap, address(this)); fixtures[i].downLimit = downLimit;
+        }
+        bytes32 menuHash;
+        (menuHash, r) = abi.decode(vm.ffi(_epochCommand("--menu", abi.encode(uint8(0), fixtures))), (bytes32, MenuResult));
+        assertEq(menuHash, keccak256(abi.encode(keccak256("OtterBoundAskResponse/v1"), r)));
+        assertEq(r.targetIndex, 0); assertEq(r.trader, vm.addr(0xA11CE)); assertEq(r.trueBudget, targetBudget); assertEq(r.down, down);
+        assertEq(r.soldCurrency, Currency.unwrap(down ? k.currency0 : k.currency1));
+        assertEq(r.paymentCurrency, Currency.unwrap(down ? k.currency1 : k.currency0));
+        assertEq(keccak256(abi.encode(r.reports)), keccak256(abi.encode(expected)));
+        OtterOrderBook.Order[] memory orders = book.getOrders(PoolId.unwrap(k.toId()), 0); orders[0].ask = 0;
+        assertEq(r.fixedReportsHash, keccak256(abi.encode(orders)));
+        Curve[] memory curves = new Curve[](2); OtterExecutionOracle oracle = new OtterExecutionOracle(manager);
+        for (uint256 side; side < 2; ++side) {
+            curves[side].down = side == 0; curves[side].maxInput = cap;
+            curves[side].limit = side == 0 ? downLimit : fixtures[0].upLimit;
+            curves[side].points = new OtterExecutionOracle.Quote[](cap + 1);
+            for (uint256 q; q <= cap; ++q) curves[side].points[q] = oracle.quoteExactInput(k, side == 0, q, curves[side].limit);
+        }
+        assertEq(r.contextHash, keccak256(abi.encode(book.snapshotHash(PoolId.unwrap(k.toId()), 0), keccak256(abi.encode(curves)),
+            fixtures[0].blockNumber, fixtures[0].blockHash, keccak256(address(manager).code), book.DOMAIN_SEPARATOR())));
+        _assertMenuCertificate(r.reports, r.loose, false); _assertMenuCertificate(r.reports, r.funded, true);
+    }
+
+    function _menuAsks() private pure returns (uint256[] memory asks) {
+        asks = new uint256[](3); asks[0] = RESEARCH_WAD / 16; asks[1] = RESEARCH_WAD / 8; asks[2] = 3 * RESEARCH_WAD / 16;
+    }
+
+    function test_menuCompleteNativeOriginalDomainsAreDeliverableButIntegerTruthfulnessIsImpossible() public {
+        PoolKey memory k = _nativePool(SQRT_PRICE_1_1, 2); uint160 limit = TickMath.getSqrtPriceAtTick(-60000);
+        MenuResult memory r = _menuCheck(k, _menuAsks(), 2, 2, RESEARCH_WAD / 8, 1, true, limit);
+        assertEq(r.reports[0].input, 2); assertEq(r.reports[2].input, 0);
+        for (uint256 i; i < r.reports.length; ++i) {
+            assertLe(r.reports[i].minimumPayment + r.reports[i].otherMinimumPayment, r.reports[i].output);
+            assertEq(r.reports[i].pivotCeilDeficit, 0);
+        }
+        assertEq(r.loose.kind, 2); assertEq(r.loose.cycleWeight, -1); assertEq(r.funded.kind, 2);
+        for (uint256 i; i < r.loose.cycle.length; ++i) assertEq(r.loose.cycle[i].kind, 0);
+        assertEq(r.reports[0].ceilPivotPayment * RESEARCH_WAD - r.reports[2].ask * r.reports[0].input, 5 * RESEARCH_WAD / 8);
+        assertEq(r.reports[2].ceilPivotPayment, 0);
+        OtterExecutionOracle oracle = new OtterExecutionOracle(manager);
+        uint256[5] memory outputs = [uint256(0), 0, 1, 1, 1];
+        for (uint256 q; q < 5; ++q) {
+            OtterExecutionOracle.Quote memory quote = oracle.quoteExactInput(k, true, q, limit);
+            assertEq(uint8(quote.status), uint8(OtterExecutionOracle.Status.Complete)); assertEq(quote.consumedInput, q); assertEq(quote.output, outputs[q]);
+        }
+    }
+
+    function test_menuConstantFillReverseCurrencyHasCheckedNecessaryPayments() public {
+        MenuResult memory r = _menuCheck(otterKey, _menuAsks(), 2, 2, RESEARCH_WAD / 8, 1, false, TickMath.getSqrtPriceAtTick(-1200));
+        assertEq(r.loose.kind, 1); assertEq(r.funded.kind, 1);
+        for (uint256 i; i < r.reports.length; ++i) assertEq(r.reports[i].input, 2);
+    }
+
+    function test_menuSignedMinimumFailureAndOtherMinimumDeficitRemainDistinct() public {
+        uint256 clean = vm.snapshotState(); uint256[] memory asks = _menuAsks();
+        MenuResult memory r = _menuCheck(otterKey, asks, 1, 1, RESEARCH_WAD / 4, 1, true, TickMath.getSqrtPriceAtTick(-1200));
+        assertEq(r.loose.kind, 1); assertEq(r.funded.kind, 2);
+        assertTrue(vm.revertToState(clean)); asks = new uint256[](2); asks[0] = type(uint128).max - 2; asks[1] = type(uint128).max - 1;
+        r = _menuCheck(otterKey, asks, 1, 1, RESEARCH_WAD / 4, 2, true, TickMath.getSqrtPriceAtTick(-1200));
+        assertEq(r.loose.kind, 1); assertEq(r.funded.kind, 0);
+        for (uint256 i; i < r.reports.length; ++i) { assertEq(r.reports[i].otherMinimumDeficit, 1); assertEq(r.reports[i].availablePayment, 0); }
+    }
+
+    function test_menuRejectsChangedOriginalBudgetAcrossActualStoredProfiles() public {
+        uint256 clean = vm.snapshotState(); EpochFixture[] memory fixtures = new EpochFixture[](2);
+        for (uint256 i; i < 2; ++i) {
+            assertTrue(vm.revertToState(clean)); _submitStored(otterKey, true, 2, (i + 1) * RESEARCH_WAD / 16, 0, 0xA11CE, false);
+            _submitStored(otterKey, true, 2 + i, RESEARCH_WAD / 8, 0, 0xB0B, false); _close(otterKey, 0);
+            fixtures[i] = _batchFixture(otterKey, 0, 8, address(this));
+        }
+        Vm.FfiResult memory result = vm.tryFfi(_epochCommand("--menu", abi.encode(uint8(0), fixtures)));
+        assertNotEq(result.exitCode, 0); assertEq(result.stdout.length, 0);
+        assertEq(string(result.stderr), "Epoch capture bridge failed: Bound ask-response profiles must keep the same opening context and every original field except the selected ask.\n");
     }
 }

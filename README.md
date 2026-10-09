@@ -187,6 +187,12 @@ The current hook enforces the following integration rules:
   some batches have no positive-output feasible fill, while others require a
   different, higher-cost fill at the same input. No allocation/payment policy
   changes. See [checkpoint 4R](./reviews/CHECKPOINT_4R.md).
+- **Bound ask-response research.** Complete small original profiles are compared
+  while only one target ask changes. A funded, deliverable actual-native example
+  still has no whole-unit truthful target payments for the efficient fills.
+  Checked finite payment/cycle certificates diagnose the hypothesis without
+  adopting a rule. See [checkpoint 4S](./reviews/CHECKPOINT_4S.md) and
+  [completion status](./reviews/COMPLETION_STATUS.md).
 - **Discrete mechanism research.** `solver/src/discrete-research.ts` maximizes
   exact linear welfare on fixed small one-sided domains and computes raw pivots,
   with independent exhaustive checks. It preserves partial-capacity diagnostics

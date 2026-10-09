@@ -1,0 +1,1248 @@
+{
+  "schema": "otter/review-evidence/v1",
+  "preparedOn": "2026-10-08",
+  "baselineCommit": "b25bea017f07b37f9a64b24912dc825ebbeb3dec",
+  "scope": "Post-checkpoint selected local content based on the stated pre-checkpoint baseline. Retains the 295-file 4R selection and adds the pure bound ask-response inspector and Node tests, including the 97-file Solidity import closure. Excludes mutable packet/status documents, installed packages, generated builds/artifacts and temporary logs.",
+  "qualification": "Unsigned identity for local 4S checkpoint bytes pending the user-created commit, not equality with the pre-checkpoint commit. Caller-authenticated anchors, configured book code/source and RPC remain trust inputs. Complete small original one-sided profiles hold every original field except one target ask fixed. Checked finite integer target payment/cycle certificates diagnose the existing linear-welfare allocation hypothesis. The full-original native liquidity-2 witness is deliverable and ceil-funded but has a truthfulness-only negative cycle; passing constant-fill finite constraints do not prove a complete mechanism. Other-minimum deficits leave funding analysis explicitly unavailable. No selected allocation/payment/participant policy, report/budget/minimum restriction, revised asset/utility, joint truthful payment scheme, beneficial-owner proof, complete type-space theorem, scalable two-sided computation, accepted on-chain economic witness, historical signature proof, consensus/finality, future delivery guarantee, independent review or deployment/grant certification. Actual fixture worlds are isolated alternatives with synthetic block/RPC identity.",
+  "observedTools": {
+    "node": "v24.10.0",
+    "python": "3.9.6",
+    "forge": "1.5.1-stable (b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2)",
+    "solc": "0.8.26",
+    "evm": "cancun",
+    "viaIR": true,
+    "optimizerRuns": 200,
+    "fuzzRuns": 512,
+    "checkpointFuzzRuns": 64
+  },
+  "submoduleCommits": [
+    {
+      "path": "contracts/lib/forge-std",
+      "commit": "bf647bd6046f2f7da30d0c2bf435e5c76a780c1b"
+    },
+    {
+      "path": "contracts/lib/v4-core",
+      "commit": "e50237c43811bd9b526eff40f26772152a42daba"
+    },
+    {
+      "path": "contracts/lib/v4-core/lib/forge-std",
+      "commit": "1de6eecf821de7fe2c908cc48d3ab3dced20717f"
+    },
+    {
+      "path": "contracts/lib/v4-core/lib/openzeppelin-contracts",
+      "commit": "dbb6104ce834628e473d2173bbc9d47f81a9eec3"
+    },
+    {
+      "path": "contracts/lib/v4-core/lib/openzeppelin-contracts/lib/erc4626-tests",
+      "commit": "8b1d7c2ac248c33c3506b1bff8321758943c5e11"
+    },
+    {
+      "path": "contracts/lib/v4-core/lib/openzeppelin-contracts/lib/forge-std",
+      "commit": "eb980e1d4f0e8173ec27da77297ae411840c8ccb"
+    },
+    {
+      "path": "contracts/lib/v4-core/lib/openzeppelin-contracts/lib/forge-std/lib/ds-test",
+      "commit": "cd98eff28324bfac652e63a239a60632a761790b"
+    },
+    {
+      "path": "contracts/lib/v4-core/lib/solmate",
+      "commit": "4b47a19038b798b4a33d9749d25e570443520647"
+    },
+    {
+      "path": "contracts/lib/v4-core/lib/solmate/lib/ds-test",
+      "commit": "cd98eff28324bfac652e63a239a60632a761790b"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitmodules",
+      "sha256": "ce31c1dc93aa86e94d84a51e5a6d4e7c0e988bc1398685ebb8cb6894eed1cf08"
+    },
+    {
+      "path": "CORRECTIONS.md",
+      "sha256": "71ae95a4d47db0eaec420edfcc47a455567c2e0ac7b4da2c86ec892e4982e085"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "0d36b93e47f56627bd628ae225894c91f33e507734dbc02bc3109bb271166e4f"
+    },
+    {
+      "path": "contracts/foundry.toml",
+      "sha256": "f555cf2bc233058e719b183c183c5b5abd8149c75d9582037313608a4731138a"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/Base.sol",
+      "sha256": "76b05dda37981797d3d403f29fc6cad79b46e2fc11da47d649ff13acb69158b2"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/Script.sol",
+      "sha256": "cfb5be01f4ddbc037a3502dac3d487d629a4c8b58aa9e2ec48c9fa1b334d96ec"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/StdAssertions.sol",
+      "sha256": "203de35565c3d68b6599f84e88068f79c23b53a80d18c46056e85d4c5f48613c"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/StdChains.sol",
+      "sha256": "981b7ce12f4bc3193c7914c68f51be74d1d03c33732db894f5d36ad8025ab4f5"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/StdCheats.sol",
+      "sha256": "988843996b3e8ebab594c659fba9502bab437220f84e7ded9a9e3f6e730d358e"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/StdConstants.sol",
+      "sha256": "17dfd996881264de1e6af6697a3dc7a56ae8ff0717e4cb4f1685bd7fb3a45147"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/StdError.sol",
+      "sha256": "c1f7271f11a44628810ef6beb2da0c43add131ff9cfcac4d7acd633c269ccf7d"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/StdInvariant.sol",
+      "sha256": "7d3a62087c7d06766e99f8e4f4e50997b0ff8730fb304986f2c4cd895a67fbbd"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/StdJson.sol",
+      "sha256": "556494110d1e791ce0992bf22c2ac6df5e614122659a97cd1269a8d9dce139c0"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/StdMath.sol",
+      "sha256": "7224cea66fc06c7a9d303084cccb14eaedffe4b21b3f9695d06dc590d2894d7d"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/StdStorage.sol",
+      "sha256": "8835d2e5de9ceca2a4988a212916216de052634584f832d5364dc8c42d460113"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/StdStyle.sol",
+      "sha256": "903ea6f4e4aa31e416b5043abecc09ced41dc78c9ce9dabb5c745337ee13139d"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/StdToml.sol",
+      "sha256": "682e9c74bd02de5df7be595d27fa44eeaf0a5d96ad5c2db507065386d35eb433"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/StdUtils.sol",
+      "sha256": "52d713d886305184e7ed3b3a2e5941ea1440f071d9c9a4d6fea618135e1d3f67"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/Test.sol",
+      "sha256": "2e69383110d088b4c413edf79bb71f9d05e4791625fb7fa53429d34440ea50dd"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/Vm.sol",
+      "sha256": "ad4bc58d4a2cfdb45c6439fe977a7ad390fd83e3e7485ec4597458a278993eeb"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/console.sol",
+      "sha256": "894dc6e40fe62d887df6243112d8c775df2db60babc3024ee04a5564b90af64d"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/console2.sol",
+      "sha256": "62d8ccbd118fec4f99c5e847322d6ca0d7fbe6a0a16e5a26b0590869fcd69357"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/interfaces/IMulticall3.sol",
+      "sha256": "890a5b361034daa6006b3ba2275e743cd6197c4d81e3df5732cdce731d3c0868"
+    },
+    {
+      "path": "contracts/lib/forge-std/src/safeconsole.sol",
+      "sha256": "fd74d8ed377e1470217cd6dce7699dcbc4e79b3893f17ae2a298c0e7e4418181"
+    },
+    {
+      "path": "contracts/lib/v4-core/lib/solmate/src/auth/Owned.sol",
+      "sha256": "8ac2f2dc41ab8012e93adb3791326ffa1e4059a20c306a777109dd81816b9125"
+    },
+    {
+      "path": "contracts/lib/v4-core/lib/solmate/src/test/utils/mocks/MockERC20.sol",
+      "sha256": "9af27b7d7230e4eb62406011643a8844405493f2f6d2c10daff87a9276f65eab"
+    },
+    {
+      "path": "contracts/lib/v4-core/lib/solmate/src/tokens/ERC20.sol",
+      "sha256": "a3a7e839f42762ef24623581542a916e838f3c7c0bef647963d1fdad0f9d208a"
+    },
+    {
+      "path": "contracts/lib/v4-core/lib/solmate/src/utils/FixedPointMathLib.sol",
+      "sha256": "edfd7fa8ec4087d252f637df16669599d5c0ac803ab465730f8cc3a5e8a8d55a"
+    },
+    {
+      "path": "contracts/lib/v4-core/lib/solmate/src/utils/SafeTransferLib.sol",
+      "sha256": "ed12cae0865a8a92adb9dadd125b2cf23920870845ef128431d811963b474103"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/ERC6909.sol",
+      "sha256": "0f1bf94844851b561ae53d57263366d18f4c4431eb47096871e8715837c6ec9d"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/ERC6909Claims.sol",
+      "sha256": "6fa9989899398646fd7c33f837254a69e7c75b77af120970ede397c3d0fbdc37"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/Extsload.sol",
+      "sha256": "ac157c05d62562eed212cdf290046a85d192e7b1f8aba69c3ce358b0ebac4279"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/Exttload.sol",
+      "sha256": "386b5618307a20144a44308b81188c7755a6c279db6c5824cf63a910864324d4"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/NoDelegateCall.sol",
+      "sha256": "525bf4df92c4ac0fd582e1b6ac18fdfb5d147d410f38f19231e4c9a469187415"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/PoolManager.sol",
+      "sha256": "6b0327ec5427acf894865003425eed18fc09a70389f785d4c1c05541133f1012"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/ProtocolFees.sol",
+      "sha256": "bdabfbdfa0d8692ee187ffab948c295c2c6ebcc2dcf86e552fba3491309843c6"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/interfaces/IExtsload.sol",
+      "sha256": "9421ef4ba198d94058cd9a4c9fd2d663c61fc682f7dafa449a873456853f0025"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/interfaces/IExttload.sol",
+      "sha256": "c21643d2c7f48d2d2407438a64a3ff0f376324cf6a0c62608977713652308c9e"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/interfaces/IHooks.sol",
+      "sha256": "aca1db9898026d9a4b8740752fb0dbfc6a55e4bede6a949c6af4e07d626f6900"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/interfaces/IPoolManager.sol",
+      "sha256": "173a3f93aeb39373271ebe2bfb961d824922378a39b7a5e983acbb1c122d296e"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/interfaces/IProtocolFees.sol",
+      "sha256": "807d68adea106ec2aa51a8009155de09ebfe09e1ee7053d5a5ae448d7e840654"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/interfaces/callback/IUnlockCallback.sol",
+      "sha256": "2e4a514730654da2e08a82eff5b3eabae12dc1c6198951396e1d466d4c0e223e"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/interfaces/external/IERC20Minimal.sol",
+      "sha256": "5e966a2d22b3b234a56af4b17e36bf7be90f9b29b1ddb6a15bfefc0b6dab4282"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/interfaces/external/IERC6909Claims.sol",
+      "sha256": "1cd65496c829036bc6aee67bc71363ab5fb6989c65e793087d0e1e2379f7d7d8"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/BitMath.sol",
+      "sha256": "e8a45eb3d57f9427fc47bbb2543c1a6a5f394113b378123ac7ca9f113a7502b4"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/CurrencyDelta.sol",
+      "sha256": "dfbb3d232c2d52bb09c8dcbb38b4a8fd16c616b8e6bf49e6f4ee948760530f7b"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/CurrencyReserves.sol",
+      "sha256": "b38f1d3807d90bbccb865c0d96caf1ef92d6df9b69adbbe43b1d12e1241523c9"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/CustomRevert.sol",
+      "sha256": "9d3dbe6b742cb1ac30f57df89d879ade9649389de1165fc637114bd062d39fca"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/FixedPoint128.sol",
+      "sha256": "1ca2f55160697b73bd66fd27c8724d79a57108121ce1e8a0ab8b79f38bb58fbb"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/FixedPoint96.sol",
+      "sha256": "66ee26d4fb3ac639124bdfa27d3256d196970997fa127c09e9bf7154e30d4590"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/FullMath.sol",
+      "sha256": "a9607255a6fd604d9c92f6b7416811c38b9d86e5dfdb0c345a494ebd35f7a4a3"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/Hooks.sol",
+      "sha256": "f6012d7f627259f8f32816ee8e10b1d6244067c602a178072732bcaa32086b17"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/LPFeeLibrary.sol",
+      "sha256": "e96c3fa7deac991dc09b6c5e560a340d01d6c68ccba483d4b29f8a66e5aa44e0"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/LiquidityMath.sol",
+      "sha256": "67a39e58732340af4870342ba9230691f35501d89ed8725ca1b338deaa0eb26a"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/Lock.sol",
+      "sha256": "29cd41a53de22514164e638e7bc965ccf4d9f34b455b43a1a15e06a8cb86e7f1"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/NonzeroDeltaCount.sol",
+      "sha256": "0ae35ca64da2527b4e1f7afa4ca10c4b65af952dc473c33b6663101e8d199f40"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/ParseBytes.sol",
+      "sha256": "6a6f3d1cec0143fd70ea68c34e6dce3bde72f368b213f1a225ada23dbfd99bb8"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/Pool.sol",
+      "sha256": "59c493035ad25d56f24a457e8b40d9d1e3784504b8ff13d171db1eb25c6f128e"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/Position.sol",
+      "sha256": "3dc4e2ad1564fa94eddf3ff06ce9ac592c9d578ea64ca194050382da454c8fcb"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/ProtocolFeeLibrary.sol",
+      "sha256": "f8d96d9c8b5d12ab927b34551699bd7086750475f70254c9505e636f2cafe56a"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/SafeCast.sol",
+      "sha256": "c1a815a41607be5b4c86ca588a951f368156da8ee21bdfc18b5d51b58a0f27be"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/SqrtPriceMath.sol",
+      "sha256": "42440c21bbab86c7eed4716b281ed5ca281cf14af8b5e06dc6dc3bc6864bcfdf"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/StateLibrary.sol",
+      "sha256": "eebdbc1b6e431072ce5521b9e1b603d43831e3b6e062743e6665e070d5cf8a1a"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/SwapMath.sol",
+      "sha256": "eb3971ea0ba84ff0a01f2fbe43f62f9c393121ef1724774ed3f3ab7760780e4a"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/TickBitmap.sol",
+      "sha256": "19b25dccfac8bd90f9d615fb182547eb7b5908a5cbf21a1c5920b92c47383cb6"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/TickMath.sol",
+      "sha256": "272d4f6d3ff9ae33596ebcdb84a71a3c2d4542ae8fb5c88ddf1aca8043f5d06b"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/TransientStateLibrary.sol",
+      "sha256": "9835fca9df8b3f649def66835c5d7ee68de6a6cbe92bf255eb5d8b92a6a8d60e"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/libraries/UnsafeMath.sol",
+      "sha256": "2de236e7ca0b9572a6b0184557565b6fd54e177224e202c727fe248785ede427"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/test/ActionsRouter.sol",
+      "sha256": "b3a0e95010e4d7051b7579c81821addc1d81279a05ca5b6bcf136a93e8acc478"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/test/PoolClaimsTest.sol",
+      "sha256": "73e4488e5db8eedff5001d83b46a8aa620d337b4b26bf38b27bf9b56eedcf07a"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/test/PoolDonateTest.sol",
+      "sha256": "d78aeca9df8d49c621d5f0dfba8637174a1dd36e9d7daed97fc65ecf2083369a"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/test/PoolModifyLiquidityTest.sol",
+      "sha256": "f2f2e31ff699800706afabe0b2179d6f23042b9df6e838de29429617a1d90590"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/test/PoolModifyLiquidityTestNoChecks.sol",
+      "sha256": "eea606a2f49dc2114e4e762f92c1182e60fc369dfb96283fcc4bb8b47468af38"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/test/PoolNestedActionsTest.sol",
+      "sha256": "f47549121086c8a39b9493dcafe76b127df1cf4764e124edcb831b0ed4e6b077"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/test/PoolSwapTest.sol",
+      "sha256": "f6bcbae53e11da5fc95ca172d2711c69a2c26bc4292a199fec5aac7fb907c753"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/test/PoolTakeTest.sol",
+      "sha256": "7caed276fff2011a310a5ea4f56f491a1617b714c05c0846ba15cff079efca35"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/test/PoolTestBase.sol",
+      "sha256": "e3ab1cd908af2302b1abfdfa327ea344c297fb879312164392d7020321943833"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/test/SwapRouterNoChecks.sol",
+      "sha256": "b54f0c73c49f1d3af45baee663c347cc9b035d3b41368f9f5a3f8009ac70f6d1"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/types/BalanceDelta.sol",
+      "sha256": "320d9c13dec135c3903729e66d3a1040fe86d537a7ee53728915012ca183af32"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/types/BeforeSwapDelta.sol",
+      "sha256": "6aee06f1553e879f5909e8f4c0eac26ec23dd4821a7e56e4d5077db39a227e12"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/types/Currency.sol",
+      "sha256": "ba6726fd24fbc66848208dfbb2899116c10729c505e6e5552316ac2444f1dfc3"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/types/PoolId.sol",
+      "sha256": "548424ac50ad58212545da70207283fb8990731578c115c85d5acbcb0e1d3c9f"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/types/PoolKey.sol",
+      "sha256": "99e1afe285b5c614ebc9586ab5196db9d24a63fd924a449f5d99f490a6a6d6a9"
+    },
+    {
+      "path": "contracts/lib/v4-core/src/types/Slot0.sol",
+      "sha256": "378b45486644dc7e49726358e83d0e2fffdaee088d18cac1a3df00d02c3635b4"
+    },
+    {
+      "path": "contracts/lib/v4-core/test/utils/Constants.sol",
+      "sha256": "186e9451bb481f818792cdb785eafcc26b1f13f1bac1445d1ba54832a25505cb"
+    },
+    {
+      "path": "contracts/lib/v4-core/test/utils/CurrencySettler.sol",
+      "sha256": "afe4d7de04f55f35f25bae046a96baa4137709b9df13d90b76c643a1317df6b8"
+    },
+    {
+      "path": "contracts/lib/v4-core/test/utils/Deployers.sol",
+      "sha256": "4acf61e69d141e577933c0e2132f6fabe42099f07658cfb912f86560e5a35253"
+    },
+    {
+      "path": "contracts/lib/v4-core/test/utils/LiquidityAmounts.sol",
+      "sha256": "2c766733b2696500b84f8dc129aed21dcc92d4af0929ae14684e0bf3cda15a95"
+    },
+    {
+      "path": "contracts/lib/v4-core/test/utils/SortTokens.sol",
+      "sha256": "ea9cd93ccb12d8c618f32db04a746a19158db7ae1c2a7069dd5ffba314345474"
+    },
+    {
+      "path": "contracts/remappings.txt",
+      "sha256": "9ea24e1116b6a83adf06f125965cc244478297358ef9b2ce94302511fa3da51c"
+    },
+    {
+      "path": "contracts/script/Deploy.s.sol",
+      "sha256": "3b41b3acecfaab4280d1ce98cf028fd1d60f4a54cd1a20951355592b3c3d1e54"
+    },
+    {
+      "path": "contracts/src/OtterExecutionOracle.sol",
+      "sha256": "1827c2f1b34d7de105ff6ed301457200b6044f68bfc6c1e16a3bae190128af8b"
+    },
+    {
+      "path": "contracts/src/OtterHook.sol",
+      "sha256": "6e2867f0df19deb6afabc2053d79d76b5275cfde27d83a31013c6f5844f138b6"
+    },
+    {
+      "path": "contracts/src/OtterLiquidityVault.sol",
+      "sha256": "88d3ad6d22c467f4357a024269b6974b2f8405c4cfe4b63c965b1c0768722a00"
+    },
+    {
+      "path": "contracts/src/OtterMath.sol",
+      "sha256": "92c3059c96cbe77118d44b20b4d6d54d90a49359af0a21db0abb7fee071a901c"
+    },
+    {
+      "path": "contracts/src/OtterOrderBook.sol",
+      "sha256": "2fa5726446b29643a81f5dad1a3ca42d1c47fcb9661b1330c297a714071e4de8"
+    },
+    {
+      "path": "contracts/src/OtterRewardLedger.sol",
+      "sha256": "b462758acf386fb012d5958c0a25d91b8b0866a3b33a6fe95a4f0c1ad62b6a73"
+    },
+    {
+      "path": "contracts/src/OtterRewardMath.sol",
+      "sha256": "6356964c24aad4825e73354d45b417fa95b18d707e52aa2494eed2e6a56dc1ef"
+    },
+    {
+      "path": "contracts/src/OtterSettlement.sol",
+      "sha256": "b8b937f481610d12d59e1036033ffd9ed86ab6786070e3adacbeba4cde00167d"
+    },
+    {
+      "path": "contracts/src/interfaces/IOtterLiquidityGuard.sol",
+      "sha256": "407ceba773ebb344d134676cbf6b8b0b9fa6bffa00e2bcb982e416ebf8aaca31"
+    },
+    {
+      "path": "contracts/test/CrossCheck.t.sol",
+      "sha256": "de30fb9cde0631012ddef87931db4c34dcb2dc313967b9fea501b71663ce3924"
+    },
+    {
+      "path": "contracts/test/CurveSweep.t.sol",
+      "sha256": "c0fa596ff66c05b6364a29492c7d7d02afb68452a5c7cc5713f5f45accb90449"
+    },
+    {
+      "path": "contracts/test/GasCurve.t.sol",
+      "sha256": "ad84372b277754424673022d44190a1b9dba6b80ebd5bf531332fd505306e455"
+    },
+    {
+      "path": "contracts/test/GrantReview.t.sol",
+      "sha256": "6352acb95952298242fe22f96e6a25728664e81d1221f6ad85e9a6c786879cbd"
+    },
+    {
+      "path": "contracts/test/OtterAssets.t.sol",
+      "sha256": "2de1922676b1c01637afc9bcfa5b049864bea0237ef861646dc4309d66d39739"
+    },
+    {
+      "path": "contracts/test/OtterCostGrid.t.sol",
+      "sha256": "8a609aac0c712c04266d39dae1a8eaaae382a3ac9d0441b6870984791d7c71e8"
+    },
+    {
+      "path": "contracts/test/OtterDiscreteMechanism.t.sol",
+      "sha256": "d080413dc935d97c23549c3260c3c06f98ea073d643d91c92e9ff7aff287c379"
+    },
+    {
+      "path": "contracts/test/OtterDonationBounds.t.sol",
+      "sha256": "a58f4aa1eff9f5be530e579f9c6e08b83d50eddbf5d668d87db4ab617ef0747f"
+    },
+    {
+      "path": "contracts/test/OtterEpochIntegration.t.sol",
+      "sha256": "4b2bb8aec40a952dc584307d4841c56f1fd6b0b4dcde5adcdcf46b92df2df59a"
+    },
+    {
+      "path": "contracts/test/OtterEpochs.t.sol",
+      "sha256": "9752b2521c336bcc4c7ac65ec144351f9ba9ca01f35ce170cc1cf8f58af4a37e"
+    },
+    {
+      "path": "contracts/test/OtterExecutionOracle.t.sol",
+      "sha256": "f4842298742b857a8068bf8185e7386f462ffd9191f3d3a1073d134204b48910"
+    },
+    {
+      "path": "contracts/test/OtterExecutionReference.t.sol",
+      "sha256": "d085cc2b6f83707d2f6cdfd2ba23bdae43ac0183d0c4cbdcf7a80fffa004863a"
+    },
+    {
+      "path": "contracts/test/OtterExits.t.sol",
+      "sha256": "3cf0c915b99d7b5f15233e3561897d5c6b49f49edfbe86a44545be9e988189f1"
+    },
+    {
+      "path": "contracts/test/OtterHistoricalRewards.t.sol",
+      "sha256": "c72c5e5b29e4b84c002065526ea3d476ae5f3a80ad32a593a939efcd3e9c4e79"
+    },
+    {
+      "path": "contracts/test/OtterHook.t.sol",
+      "sha256": "7a1f1924f6c79222d18da246b2b4e5b36b06f386b308f2c20097c7145e176dcb"
+    },
+    {
+      "path": "contracts/test/OtterLiquidityVault.t.sol",
+      "sha256": "3d256e51574ceb8130f8afcd60f8490a1e832a7ec8156b53547ad2818dc334d1"
+    },
+    {
+      "path": "contracts/test/OtterLotCandidate.t.sol",
+      "sha256": "8688d8c557dfaa3d0af748720b25db9d1d1ee452e8d66085ee872a33b0184f30"
+    },
+    {
+      "path": "contracts/test/OtterMargin.t.sol",
+      "sha256": "6d2f653169651a21d26d04ee0ae1d2781d0c40e7595fdf7b5887d78cf834d826"
+    },
+    {
+      "path": "contracts/test/OtterMath.t.sol",
+      "sha256": "e835dec973664b86681e1f666f5f05c9ee1e8f05488d304c16d64c0515403aa3"
+    },
+    {
+      "path": "contracts/test/OtterMinimumOutput.t.sol",
+      "sha256": "bb0c8050df77255ac29a52408578c693cdc626d713858b292980163acf0c07e9"
+    },
+    {
+      "path": "contracts/test/OtterNativeSettlement.t.sol",
+      "sha256": "08a541c3cfd208d214912dd0fcdc504d990901276d3896f76df7005c4183234c"
+    },
+    {
+      "path": "contracts/test/OtterOpeningExecution.t.sol",
+      "sha256": "3e0d51d972faead4e74dee39ba6513b1398d54826b98606f4c627581b1e37d07"
+    },
+    {
+      "path": "contracts/test/OtterOrderBook.t.sol",
+      "sha256": "dd940079a873dabcecb1efdc6dcdcad42b3715101c5e3d399db2b740313dae2d"
+    },
+    {
+      "path": "contracts/test/OtterOrderBookView.t.sol",
+      "sha256": "4d1b655f7315e8faf3b33625490d61944e6cab103588911c4c23de0daf1f8cf4"
+    },
+    {
+      "path": "contracts/test/OtterRepresentation.t.sol",
+      "sha256": "17aec4b74cbf7587815a869819f702cfc095d2261508d0d11c1c4354efad75af"
+    },
+    {
+      "path": "contracts/test/OtterRewardComposition.t.sol",
+      "sha256": "0d54d4cafb865d1f3f65a657ee2fe0c75f5481c36d6190aa5b063a165136e308"
+    },
+    {
+      "path": "contracts/test/OtterRewardLedger.t.sol",
+      "sha256": "9fb9e2f659d0893f5b80e80a89d6f5b3a4b2382b7f241c8bd51682d0adea24ad"
+    },
+    {
+      "path": "contracts/test/OtterRewardMath.t.sol",
+      "sha256": "378b4643b71946179d2ed92c577033d4f90e82e20c257569b9477866d3c7e432"
+    },
+    {
+      "path": "contracts/test/OtterSettlement.t.sol",
+      "sha256": "08341d9d2ef8252f276f847081c8ff6c5d67051dd164a7997d980da8dac5b1f9"
+    },
+    {
+      "path": "contracts/test/OtterSettlementSellX.t.sol",
+      "sha256": "462a65e43c5cac2d8812e0d0434f4702fa7bb72d346dd9b0ec90d537c980a32a"
+    },
+    {
+      "path": "contracts/test/OtterSnapshotReader.t.sol",
+      "sha256": "bdbf45923158f950f0fa87ff4eec6554875395134276257f94171e91175b1981"
+    },
+    {
+      "path": "contracts/test/OtterSnapshots.t.sol",
+      "sha256": "7e968fb38f33986ab668d0f106b0f68e4e4f0bca0bc2111aa3664c5e2b476077"
+    },
+    {
+      "path": "contracts/test/OtterSurplusToLPs.t.sol",
+      "sha256": "995fa5c7512ce58db70c623d4f7c2ed884967520c513dc6933fbba587d4492d9"
+    },
+    {
+      "path": "contracts/test/OtterTransferResearch.t.sol",
+      "sha256": "121ad5db84b5be8a33fb13e9feaeeb7046f4e7ddf8646d869da4c5af437806f9"
+    },
+    {
+      "path": "contracts/test/OtterWalletEncoding.t.sol",
+      "sha256": "a4d3f5d30ea1f764bfca01234b5b32044b4c9731934126f204d801eeda807df3"
+    },
+    {
+      "path": "contracts/test/SandwichHarness.t.sol",
+      "sha256": "1e92e1cee79c89628a67d258d106bec0546243739513c1d4409e33e877a06854"
+    },
+    {
+      "path": "contracts/test/SolverEndToEnd.t.sol",
+      "sha256": "0649a9c770c4863dff802529c86854c7c2aac785815a12df7ddb3808714c859b"
+    },
+    {
+      "path": "contracts/test/utils/HookMiner.sol",
+      "sha256": "cfab4aeb13db1409a26a9ad4febd501d57133719d7dff350775e1884f52a5f5b"
+    },
+    {
+      "path": "contracts/test/utils/MockLiquidityGuard.sol",
+      "sha256": "fe9ccecbfc77cd0e947e9cbb1484abd197f9f202b55519cd8ed6206acafbd9ec"
+    },
+    {
+      "path": "contracts/test/utils/OtterExecutionFixture.sol",
+      "sha256": "6b560a8365bce43fc46a1aec271b58bf3eaacff574417a77d3d2e82f92a90143"
+    },
+    {
+      "path": "contracts/test/utils/OtterHookFixture.sol",
+      "sha256": "3c0c9b8b908a170871c0f5e1a6e57dd0a97e5b0e306a29bef4ca65e6320ca4be"
+    },
+    {
+      "path": "contracts/test/utils/OtterTestDeployers.sol",
+      "sha256": "dcb48860d2fbbe6c7086134f140be8debaae5dc4145e515e980e09f7058ea572"
+    },
+    {
+      "path": "fixtures/README.md",
+      "sha256": "1d2dfc111486ef4ea2f0dcecece634599f8c263ea08e730c9cbd7abef77405b3"
+    },
+    {
+      "path": "fixtures/research/cost-grid-research.json",
+      "sha256": "1aa28d1b9fad31b759938daa88d51e47395349c3433765d1a185d119e468ebac"
+    },
+    {
+      "path": "fixtures/research/discrete-counterexamples.json",
+      "sha256": "ad72aeeb2cacec138589a89a9a2a95971b9a6af46d3093cb32f8e2a128e4d66a"
+    },
+    {
+      "path": "fixtures/research/lot-candidate.json",
+      "sha256": "0185635d5d5a2831d2d8b1f4b336f737fcc29538ccdc40d945ed850d2178df87"
+    },
+    {
+      "path": "fixtures/research/redistribution-research.json",
+      "sha256": "2992ffe4339366f15ac84fc062c5a8958eb22c8718e4e234e9526b72937d9b89"
+    },
+    {
+      "path": "fixtures/research/representation-research.json",
+      "sha256": "e7294ffe4e5db61e8833fb0ddc74091f8426ac160b4c3f8e6df52fbce5a81ff5"
+    },
+    {
+      "path": "fixtures/research/reward-composition.json",
+      "sha256": "a33da3c6254c8de9c1e19b66bde88fe83296bd302f3c4ed81c1179969146655f"
+    },
+    {
+      "path": "fixtures/research/transfer-research.json",
+      "sha256": "25edd05086d61d510eacd03a8fb47dfa3b33c4c7703c215268d5c8488c067ad0"
+    },
+    {
+      "path": "reviews/CHECKPOINT_2A.md",
+      "sha256": "d377e8a9815859d1baeb9633e0a24773ac2cd1f7c04395334db3624c59970957"
+    },
+    {
+      "path": "reviews/CHECKPOINT_2B.md",
+      "sha256": "5fa295cdbdb9ef9b9153de063795f21deacf5ba02534528199400327ab0220d6"
+    },
+    {
+      "path": "reviews/CHECKPOINT_3A.md",
+      "sha256": "ac2a9405d1b6a6c72a97a880b498eb242f736fd59a53a0daacf8b8de2c857db8"
+    },
+    {
+      "path": "reviews/CHECKPOINT_3B.md",
+      "sha256": "19f6eee0f0104845f1e3b4ba557bd7147881b4b57b07e8bfda4d771ecc04ca13"
+    },
+    {
+      "path": "reviews/CHECKPOINT_4A.md",
+      "sha256": "7bf2d59a46e7e29973c5f38790f35bf2a32dac816d2c3045e74e47977b410a6c"
+    },
+    {
+      "path": "reviews/CHECKPOINT_4B.md",
+      "sha256": "ac31d5dfd33bcd88960d04f4ea04411bcb49e597b1c55ef63b481fc512e69a08"
+    },
+    {
+      "path": "reviews/CHECKPOINT_4C.md",
+      "sha256": "f070f57bf503045f90321bd9173f919e87613a7428c8bd1dc7827875bbc6bca7"
+    },
+    {
+      "path": "reviews/CHECKPOINT_4D.md",
+      "sha256": "154ac9c38ac4fff1d673c3f014d7794827318e74c92d0b7feb81385175a0471e"
+    },
+    {
+      "path": "reviews/CHECKPOINT_4E.md",
+      "sha256": "b2397d71c34bbcdc0c2b08f03f693f90050d372427dfeb50ad47e6eb2b357fe4"
+    },
+    {
+      "path": "reviews/CHECKPOINT_4F.md",
+      "sha256": "96c2899f4527e50bea09f21bc91c227212ce01cbf59351501b5c7c138c1313b7"
+    },
+    {
+      "path": "reviews/CHECKPOINT_4G.md",
+      "sha256": "7aed9988acd7fd1c299d3398069f2ebcf2f0f5b6dce2d16682da2dc092c7c1bd"
+    },
+    {
+      "path": "reviews/CHECKPOINT_4H.md",
+      "sha256": "486f4ccdec495e36ffb80795af9ed61cda5cce9e999a56e728e9cf029a99930b"
+    },
+    {
+      "path": "reviews/CHECKPOINT_6A.md",
+      "sha256": "1769e2c2040789482628021eb98dbafb1169d0248761c6867ac630983f2c4ee8"
+    },
+    {
+      "path": "reviews/CHECKPOINT_6B.md",
+      "sha256": "7a1a9b16fef47786b292a954240e27ff3e0309cc5ba5c58731f9cd4fd809a12e"
+    },
+    {
+      "path": "reviews/CHECKPOINT_6C.md",
+      "sha256": "457b6a6cc48d8c25bab8f6be7c5255015b964b589960b14c25cbfa9af5d6c04e"
+    },
+    {
+      "path": "reviews/GRANT_READINESS_REVIEW_2026-10-02.md",
+      "sha256": "0731dff8c9e395e31eabff089b48519eb9a49d208c3dd7130696bfa067c83e3a"
+    },
+    {
+      "path": "reviews/ORIGINAL_DOMAIN_REQUIREMENTS.md",
+      "sha256": "b8a96fa6282e623647c58804177dcb0a10cfcfd603296e8b9dc14ccde1a99696"
+    },
+    {
+      "path": "reviews/REDISTRIBUTION_DESIGN.md",
+      "sha256": "0cded9d819161445f5ddd3119d6df8c316aaa186161cb6628e40b3e4b376ae2d"
+    },
+    {
+      "path": "solver/package.json",
+      "sha256": "373b08d264e9f0b9c40a6cd52f049e8a20726ba75e4367270c6c36d7ffb9481a"
+    },
+    {
+      "path": "solver/research/cost-grid-cases.ts",
+      "sha256": "9bab845b17052d0f43883045c2eb727f85b320e1440e6cca1816f8b3d86a5e5a"
+    },
+    {
+      "path": "solver/research/cost-grid-cli.ts",
+      "sha256": "fed888b070cc07f226a125546580480d1b92927d9e62a64f66ccc07d9e08bd4d"
+    },
+    {
+      "path": "solver/research/discrete-cases.ts",
+      "sha256": "245158ae8916579256e95aed2eff409af45dc8b16676e4e23a513d3818facdac"
+    },
+    {
+      "path": "solver/research/discrete-cli.ts",
+      "sha256": "67d91438fb0ddef349b185464030e8679aa3e6cd22cb3307e31226891de911a9"
+    },
+    {
+      "path": "solver/research/lot-cases.ts",
+      "sha256": "0a002813f30a5c0125615da77a5c77eca8bc8984de1995187d349d0a9805306a"
+    },
+    {
+      "path": "solver/research/lot-cli.ts",
+      "sha256": "fe1c3ea6c1c5491e61c85c2341cbc0ec50f40e2059f31536eeb6587c5b28bbec"
+    },
+    {
+      "path": "solver/research/redistribution-cases.ts",
+      "sha256": "b050118084b7a91d9c772f9b0c315bb412da162466f0580c541c3bf7fc2396d4"
+    },
+    {
+      "path": "solver/research/redistribution-cli.ts",
+      "sha256": "ad01b1d5ef97a42caa68ce5d623b668fdca4cae98213f5b2fb87c068bdcd4b99"
+    },
+    {
+      "path": "solver/research/representation-cases.ts",
+      "sha256": "6cbd482c7b0d96606cd47faf4a8ef2cbd48a494f9be1b6cfa472e9266729e7c9"
+    },
+    {
+      "path": "solver/research/representation-cli.ts",
+      "sha256": "881367036178a2937986f3eddff3545415a213339f78922f687f410f43a04b5c"
+    },
+    {
+      "path": "solver/research/reward-composition-cases.ts",
+      "sha256": "d137b306e9857ca2b605c1cea667ce87e36a3744b17250a42ac595ae7dda3c14"
+    },
+    {
+      "path": "solver/research/reward-composition-cli.ts",
+      "sha256": "a3247fe698171748ff724c20c0c6e45f6e89003736c60c776f8e35370711a8e0"
+    },
+    {
+      "path": "solver/research/transfer-cases.ts",
+      "sha256": "960328b70b72cc73770cb7492ce713ca2e77cf22c99963f59bad893c9ffdf8ce"
+    },
+    {
+      "path": "solver/research/transfer-cli.ts",
+      "sha256": "7f4a9fd7badf537a976b27d2cf05fa8fdc8066e2844bc76aefd443293248fb7e"
+    },
+    {
+      "path": "solver/src/cli.ts",
+      "sha256": "75a96217a2dcff58d5daa693191275e07d5303c1f0be64ac8cddc4f1591fb9f9"
+    },
+    {
+      "path": "solver/src/cost-grid-research.ts",
+      "sha256": "f9d4bae8a7435d5e10cfd663567fdfb5624e34ae3476303eefc2a1697097c3bb"
+    },
+    {
+      "path": "solver/src/curve.ts",
+      "sha256": "2ab26718cc87c666c55582778cbff3411e89bcd3d413a4618dc42d008bd5299a"
+    },
+    {
+      "path": "solver/src/demo-cli.ts",
+      "sha256": "41850ca86f0ac4d4bcda58a7c90c0238ca38602e103143cb5f55cd60ba4842ea"
+    },
+    {
+      "path": "solver/src/discrete-research.ts",
+      "sha256": "33c99f76825964442400c21f05d3ff3f898f84bf0a2ff20a7dd4ca0eea211f91"
+    },
+    {
+      "path": "solver/src/exact.ts",
+      "sha256": "0f65dd293db0f2dfaf44c457c487bb56c76f46d8a83690699664df2b629cbc10"
+    },
+    {
+      "path": "solver/src/execution-abi.ts",
+      "sha256": "a5a6656a6f3b86f8696566fd86f698eee11e045973fd273df089dc4a68bbd0d1"
+    },
+    {
+      "path": "solver/src/execution-cli.ts",
+      "sha256": "a9e39db91d4f7ab4fbef7bc7db4908817f94e637b20ef2be01f05fcd2d648dfa"
+    },
+    {
+      "path": "solver/src/execution.ts",
+      "sha256": "57a50dd52744e762dd5a12618a1315bf8639122eba318adbcfa92558a6485240"
+    },
+    {
+      "path": "solver/src/fixed.ts",
+      "sha256": "bf3f8a1e1e69613a0f9b3007bb2863a366955d9f8c39ddbe9d89e0762e805b40"
+    },
+    {
+      "path": "solver/src/lot-candidate.ts",
+      "sha256": "bb192f4184263281c7ab17328bf35d67e1d0586fa7aeb7cd50fa79a6da373224"
+    },
+    {
+      "path": "solver/src/onesided.ts",
+      "sha256": "0f805d2b5ece6faf802598002b6338baa3c768343189e19bc8f9224b3213be7d"
+    },
+    {
+      "path": "solver/src/otter.ts",
+      "sha256": "050f66a07f781756327d8dbb9097f133667326c2458df13e22cbd787502322e2"
+    },
+    {
+      "path": "solver/src/redistribution-research.ts",
+      "sha256": "850fe8de8a4698940cad8c2428e3ee6a2e4ec7024065790dd77197b6305dcf84"
+    },
+    {
+      "path": "solver/src/representation-research.ts",
+      "sha256": "758bee5c5bc93df52025db9beb38bf19dc2eeff09b31e5d4d2da21b87f779e12"
+    },
+    {
+      "path": "solver/src/reward-composition-research.ts",
+      "sha256": "137b053dabb4af7ecb747d8f65e76f932650ceae83548f5b3e268ac3ceb2c6c9"
+    },
+    {
+      "path": "solver/src/rewards-cli.ts",
+      "sha256": "5518debe405ac621f33d451657ff3273f0087f1a9c9a87eb50005a0a59492c3b"
+    },
+    {
+      "path": "solver/src/rewards.ts",
+      "sha256": "5d19adf2896158d7596f2005272867c10d068dc0cd36dc0e5e5363f6419a782f"
+    },
+    {
+      "path": "solver/src/settlement-check-cli.ts",
+      "sha256": "600f43ff33742f52f0ec9167b9c1bc56374e144bfd6b65d83ffb7db37c7357e2"
+    },
+    {
+      "path": "solver/src/settlement-check.ts",
+      "sha256": "7fbfce0c7ff1fe1c0db16563180bc5b1bc159a9f0edf4d9f5c638d41d3f24397"
+    },
+    {
+      "path": "solver/src/transfer-research.ts",
+      "sha256": "130d9e292052d09e9a4e2c21059ffbb3f8927047a9b0482e51deb18f7dcdddd6"
+    },
+    {
+      "path": "solver/test/bench.ts",
+      "sha256": "b0407ec09903f57d72155465d1650e1a56623f36a950ede7b433592189d191b7"
+    },
+    {
+      "path": "solver/test/cost-grid-research.ts",
+      "sha256": "e6ce6bf4beae42c9e8c0df2f20b460b836044b4621e964b9cd6db14deb07cb45"
+    },
+    {
+      "path": "solver/test/discrete-research.ts",
+      "sha256": "8414ee1b7c0740efd3de143ceaf6caf42936bc4a56139bc38bba42bca4335792"
+    },
+    {
+      "path": "solver/test/exact.ts",
+      "sha256": "b2e1db5c85cd8854ff34407fec43f5087ea3f807c862873e2ab23f6924c05cd0"
+    },
+    {
+      "path": "solver/test/execution.ts",
+      "sha256": "a6fb8ef25370389d9941e0857f70124e75513360b971e7f0db2192467573e8bf"
+    },
+    {
+      "path": "solver/test/grant-review.ts",
+      "sha256": "0e818ead6ff80bd458bd668d3d4ddda24e6652201f0923caa29ac74bdb9ff7f1"
+    },
+    {
+      "path": "solver/test/lot-candidate.ts",
+      "sha256": "a648f705c8aff851cf50c0e4dbf9e7b1d79918edc0c01c49bb2429cdea0ea919"
+    },
+    {
+      "path": "solver/test/mutation.ts",
+      "sha256": "11f5dfe2005601c6d59d5e999a1863b91e14f85ca1c90f8438db77451b1eb5b7"
+    },
+    {
+      "path": "solver/test/properties.ts",
+      "sha256": "47a7d523f3f0f8584a0617ad17719fd160d30790dc2a55591520a71c6a7fc25b"
+    },
+    {
+      "path": "solver/test/redistribution-research.ts",
+      "sha256": "8e961fa4019503eac5f6742e06f7e633e699f76e0b4f3427dd746437b7014abd"
+    },
+    {
+      "path": "solver/test/representation-research.ts",
+      "sha256": "725cc25eec999275411efb20bcced77889de5726232560fdc879beb88ee69050"
+    },
+    {
+      "path": "solver/test/reward-composition-research.ts",
+      "sha256": "94f50464620e5dc4c696d5ce3c76de41fe70db4144661bfad0b2d0590bcbcf87"
+    },
+    {
+      "path": "solver/test/rewards.ts",
+      "sha256": "386fd0a720d507b751343874023202ccc380a165695710e0b1c1149990525ca9"
+    },
+    {
+      "path": "solver/test/settlement-check.ts",
+      "sha256": "e40c04ba0f943e291b4405a060b799633db01d6aba837d5c7e6e9232437d8e51"
+    },
+    {
+      "path": "solver/test/transfer-research.ts",
+      "sha256": "edca40d1e927a6029f630ef0686d07a5d51539f0039b8516c704f75249a1f0b8"
+    },
+    {
+      "path": "web/index.html",
+      "sha256": "dc34b38df75acebf3660696724fa73792eefbc7d425fe3048f326c9873f69c9c"
+    },
+    {
+      "path": "web/package.json",
+      "sha256": "6d2494235588b95ada93cd4cd9b866ee16db774aadc7e0b1563e654beb170c92"
+    },
+    {
+      "path": "web/src/App.module.css",
+      "sha256": "d46544b1dd486215445dc5ae7f44f37f100915538d880ab9d12819b66710a33c"
+    },
+    {
+      "path": "web/src/App.tsx",
+      "sha256": "a6e176d3cdf0f9106edd53865014cbda278d2ee02e1513bb2d131e39c8407db8"
+    },
+    {
+      "path": "web/src/components/BatchClock.module.css",
+      "sha256": "5f98fbb11c19fd00cd9e02863f6b9d2a659817de97cd6d84948b0f4e7a1de430"
+    },
+    {
+      "path": "web/src/components/BatchClock.tsx",
+      "sha256": "032ccd644423473a1d6e17e4a3d787f6e132a37ad7233372c0057f37687ef804"
+    },
+    {
+      "path": "web/src/components/DemoStory.module.css",
+      "sha256": "45143eeadb38ce1faaecf2272b114a6bfe098cdec2912e940a513b1f9de9560c"
+    },
+    {
+      "path": "web/src/components/DemoStory.tsx",
+      "sha256": "c56ad3996edfc782ba1f8d31057a3700150e1557a6a200e182996966b178e9da"
+    },
+    {
+      "path": "web/src/components/GasChart.module.css",
+      "sha256": "e70f582daab892bddeb7e9e5d5248eaaca7afad9b341c9dafa1d3bd218c0d46e"
+    },
+    {
+      "path": "web/src/components/GasChart.tsx",
+      "sha256": "2bc20e6723b5a31c47f9110b495c188c8bf89a8508133afa2b681b7f4e0f6632"
+    },
+    {
+      "path": "web/src/components/Header.module.css",
+      "sha256": "8207c02f7eafdf6783e32a3a3c00e2d71de34e1e767a1d1be130f825a5439eac"
+    },
+    {
+      "path": "web/src/components/Header.tsx",
+      "sha256": "3cc22c1412473faaf6d70fce7cb51160e3bb1e559074041b5ee07fdf65b2ead8"
+    },
+    {
+      "path": "web/src/components/HomePage.module.css",
+      "sha256": "084ab2a7656927e99a586a057c5ca396de6b784d17f107f57c89184eaaf87a08"
+    },
+    {
+      "path": "web/src/components/HomePage.tsx",
+      "sha256": "de7aa26e8d246ae737b9eb8673043137c3e7cb49ca68a6fc4a66b80d3f8b18fa"
+    },
+    {
+      "path": "web/src/components/LiquidityExitPanel.tsx",
+      "sha256": "713f56cfb0a592a79b4097a4306393b0cd593040aac1a54afcf6ac0df6f88a2e"
+    },
+    {
+      "path": "web/src/components/OrderComposer.module.css",
+      "sha256": "f1a9f20c127e6beee44daed69a317e339f3e3a8d1c1c02321dc30c51628cfcb7"
+    },
+    {
+      "path": "web/src/components/OrderComposer.tsx",
+      "sha256": "8737bb48a19546d2f323eeb804e55c8e9f5ebb38abcda218c14fd0e7df0c17ed"
+    },
+    {
+      "path": "web/src/components/OrderLedger.module.css",
+      "sha256": "6f4e591672b51a2b59f41559db3d91eb2232352642a3e57981a85d916b9f8cdb"
+    },
+    {
+      "path": "web/src/components/OrderLedger.tsx",
+      "sha256": "16505e9315e0508d5d31a2a5d1582475d49b52f70457f2a312f4518cfbdd42d3"
+    },
+    {
+      "path": "web/src/components/OutcomePanel.module.css",
+      "sha256": "f28ad082e348df9d099bea90ef9bf5e1af44d7366ec4f21ea08e21860c507b40"
+    },
+    {
+      "path": "web/src/components/OutcomePanel.tsx",
+      "sha256": "58d350ab140db9791a8e7c07120b1dde2d08c9c66c6dd102a7b94ad5e5c79e84"
+    },
+    {
+      "path": "web/src/components/ProofRail.module.css",
+      "sha256": "d158e19a2792d7b1a3c7614a33e130e1d981f75e42a4e13ebbb759f0f2c9228b"
+    },
+    {
+      "path": "web/src/components/ProofRail.tsx",
+      "sha256": "57e6ebda7424527efb4938e591d2172100dba4d256d5640e08a2a24b8840d396"
+    },
+    {
+      "path": "web/src/components/RecoveryPanel.tsx",
+      "sha256": "65fd663c30eddebe27bdfeb40719b3940fac8fbb241b37b5c87c22a4b6342039"
+    },
+    {
+      "path": "web/src/components/SandwichViz.module.css",
+      "sha256": "c9e6febf5d00a0fb528cc1b98b52d185b10776f43e9fb8b1577660eb7b398ae4"
+    },
+    {
+      "path": "web/src/components/SandwichViz.tsx",
+      "sha256": "a2107f62562c2eb5f50549bcc832fa1435f2f21677cdb5dd5467c2bddf8aa0b3"
+    },
+    {
+      "path": "web/src/components/SepoliaStatus.module.css",
+      "sha256": "07914c50e78a7e9e8cb5254ebf93b012c3324e665714ca462e2876dffd06b0c3"
+    },
+    {
+      "path": "web/src/components/SepoliaStatus.tsx",
+      "sha256": "7a9e52bd91616ab3429e3e1e71c93226ed2618a223fb95fac209fe703d6cf7aa"
+    },
+    {
+      "path": "web/src/components/TransactionHistoryPanel.tsx",
+      "sha256": "39ebf4398857b414e66b886bccca7b200f7f8824bd93bc7f497ee516ce91d22e"
+    },
+    {
+      "path": "web/src/config/contracts.ts",
+      "sha256": "18c4af917c97cce83b0a2aa5593d57181874b3950eba79378ea1d8d46df50184"
+    },
+    {
+      "path": "web/src/config/deployment.json",
+      "sha256": "356672a6d114811ae5220e0092f6caeb522f7df5fc8b5e8ccdc849b0d1caaa86"
+    },
+    {
+      "path": "web/src/config/deployment.ts",
+      "sha256": "def33594f4472e7df899e5938b33bf5411716da379cd7b8b3ffea5752592aaf1"
+    },
+    {
+      "path": "web/src/config/wagmi.ts",
+      "sha256": "2431a9acc86e8626f5db5910b250e5eb47e0f81b65da661f211d812d81ec4c9e"
+    },
+    {
+      "path": "web/src/data/demoBatch.ts",
+      "sha256": "446f6ea7034db461ee2318af086ad6a6aec1befd62f5fa07d251b574ede9452c"
+    },
+    {
+      "path": "web/src/data/gasCurve.ts",
+      "sha256": "346ee5d54a9858a58bdbd87ef89b3d4cb6ba4c51368e58b61c436092f43ef70d"
+    },
+    {
+      "path": "web/src/data/sandwich.ts",
+      "sha256": "49547a283f3185580bdc419bf0b6032ab2afb76736bda7a6c7190f0ebe3be5d0"
+    },
+    {
+      "path": "web/src/hooks/useBatchStatus.ts",
+      "sha256": "a5ccae9a099fee1ecbf710bbf52be9524a70c9b04a5ad849fe029470fa349c81"
+    },
+    {
+      "path": "web/src/hooks/useDemoStory.ts",
+      "sha256": "62c369bff0ce589dcde638e81ba1f5be9571671dafb3b5facdeafb319691918e"
+    },
+    {
+      "path": "web/src/hooks/useSubmitOrder.ts",
+      "sha256": "76542e4384e3da68a23df2c7fcd50684e04cc465e2d297314dabfb1e154c980d"
+    },
+    {
+      "path": "web/src/hooks/useWalletActions.ts",
+      "sha256": "0c0c4762e0195f02016aa6300ddc00155ef449a2dfb4ac9f0063bd391b13648d"
+    },
+    {
+      "path": "web/src/main.tsx",
+      "sha256": "f03d6857192a1d70c40cda58bf08f0a21fdbaf5bb6d3a09e9b10f80cd581dafc"
+    },
+    {
+      "path": "web/src/protocol/abi.ts",
+      "sha256": "1d0745da6c591f2169cb4ac3d8229c59fb90082aca1add0218e91aeb8770cfae"
+    },
+    {
+      "path": "web/src/protocol/batchCoverage.ts",
+      "sha256": "499f913801f007beb7c7845cc517bada106da61e273dfacac4ae32e557a8725b"
+    },
+    {
+      "path": "web/src/protocol/boundResearch.ts",
+      "sha256": "e317e277aaec19bad0998e2e01154173a7fe5a15eafd3578cdf3b7bc06db67ce"
+    },
+    {
+      "path": "web/src/protocol/client.ts",
+      "sha256": "be2c5a9282b837cf3b05a0ec4c5f4d275be2af5d9f1594c4b42d08502e0291aa"
+    },
+    {
+      "path": "web/src/protocol/deployment.ts",
+      "sha256": "e4ad8a13e851abbe9efc09ef0a017b00b01d89a9926966716f83cf1979998dab"
+    },
+    {
+      "path": "web/src/protocol/epochBatch.ts",
+      "sha256": "43fa442598002ab85cd58e7abd3dcdd024c8893047ccfdd69d2b495b27fde4af"
+    },
+    {
+      "path": "web/src/protocol/epochSnapshot.ts",
+      "sha256": "99565938059fb4abc9ce89d9a71e05bb55847e416cdf0e55d3c55020f846cb67"
+    },
+    {
+      "path": "web/src/protocol/executionSnapshot.ts",
+      "sha256": "3a0cd2eb33a6ea837c0edd21df09e8095699c1eee5a0eee7a6a9fe26f8e90417"
+    },
+    {
+      "path": "web/src/protocol/inspectTransaction.ts",
+      "sha256": "a3ff147d892aef1d26d7d1ff16c11d9b22771be07ad6b3965c4cca41e1f7f79a"
+    },
+    {
+      "path": "web/src/protocol/minimumFeasibility.ts",
+      "sha256": "861bf6e8c1dbd8478de47576d6cf1311c7cfe2a1174392bee1b7e83cd9d9f6af"
+    },
+    {
+      "path": "web/src/protocol/openingExecution.ts",
+      "sha256": "76d439385eeccb389737d62abe55bc1c96eef37422f207f099bfe4b657b2772d"
+    },
+    {
+      "path": "web/src/protocol/orders.ts",
+      "sha256": "b3a5accf990a10bca2eeac11a74d168baf822896f2c046049e7754164e556bb9"
+    },
+    {
+      "path": "web/src/protocol/reportMenu.ts",
+      "sha256": "5505be34c9688c880fcc679ac996d06783afb697f664970f73cc1a2e24472979"
+    },
+    {
+      "path": "web/src/protocol/transactionJournal.ts",
+      "sha256": "03f39d2c876d35f093f0b01625fc05ee5ae2aed014a8fdc798b7affddb1e428b"
+    },
+    {
+      "path": "web/src/protocol/viemTransport.ts",
+      "sha256": "8ac00e12974038c771a2e214d04f4433ef231262f6f77402544a41f1387beec1"
+    },
+    {
+      "path": "web/src/protocol/walletJournal.ts",
+      "sha256": "9a923fadb4c22c5c7126410925d8aa997a773a3a53b4ed0c07f29f2c501899ee"
+    },
+    {
+      "path": "web/src/styles/animations.css",
+      "sha256": "2e5a558c43eeeb7a67d2a4bc3e7af9bbaaaf69f9b13898ef0495e11fa6587ef7"
+    },
+    {
+      "path": "web/src/styles/theme.css",
+      "sha256": "e442e8b0944a6760bbb0ed03905b17cb7dfd9edd1727d3ce4f18dfa12bb55ada"
+    },
+    {
+      "path": "web/src/vite-env.d.ts",
+      "sha256": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
+    },
+    {
+      "path": "web/test/batchCoverage.test.ts",
+      "sha256": "a56346e7328e20a75bd1e339449392bc7fc768efad67f5ecd2c3cd21e3b38def"
+    },
+    {
+      "path": "web/test/boundResearch.test.ts",
+      "sha256": "4cec2e2291b388a2dc8a90672b6fe405e36362d6cd4b4e4448410df240c4b1b3"
+    },
+    {
+      "path": "web/test/epoch-batch-fixture.ts",
+      "sha256": "9209aa3c5072ad0f3044c2eabf46d0e2dfb97f0123e3ece1afaefbce33268bd6"
+    },
+    {
+      "path": "web/test/epoch-snapshot-cli.ts",
+      "sha256": "efd65d08b6165841175f2de1577052c00692b7128c3fe29bd60958e5f001b327"
+    },
+    {
+      "path": "web/test/epochBatch.test.ts",
+      "sha256": "e7e83856a503ace2f21ff10bda031ecf9cdcb10989c0f7263c1abfea82a40974"
+    },
+    {
+      "path": "web/test/epochSnapshot.test.ts",
+      "sha256": "87af08aba9439c012dd28d0b28cfcc31de658343ae9e4e1f5cf79ea97acacbb3"
+    },
+    {
+      "path": "web/test/executionSnapshot.test.ts",
+      "sha256": "a08995f338a63a2dfa03dd1cd4e9b2f84f560686486347923508638aa6afbb15"
+    },
+    {
+      "path": "web/test/hash-order.ts",
+      "sha256": "fb371cf13e875933b3f66237d1b193005fd6a4f2075795bfdb79789a565b0795"
+    },
+    {
+      "path": "web/test/minimumFeasibility.test.ts",
+      "sha256": "e2950930dba1f7979e3e77dbbef3b4dabe5241aaeff9df774a333d638c62c3a4"
+    },
+    {
+      "path": "web/test/opening-execution-cli.ts",
+      "sha256": "1d5270c8a756d8042b97dbc2f959f3944f254f4dee3773bec4ff6a2bc594a506"
+    },
+    {
+      "path": "web/test/openingExecution.test.ts",
+      "sha256": "b19ebaa6e324c4b0537fdd2738324cfefa082ab6780c6b3fbe02f96ac15caab1"
+    },
+    {
+      "path": "web/test/protocol.test.ts",
+      "sha256": "18a99844073cf7afc4ca5db135be65a0173d643a6965b9e557cdc4276d521002"
+    },
+    {
+      "path": "web/test/reportMenu.test.ts",
+      "sha256": "a5229de646ff001b599f40e6ae371d89b2dbbb476e4589dbd3e9610322ae082f"
+    },
+    {
+      "path": "web/test/snapshot-reader-cli.ts",
+      "sha256": "547e91a2a99ffc25788d085eeca116e39d7478a09dad1cd977a7e41b5460002b"
+    },
+    {
+      "path": "web/tsconfig.json",
+      "sha256": "1e3318d00f882d629b7dbb47eda96c2c8dd849c56ba7e1911c9cdac2c04eef9f"
+    },
+    {
+      "path": "web/tsconfig.node.json",
+      "sha256": "bb9fd8592a9e364641441219f10d84daae9ba2ca5cc85db798efad6913bb8257"
+    },
+    {
+      "path": "web/vite.config.ts",
+      "sha256": "8e0dbec54504aa883543762ce47cc8bfed12a6cb171ec5a9c08a16effd80136f"
+    },
+    {
+      "path": "web/yarn.lock",
+      "sha256": "452b3470a28fb702cc1aa621a81786da9cc3466927594a042b4a7ecd1fce00df"
+    }
+  ],
+  "checkpoint": "4L local exhaustive small execution prefixes at one shared block; pending user-created commit",
+  "validationScope": "Fresh 75 mocked wallet/reader/curve groups, TypeScript/production build and 16 local-core reader tests with 64 exhaustive-curve and 64 existing single-quote fuzz cases. Every curve point independently starts from opening state. RPC/block metadata synthetic; numerical solver, production Solidity and mechanism unchanged. No fresh broad solver/contracts/benchmarks, real provider, wallet/testnet or independent proof/audit."
+}

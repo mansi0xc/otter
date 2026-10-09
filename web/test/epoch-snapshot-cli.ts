@@ -7,6 +7,7 @@ import type { Order } from '../src/protocol/orders.ts'
 import { inspectOpeningPrefixCoverage, COVERAGE_CASE_COMPONENTS } from '../src/protocol/batchCoverage.ts'
 import { researchBoundOneSidedBatch, RESEARCH_RESULT_COMPONENTS } from '../src/protocol/boundResearch.ts'
 import { inspectSignedMinimumFeasibility, MINIMUM_RESULT_COMPONENTS } from '../src/protocol/minimumFeasibility.ts'
+import { inspectBoundAskResponses, MENU_RESULT_COMPONENTS } from '../src/protocol/reportMenu.ts'
 import { POOL_KEY_COMPONENTS, EXTSLOAD_ABI, type SnapshotRpc } from '../src/protocol/executionSnapshot.ts'
 const fingerprint = [{ name: 'address', type: 'address' }, { name: 'runtimeHash', type: 'bytes32' }] as const
 const sourceComponents = [{ name: 'chainId', type: 'uint256' }, { name: 'configVersion', type: 'uint256' },
@@ -29,9 +30,49 @@ const outputAbi = [
   ...Array.from({ length: 4 }, () => ({ type: 'uint256' })),
   { type: 'bytes32' }, { type: 'address' }, { type: 'uint256' },
 ] as const
+function decodeFixture(payload: Hex) { return decodeAbiParameters(fixtureAbi, payload)[0] }
+async function captureFixture(f: ReturnType<typeof decodeFixture>, batch: boolean) {
+  if (encodeAbiParameters(fixtureAbi, [f]).length > 500000 || f.codes.length !== 5
+    || (!batch ? f.replies.length !== 36 : f.replies.length < 36 || f.replies.length > 110)
+    || f.slots.length !== f.values.length || f.slots.length > 36) throw new Error('Noncanonical epoch capture fixture.')
+  const s = f.source as EpochSource, storage = new Map<Hash, Hash>(), replies = new Map<string, typeof f.replies[number]>()
+  f.slots.forEach((slot, i) => { if (storage.has(slot)) throw new Error('Duplicate epoch core slot.'); storage.set(slot, f.values[i]) })
+  for (const r of f.replies) { const key = `${r.target.toLowerCase()}/${r.data.toLowerCase()}`; if (replies.has(key)) throw new Error('Duplicate epoch reply.'); replies.set(key, r) }
+  const rpc: BatchRpc = async (method, params) => {
+    if (method === 'eth_chainId') return `0x${s.chainId.toString(16)}`
+    if (method === 'eth_getBlockByNumber') {
+      if (params[0] !== `0x${f.blockNumber.toString(16)}` || params[1] !== false) throw new Error('Unpinned epoch block query.')
+      return { number: params[0], hash: f.blockHash, timestamp: `0x${f.timestamp.toString(16)}` }
+    }
+    const selector = params[1] as { blockHash: Hash; requireCanonical: boolean }
+    if (selector.blockHash !== f.blockHash || selector.requireCanonical !== true) throw new Error('Unpinned epoch state query.')
+    if (method === 'eth_getBalance') {
+      if (String(params[0]).toLowerCase() !== s.contracts.book.address.toLowerCase()) throw new Error('Wrong native balance target.')
+      return `0x${f.nativeBalance.toString(16)}`
+    }
+    if (method === 'eth_getCode') {
+      const i = EPOCH_TARGETS.findIndex(t => s.contracts[t].address.toLowerCase() === String(params[0]).toLowerCase())
+      if (i < 0) throw new Error('Wrong epoch code target.')
+      return f.codes[i]
+    }
+    const c = params[0] as { to: string; data: Hex }
+    if (c.to.toLowerCase() === s.contracts.manager.address.toLowerCase()) {
+      const slot = decodeFunctionData({ abi: EXTSLOAD_ABI, data: c.data }).args[0], value = storage.get(slot)
+      if (value === undefined) throw new Error('Required epoch core slot was not exported.')
+      return value
+    }
+    const r = replies.get(`${c.to.toLowerCase()}/${c.data.toLowerCase()}`)
+    if (!r || !r.ok) throw new Error('Epoch staticcall reverted or was not exported.')
+    return r.result
+  }
+  const request = { epoch: f.epoch as bigint, caller: f.caller, blockNumber: f.blockNumber as bigint,
+    domains: [{ down: true, maxInput: f.cap as bigint, limit: f.downLimit }, { down: false, maxInput: f.cap as bigint, limit: f.upLimit }] }
+  return batch ? await captureEpochBatch(rpc, s, request) : await captureEpochExecution(rpc, s, request)
+}
+const menuAbi = [{ type: 'uint8' }, { type: 'tuple[]', components: fixtureAbi[0].components }] as const
 try {
   const mode = process.argv[2], payload = process.argv[3]
-  if (process.argv.length !== 4 || !['--reads', '--capture', '--batch-reads', '--batch', '--coverage', '--research', '--minimum'].includes(mode) || !payload || payload.length > 500000 || !/^0x(?:[0-9a-fA-F]{2})+$/.test(payload)) throw new Error('Expected one bounded epoch fixture and mode.')
+  if (process.argv.length !== 4 || !['--reads', '--capture', '--batch-reads', '--batch', '--coverage', '--research', '--minimum', '--menu'].includes(mode) || !payload || payload.length > (mode === '--menu' ? 8000000 : 500000) || !/^0x(?:[0-9a-fA-F]{2})+$/.test(payload)) throw new Error('Expected one bounded epoch fixture and mode.')
   if (mode === '--reads') {
     const [source, epoch] = decodeAbiParameters(planAbi, payload as Hex)
     if (encodeAbiParameters(planAbi, [source, epoch]).toLowerCase() !== payload.toLowerCase()) throw new Error('Noncanonical epoch read plan.')
@@ -40,44 +81,25 @@ try {
     const [source, epoch, orders] = decodeAbiParameters(batchPlanAbi, payload as Hex)
     if (encodeAbiParameters(batchPlanAbi, [source, epoch, orders]).toLowerCase() !== payload.toLowerCase()) throw new Error('Noncanonical stored batch read plan.')
     process.stdout.write(encodeAbiParameters([{ type: 'tuple[]', components: readComponents }], [storedBatchReads(source as EpochSource, epoch as bigint, orders as Order[])]))
+  } else if (mode === '--menu') {
+    if (payload.length < 194 || BigInt(`0x${payload.slice(66, 130)}`) !== 64n
+      || BigInt(`0x${payload.slice(130, 194)}`) < 1n || BigInt(`0x${payload.slice(130, 194)}`) > 16n) throw new Error('Bounded canonical report-menu array required.')
+    const [targetIndex, fixtures] = decodeAbiParameters(menuAbi, payload as Hex)
+    if (encodeAbiParameters(menuAbi, [targetIndex, fixtures]).toLowerCase() !== payload.toLowerCase()) throw new Error('Noncanonical report-menu fixture.')
+    const profiles = []
+    for (const f of fixtures) {
+      const captured = await captureFixture(f, true)
+      if (!('batchBinding' in captured)) throw new Error('Report-menu capture requires a complete stored batch.')
+      profiles.push({ anchor: captured.batchBinding, record: captured.record, frame: captured.frame, orders: captured.orders })
+    }
+    const menu = inspectBoundAskResponses(profiles, targetIndex)
+    process.stdout.write(encodeAbiParameters([{ type: 'bytes32' }, { type: 'tuple', components: MENU_RESULT_COMPONENTS }], [menu.menuHash, menu]))
   } else {
     const [f] = decodeAbiParameters(fixtureAbi, payload as Hex)
     if (encodeAbiParameters(fixtureAbi, [f]).toLowerCase() !== payload.toLowerCase() || f.codes.length !== 5
       || (mode === '--capture' ? f.replies.length !== 36 : f.replies.length < 36 || f.replies.length > 110)
       || f.slots.length !== f.values.length || f.slots.length > 36) throw new Error('Noncanonical epoch capture fixture.')
-    const s = f.source as EpochSource, storage = new Map<Hash, Hash>(), replies = new Map<string, typeof f.replies[number]>()
-    f.slots.forEach((slot, i) => { if (storage.has(slot)) throw new Error('Duplicate epoch core slot.'); storage.set(slot, f.values[i]) })
-    for (const r of f.replies) { const key = `${r.target.toLowerCase()}/${r.data.toLowerCase()}`; if (replies.has(key)) throw new Error('Duplicate epoch reply.'); replies.set(key, r) }
-    const rpc: BatchRpc = async (method, params) => {
-      if (method === 'eth_chainId') return `0x${s.chainId.toString(16)}`
-      if (method === 'eth_getBlockByNumber') {
-        if (params[0] !== `0x${f.blockNumber.toString(16)}` || params[1] !== false) throw new Error('Unpinned epoch block query.')
-        return { number: params[0], hash: f.blockHash, timestamp: `0x${f.timestamp.toString(16)}` }
-      }
-      const selector = params[1] as { blockHash: Hash; requireCanonical: boolean }
-      if (selector.blockHash !== f.blockHash || selector.requireCanonical !== true) throw new Error('Unpinned epoch state query.')
-      if (method === 'eth_getBalance') {
-        if (String(params[0]).toLowerCase() !== s.contracts.book.address.toLowerCase()) throw new Error('Wrong native balance target.')
-        return `0x${f.nativeBalance.toString(16)}`
-      }
-      if (method === 'eth_getCode') {
-        const i = EPOCH_TARGETS.findIndex(t => s.contracts[t].address.toLowerCase() === String(params[0]).toLowerCase())
-        if (i < 0) throw new Error('Wrong epoch code target.')
-        return f.codes[i]
-      }
-      const c = params[0] as { to: string; data: Hex }
-      if (c.to.toLowerCase() === s.contracts.manager.address.toLowerCase()) {
-        const slot = decodeFunctionData({ abi: EXTSLOAD_ABI, data: c.data }).args[0], value = storage.get(slot)
-        if (value === undefined) throw new Error('Required epoch core slot was not exported.')
-        return value
-      }
-      const r = replies.get(`${c.to.toLowerCase()}/${c.data.toLowerCase()}`)
-      if (!r || !r.ok) throw new Error('Epoch staticcall reverted or was not exported.')
-      return r.result
-    }
-    const request = { epoch: f.epoch as bigint, caller: f.caller, blockNumber: f.blockNumber as bigint,
-      domains: [{ down: true, maxInput: f.cap as bigint, limit: f.downLimit }, { down: false, maxInput: f.cap as bigint, limit: f.upLimit }] }
-    const result = ['--batch', '--coverage', '--research', '--minimum'].includes(mode) ? await captureEpochBatch(rpc, s, request) : await captureEpochExecution(rpc, s, request)
+    const result = await captureFixture(f, ['--batch', '--coverage', '--research', '--minimum'].includes(mode))
     const b = result.binding, e = result.eligibility
     const values = [b.positionsHash, b.weightsHash, b.snapshotHash, b.curvesHash,
       BigInt(b.pointCount), e.blockTimestamp, BigInt(e.count), result.record.executeUntil, e.batchDigest, e.solver, e.exclusiveUntil]

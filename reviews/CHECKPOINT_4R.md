@@ -2,7 +2,7 @@
 
 Prepared 7 October 2026. Starting commit:
 `ff2718d2d09330176267d41954b1c27f51c97a37`. The working tree was clean.
-Status: **local minimum frontiers verified; waiting for the user's commit**.
+Status: **committed by the user as `b25bea017f07b37f9a64b24912dc825ebbeb3dec`; the tree was clean before 4S**.
 
 ## Outcome
 
